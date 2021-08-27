@@ -1,14 +1,5 @@
 var N = null;var sourcesIndex = {};
-sourcesIndex["custom_job_state"] = {"name":"","files":["custom_job_state.rs"]};
 sourcesIndex["etl_core"] = {"name":"","dirs":[{"name":"datastore","files":["fs.rs","job_runner.rs","mock.rs","mod.rs"]},{"name":"job","files":["command.rs","handler.rs","state.rs"]},{"name":"utils","files":["log.rs"]}],"files":["job.rs","job_manager.rs","joins.rs","lib.rs","transformer.rs","utils.rs"]};
 sourcesIndex["etl_mysql"] = {"name":"","files":["datastore.rs","lib.rs"]};
 sourcesIndex["etl_s3"] = {"name":"","files":["datastore.rs","lib.rs"]};
-sourcesIndex["etl_sftp"] = {"name":"","files":["lib.rs"]};
-sourcesIndex["job_pipe"] = {"name":"","files":["job_pipe.rs"]};
-sourcesIndex["mysql"] = {"name":"","files":["mysql.rs"]};
-sourcesIndex["s3"] = {"name":"","files":["s3.rs"]};
-sourcesIndex["simple_join"] = {"name":"","files":["simple_join.rs"]};
-sourcesIndex["simple_pipeline"] = {"name":"","files":["simple_pipeline.rs"]};
-sourcesIndex["test_connection"] = {"name":"","files":["test-connection.rs"]};
-sourcesIndex["transform"] = {"name":"","files":["transform.rs"]};
 createSourceSidebar();
