@@ -1,1 +1,0 @@
-{"rustc":17807758859236181817,"features":"[]","target":9175594324475254816,"profile":835532629594041745,"path":1672456868040718388,"deps":[[3889717946063921280,"num_traits",false,12558676649140053555]],"local":[{"CheckDepInfo":{"dep_info":"release/.fingerprint/atoi-8f87a88e19d7954d/dep-lib-atoi"}}],"rustflags":[],"metadata":15298485667598931404,"config":0,"compile_kind":0}

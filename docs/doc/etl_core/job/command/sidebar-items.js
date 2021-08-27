@@ -1,1 +1,0 @@
-initSidebarItems({"enum":[["JobCommandStatus",""]],"struct":[["SimpleCommand",""]],"trait":[["JobCommand","Designed for situations where you need to execute a single action like sql queries, cleanup, or any other side effect"]]});

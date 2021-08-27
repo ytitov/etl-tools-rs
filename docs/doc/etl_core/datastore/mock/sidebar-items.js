@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["MockJsonDataOutput","Designed as a “null” datastore target.  Items received are not written anywhere"],["MockJsonDataSource","Used for testing, simply provide the json strings and this data store will stream them"]]});

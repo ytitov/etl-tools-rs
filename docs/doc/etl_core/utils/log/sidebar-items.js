@@ -1,1 +1,0 @@
-initSidebarItems({"enum":[["LogEntryType",""]],"fn":[["log_err",""],["log_info",""]],"struct":[["LogEntry",""]],"type":[["LogMessage",""]]});

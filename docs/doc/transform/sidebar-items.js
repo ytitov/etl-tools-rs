@@ -1,1 +1,0 @@
-initSidebarItems({"fn":[["create_mock_data_source",""],["main",""]],"struct":[["Args",""],["Info","Output data"],["TestJob",""],["TestJobState",""],["TestSourceData","Starting data"]]});
