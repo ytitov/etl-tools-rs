@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Message",""],["NotifyDataSource",""],["NotifyJob",""],["NotifyJobManager",""],["NotifyJobRunner",""]],"struct":[["JobManager",""],["JobManagerChannel",""],["JobManagerConfig",""]],"type":[["JobManagerRx",""],["JobManagerTx",""]]});

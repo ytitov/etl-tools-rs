@@ -1,0 +1,17 @@
+###########################################################################
+# libssh2 installation details
+###########################################################################
+
+prefix=/home/yuri/workspace/rust/etl-tools/docs/release/build/libssh2-sys-f2561b306a1e8a5a/out
+exec_prefix=
+libdir=/home/yuri/workspace/rust/etl-tools/docs/release/build/libssh2-sys-f2561b306a1e8a5a/out/lib
+includedir=/home/yuri/workspace/rust/etl-tools/docs/release/build/libssh2-sys-f2561b306a1e8a5a/out/include
+
+Name: libssh2
+URL: https://www.libssh2.org/
+Description: Library for SSH-based communication
+Version: 1.9.0_DEV
+Requires.private: 
+Libs: -L${libdir} -lssh2 
+Libs.private: 
+Cflags: -I${includedir}
