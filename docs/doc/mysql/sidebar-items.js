@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["main",""]],"static":[["CREATE_TABLE",""]],"struct":[["Args",""],["Config",""],["Info","One of the outputs"],["TestJob",""]]});
