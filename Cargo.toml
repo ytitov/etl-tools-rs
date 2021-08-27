@@ -1,0 +1,9 @@
+[workspace]
+
+members = [
+    "etl-core",
+		"etl-mysql",
+		"etl-s3",
+		"etl-sftp",
+		"etl-examples",
+]

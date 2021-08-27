@@ -1,0 +1,16 @@
+[package]
+name = "etl-mysql"
+version = "0.1.0"
+authors = ["Yuri Titov <ytitov@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+etl-core = { path = "../etl-core" }
+sqlx = { version = "0.5", features = [ "mysql", "runtime-tokio-native-tls", "bigdecimal" ] }
+#csv = "1.1"
+#aws stuff
+#bytes = "1"
+
+serde = { version = "1.0", features = ["derive"] }

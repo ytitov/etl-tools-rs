@@ -1,0 +1,18 @@
+[package]
+name = "etl-s3"
+version = "0.1.0"
+authors = ["Yuri Titov <ytitov@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+etl-core = { path = "../etl-core" }
+csv = "1.1"
+#aws stuff
+rusoto_core = "0.47.0"
+#rusoto_athena = "0.47.0"
+rusoto_s3 = "0.47.0"
+rusoto_credential = "0.47.0"
+bytes = "1"
+

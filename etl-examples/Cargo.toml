@@ -1,0 +1,44 @@
+[package]
+name = "etl-examples"
+version = "0.1.0"
+authors = ["Yuri Titov <ytitov@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+etl-core = { path = "../etl-core" }
+etl-s3 = { path = "../etl-s3" }
+etl-mysql = { path = "../etl-mysql" }
+
+rusoto_core = "0.47.0"
+clap = { version = "3.0.0-beta.2" }
+serde = { version = "1.0", features = ["derive"] }
+
+[[bin]]
+name = "s3"
+path = "src/s3.rs"
+
+[[bin]]
+name = "mysql"
+path = "src/mysql.rs"
+
+[[bin]]
+name = "custom_job_state"
+path = "src/custom_job_state.rs"
+
+[[bin]]
+name = "transform"
+path = "src/transform.rs"
+
+[[bin]]
+name = "job_pipe"
+path = "src/job_pipe.rs"
+
+[[bin]]
+name = "simple_pipeline"
+path = "src/simple_pipeline.rs"
+
+[[bin]]
+name = "simple_join"
+path = "src/simple_join.rs"
