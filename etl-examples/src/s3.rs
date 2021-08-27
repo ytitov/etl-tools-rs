@@ -140,7 +140,8 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let jr = JobRunner::new("jr1", "s3", jm_channel.clone(), JobRunnerConfig::default());
-    jr.run(Box::new(s3_json_ds), Box::new(testjob)).await?;
+    jr.run_stream_handler(Box::new(s3_json_ds), Box::new(testjob))
+        .await?;
 
     // this is the resulting file from the previous job.
     let s3_csv_ds = S3DataSource {
@@ -159,7 +160,7 @@ async fn main() -> anyhow::Result<()> {
         .await?,
     };
     let jr = JobRunner::new("jr2", "s3", jm_channel, JobRunnerConfig::default());
-    jr.run(Box::new(s3_csv_ds), Box::new(testjob2))
+    jr.run_stream_handler(Box::new(s3_csv_ds), Box::new(testjob2))
         .await?
         .complete()?;
 

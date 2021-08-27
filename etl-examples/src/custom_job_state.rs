@@ -140,7 +140,7 @@ async fn main() -> anyhow::Result<()> {
         },
     );
 
-    jr.run(Box::new(create_mock_data_source()), Box::new(testjob))
+    jr.run_stream_handler(Box::new(create_mock_data_source()), Box::new(testjob))
         .await?
         .complete()?;
 

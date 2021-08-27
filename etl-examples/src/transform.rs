@@ -127,7 +127,7 @@ async fn main() -> anyhow::Result<()> {
         },
     );
 
-    jr.run(Box::new(transformer), Box::new(testjob))
+    jr.run_stream_handler(Box::new(transformer), Box::new(testjob))
         .await?
         .complete()?;
 

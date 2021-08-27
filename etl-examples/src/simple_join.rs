@@ -144,7 +144,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // write the transformed_ds into a mock json output
-    jr.run_data_output(
+    jr.run_stream(
         "test-join",
         Box::new(join)
             as Box<dyn DataSource<(LeftTestData, Option<RightTestData>)> + Send + Sync>,

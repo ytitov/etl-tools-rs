@@ -38,7 +38,7 @@ async fn test_simple_pipeline() {
         )
         .expect("Error creating transformed_ds");
     let jr = jr
-        .run_data_output(
+        .run_stream(
             "transformed-ds-1",
             Box::new(transformed_ds) as Box<dyn DataSource<TestOutputData> + Send + Sync>,
             Box::new(MockJsonDataOutput::default()),
@@ -53,7 +53,6 @@ async fn test_simple_pipeline() {
     jm_handle
         .await
         .expect("Error awaiting on job manager handle");
-    assert!(true);
 }
 
 pub struct TestTransformer;

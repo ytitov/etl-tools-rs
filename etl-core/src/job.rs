@@ -197,7 +197,7 @@ impl JobRunner {
 
     /// Same as run except this takes a DataSource and a DataOutput and
     /// moves the data from one to the other.
-    pub async fn run_data_output<T>(
+    pub async fn run_stream<T>(
         mut self,
         stream_name: &str,
         input: Box<dyn DataSource<T>>,
@@ -296,7 +296,7 @@ impl JobRunner {
     /// This method gives a lot of flexibility in what you can execute
     /// during the execute (like external apis).  During the init, and
     /// shutdown step give extra options.  See the relevant docs on that
-    pub async fn run<I>(
+    pub async fn run_stream_handler<I>(
         mut self,
         ds: Box<dyn DataSource<I> + Send + Sync>,
         mut job_handler: Box<dyn StreamHandler<I> + Send + Sync>,

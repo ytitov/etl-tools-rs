@@ -164,7 +164,7 @@ async fn main() -> anyhow::Result<()> {
         region: Region::UsEast1,
     };
     let job = JobRunner::new("test", "mysql", jm_channel, JobRunnerConfig::default());
-    job.run::<serde_json::Value>(Box::new(fs_ds), Box::new(testjob))
+    job.run_stream_handler::<serde_json::Value>(Box::new(fs_ds), Box::new(testjob))
         .await?
         .complete()?;
 

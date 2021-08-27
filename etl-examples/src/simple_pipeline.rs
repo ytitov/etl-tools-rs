@@ -134,7 +134,7 @@ async fn main() -> anyhow::Result<()> {
 
     // write the transformed_ds into a mock json output
     let jr = jr
-        .run_data_output(
+        .run_stream(
             "transformed-ds-1",
             Box::new(transformed_ds) as Box<dyn DataSource<TestOutputData> + Send + Sync>,
             Box::new(MockJsonDataOutput::default()),
@@ -149,7 +149,7 @@ async fn main() -> anyhow::Result<()> {
         Box::new(TestTransformer {}),
     )?;
     let jr = jr
-        .run_data_output(
+        .run_stream(
             "transformed-ds-2",
             Box::new(transformed_ds) as Box<dyn DataSource<TestOutputData> + Send + Sync>,
             Box::new(MockJsonDataOutput::default()),

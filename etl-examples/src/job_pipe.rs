@@ -84,7 +84,7 @@ async fn main() -> anyhow::Result<()> {
         },
     );
 
-    jr.run_data_output::<TestSourceData>(
+    jr.run_stream::<TestSourceData>(
         "stream1",
         Box::new(create_mock_data_source()),
         Box::new(MockJsonDataOutput::default()),
