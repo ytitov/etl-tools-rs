@@ -464,6 +464,156 @@
 <span id="462">462</span>
 <span id="463">463</span>
 <span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
+<span id="589">589</span>
+<span id="590">590</span>
+<span id="591">591</span>
+<span id="592">592</span>
+<span id="593">593</span>
+<span id="594">594</span>
+<span id="595">595</span>
+<span id="596">596</span>
+<span id="597">597</span>
+<span id="598">598</span>
+<span id="599">599</span>
+<span id="600">600</span>
+<span id="601">601</span>
+<span id="602">602</span>
+<span id="603">603</span>
+<span id="604">604</span>
+<span id="605">605</span>
+<span id="606">606</span>
+<span id="607">607</span>
+<span id="608">608</span>
+<span id="609">609</span>
+<span id="610">610</span>
+<span id="611">611</span>
+<span id="612">612</span>
+<span id="613">613</span>
+<span id="614">614</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::job</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">anyhow</span>;
@@ -472,8 +622,8 @@
 <span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">tag</span> <span class="op">=</span> <span class="string">&quot;state&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">StreamStatus</span> {
+<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">tag</span> <span class="op">=</span> <span class="string">&quot;status&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">JobStreamStatus</span> {
     <span class="ident">New</span>,
     <span class="ident">Complete</span> {
         <span class="ident">started</span>: <span class="ident">DateTime</span><span class="op">&lt;</span><span class="ident">Utc</span><span class="op">&gt;</span>,
@@ -497,9 +647,9 @@
     },
 }
 
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">StreamStatus</span> {
+<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">JobStreamStatus</span> {
     <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="ident">StreamStatus::New</span>
+        <span class="ident">JobStreamStatus::New</span>
     }
 }
 
@@ -551,7 +701,7 @@
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">JobStreamsState</span> {
-    <span class="kw">pub</span> <span class="ident">states</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">StreamStatus</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">states</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">JobStreamStatus</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">JobStreamsState</span> {
@@ -577,7 +727,7 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">in_progress</span><span class="op">&lt;</span><span class="ident">N</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">name</span>: <span class="ident">N</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">anyhow::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">states</span>
-            .<span class="ident">insert</span>(<span class="ident">name</span>.<span class="ident">into</span>(), <span class="ident">StreamStatus::new_in_progress</span>());
+            .<span class="ident">insert</span>(<span class="ident">name</span>.<span class="ident">into</span>(), <span class="ident">JobStreamStatus::new_in_progress</span>());
         <span class="prelude-val">Ok</span>(())
     }
 
@@ -653,7 +803,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_complete</span><span class="op">&lt;</span><span class="ident">N</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">name</span>: <span class="ident">N</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">states</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">name</span>.<span class="ident">into</span>()) {
             <span class="prelude-val">Some</span>(<span class="ident">js</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">js</span> {
-                <span class="ident">StreamStatus::Complete</span> { .. } <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>),
+                <span class="ident">JobStreamStatus::Complete</span> { .. } <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>),
                 <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>),
             },
             <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="macro">anyhow::anyhow!</span>(
@@ -662,16 +812,43 @@
         }
     }
 }
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
+<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">tag</span> <span class="op">=</span> <span class="string">&quot;state&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">RunStatus</span> {
+    <span class="ident">InProgress</span>,
+    <span class="ident">FatalError</span> {
+        <span class="ident">step_index</span>: <span class="ident">isize</span>,
+        <span class="ident">step_name</span>: <span class="ident">String</span>,
+        <span class="ident">message</span>: <span class="ident">String</span>,
+    },
+    <span class="ident">Completed</span>,
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
+<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">tag</span> <span class="op">=</span> <span class="string">&quot;step_type&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">JobStepStatus</span> {
+    <span class="ident">Stream</span>(<span class="ident">JobStreamStatus</span>),
+    <span class="ident">Command</span>(<span class="ident">JobCommandStatus</span>),
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">JobStepDetails</span> {
+    <span class="kw">pub</span> <span class="ident">step</span>: <span class="ident">JobStepStatus</span>,
+    <span class="kw">pub</span> <span class="ident">name</span>: <span class="ident">String</span>,
+    <span class="kw">pub</span> <span class="ident">step_index</span>: <span class="ident">usize</span>,
+}
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">JobState</span> {
-    <span class="kw">pub</span> <span class="ident">commands</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">JobCommandStatus</span><span class="op">&gt;</span>,
+    <span class="ident">commands</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">JobCommandStatus</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">settings</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">JsonValue</span><span class="op">&gt;</span>,
     <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span>)]</span>
-    <span class="comment">//pub streams: StreamStatus,</span>
     <span class="kw">pub</span> <span class="ident">streams</span>: <span class="ident">JobStreamsState</span>,
-    <span class="kw">pub</span> <span class="ident">name</span>: <span class="ident">String</span>,
-    <span class="kw">pub</span> <span class="ident">id</span>: <span class="ident">String</span>,
+    <span class="ident">name</span>: <span class="ident">String</span>,
+    <span class="ident">id</span>: <span class="ident">String</span>,
+    <span class="ident">cur_step_index</span>: <span class="ident">isize</span>,
+    <span class="ident">run_status</span>: <span class="ident">RunStatus</span>,
+    <span class="kw">pub</span> <span class="ident">step_history</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">JobStepDetails</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">JobState</span> {
@@ -682,7 +859,130 @@
             <span class="ident">streams</span>: <span class="ident">JobStreamsState::default</span>(),
             <span class="ident">id</span>: <span class="ident">id</span>.<span class="ident">into</span>(),
             <span class="ident">name</span>: <span class="ident">name</span>.<span class="ident">into</span>(),
+            <span class="ident">cur_step_index</span>: <span class="op">-</span><span class="number">1</span>,
+            <span class="ident">run_status</span>: <span class="ident">RunStatus::InProgress</span>,
+            <span class="ident">step_history</span>: <span class="ident">HashMap::new</span>(),
         }
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_command</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cmd_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;_</span> <span class="ident">JobCommandStatus</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">commands</span>.<span class="ident">get</span>(<span class="ident">cmd_name</span>)
+    }
+
+    <span class="kw">fn</span> <span class="ident">add_command</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">cmd_name</span>: <span class="ident">C</span>, <span class="ident">cmd</span>: <span class="ident">JobCommandStatus</span>) {
+        <span class="self">self</span>.<span class="ident">commands</span>.<span class="ident">insert</span>(<span class="ident">cmd_name</span>.<span class="ident">into</span>(), <span class="ident">cmd</span>);
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;_</span> <span class="ident">str</span> {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">id</span>
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;_</span> <span class="ident">str</span> {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">name</span>
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset_step_index</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">cur_step_index</span> <span class="op">=</span> <span class="op">-</span><span class="number">1</span>;
+    }
+
+    <span class="kw">fn</span> <span class="ident">set_fatal_error</span><span class="op">&lt;</span><span class="ident">N</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>, <span class="ident">M</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">name</span>: <span class="ident">N</span>, <span class="ident">message</span>: <span class="ident">M</span>) {
+        <span class="self">self</span>.<span class="ident">run_status</span> <span class="op">=</span> <span class="ident">RunStatus::FatalError</span> {
+            <span class="ident">step_index</span>: <span class="self">self</span>.<span class="ident">cur_step_index</span>,
+            <span class="ident">step_name</span>: <span class="ident">name</span>.<span class="ident">into</span>(),
+            <span class="ident">message</span>: <span class="ident">message</span>.<span class="ident">into</span>(),
+        };
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_new_cmd</span><span class="op">&lt;</span><span class="ident">N</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="ident">name</span>: <span class="ident">N</span>,
+        <span class="ident">jrc</span>: <span class="kw-2">&amp;</span><span class="ident">JobRunnerConfig</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">anyhow::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">started</span> <span class="op">=</span> <span class="ident">Utc::now</span>();
+        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">run_status</span> {
+            <span class="ident">RunStatus::InProgress</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="self">self</span>.<span class="ident">add_command</span>(<span class="ident">name</span>, <span class="ident">JobCommandStatus::InProgress</span> { <span class="ident">started</span> });
+            }
+            <span class="ident">RunStatus::Completed</span> <span class="op">=</span><span class="op">&gt;</span> {}
+            <span class="ident">RunStatus::FatalError</span> {
+                <span class="ident">step_index</span>: <span class="kw">_</span>,
+                <span class="ident">step_name</span>: <span class="kw">_</span>,
+                <span class="ident">message</span>: <span class="kw">_</span>,
+            } <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">if</span> <span class="ident">jrc</span>.<span class="ident">stop_on_error</span> {
+                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">anyhow::anyhow!</span>(<span class="string">&quot;Can&#39;t start the new job because stop_on_error flag is set to true&quot;</span>));
+                } <span class="kw">else</span> {
+                    <span class="self">self</span>.<span class="ident">add_command</span>(<span class="ident">name</span>, <span class="ident">JobCommandStatus::InProgress</span> { <span class="ident">started</span> });
+                }
+            }
+        }
+        <span class="self">self</span>.<span class="ident">cur_step_index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">cmd_ok</span><span class="op">&lt;</span><span class="ident">N</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="ident">name</span>: <span class="ident">N</span>,
+        <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="ident">JobRunnerConfig</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">anyhow::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="ident">name</span>.<span class="ident">into</span>();
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">cmd</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">commands</span>.<span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="ident">n</span>) {
+            <span class="kw">match</span> <span class="ident">cmd</span> {
+                <span class="ident">JobCommandStatus::InProgress</span> { <span class="ident">started</span> } <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="kw-2">*</span><span class="ident">cmd</span> <span class="op">=</span> <span class="ident">JobCommandStatus::Complete</span> {
+                        <span class="ident">started</span>: <span class="kw-2">*</span><span class="ident">started</span>,
+                        <span class="ident">finished</span>: <span class="ident">Utc::now</span>(),
+                    };
+                    <span class="self">self</span>.<span class="ident">step_history</span>.<span class="ident">insert</span>(
+                        <span class="ident">n</span>.<span class="ident">clone</span>(),
+                        <span class="ident">JobStepDetails</span> {
+                            <span class="ident">name</span>: <span class="ident">n</span>,
+                            <span class="ident">step_index</span>: <span class="self">self</span>.<span class="ident">cur_step_index</span> <span class="kw">as</span> <span class="ident">usize</span>,
+                            <span class="ident">step</span>: <span class="ident">JobStepStatus::Command</span>(<span class="ident">cmd</span>.<span class="ident">clone</span>()),
+                        },
+                    );
+                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+                }
+                <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> (),
+            };
+        }
+        <span class="prelude-val">Err</span>(<span class="macro">anyhow::anyhow!</span>(
+            <span class="string">&quot;Fatal error: the command was never started&quot;</span>
+        ))
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">cmd_not_ok</span><span class="op">&lt;</span><span class="ident">N</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>, <span class="ident">M</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="ident">name</span>: <span class="ident">N</span>,
+        <span class="ident">m</span>: <span class="ident">M</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">anyhow::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="ident">name</span>.<span class="ident">into</span>();
+        <span class="kw">let</span> <span class="ident">m</span> <span class="op">=</span> <span class="ident">m</span>.<span class="ident">into</span>();
+        <span class="self">self</span>.<span class="ident">set_fatal_error</span>(<span class="kw-2">&amp;</span><span class="ident">n</span>, <span class="kw-2">&amp;</span><span class="ident">m</span>);
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">cmd</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">commands</span>.<span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="ident">n</span>) {
+            <span class="kw">match</span> <span class="ident">cmd</span> {
+                <span class="ident">JobCommandStatus::InProgress</span> { <span class="ident">started</span> } <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="kw-2">*</span><span class="ident">cmd</span> <span class="op">=</span> <span class="ident">JobCommandStatus::Error</span> {
+                        <span class="ident">started</span>: <span class="kw-2">*</span><span class="ident">started</span>,
+                        <span class="ident">datetime</span>: <span class="ident">Utc::now</span>(),
+                        <span class="ident">message</span>: <span class="ident">m</span>,
+                    };
+                    <span class="self">self</span>.<span class="ident">step_history</span>.<span class="ident">insert</span>(
+                        <span class="ident">n</span>.<span class="ident">clone</span>(),
+                        <span class="ident">JobStepDetails</span> {
+                            <span class="ident">name</span>: <span class="ident">n</span>,
+                            <span class="ident">step_index</span>: <span class="self">self</span>.<span class="ident">cur_step_index</span> <span class="kw">as</span> <span class="ident">usize</span>,
+                            <span class="ident">step</span>: <span class="ident">JobStepStatus::Command</span>(<span class="ident">cmd</span>.<span class="ident">clone</span>()),
+                        },
+                    );
+                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+                }
+                <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> (),
+            };
+        }
+        <span class="prelude-val">Err</span>(<span class="macro">anyhow::anyhow!</span>(
+            <span class="string">&quot;Fatal error: the command was never started&quot;</span>
+        ))
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set</span><span class="op">&lt;</span><span class="ident">K</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>, <span class="ident">V</span>: <span class="ident">Serialize</span><span class="op">&gt;</span>(
@@ -714,9 +1014,9 @@
     }
 }
 
-<span class="kw">impl</span> <span class="ident">StreamStatus</span> {
+<span class="kw">impl</span> <span class="ident">JobStreamStatus</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_in_progress</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="ident">StreamStatus::InProgress</span> {
+        <span class="ident">JobStreamStatus::InProgress</span> {
             <span class="ident">started</span>: <span class="ident">Utc::now</span>(),
             <span class="ident">total_lines_scanned</span>: <span class="number">0</span>,
             <span class="ident">num_errors</span>: <span class="number">0</span>,
@@ -725,19 +1025,19 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">in_progress</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">StreamStatus::new_in_progress</span>();
+        <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">JobStreamStatus::new_in_progress</span>();
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">complete</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">StreamStatus::InProgress</span> {
+            <span class="ident">JobStreamStatus::InProgress</span> {
                 <span class="kw-2">ref</span> <span class="ident">started</span>,
                 <span class="kw-2">ref</span> <span class="ident">total_lines_scanned</span>,
                 <span class="kw-2">ref</span> <span class="ident">files</span>,
                 <span class="kw-2">ref</span> <span class="ident">num_errors</span>,
                 ..
             } <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">StreamStatus::Complete</span> {
+                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">JobStreamStatus::Complete</span> {
                     <span class="ident">started</span>: <span class="ident">started</span>.<span class="ident">to_owned</span>(),
                     <span class="ident">finished</span>: <span class="ident">Utc::now</span>(),
                     <span class="ident">total_lines_scanned</span>: <span class="kw-2">*</span><span class="ident">total_lines_scanned</span>,
@@ -745,34 +1045,34 @@
                     <span class="ident">files</span>: <span class="ident">files</span>.<span class="ident">clone</span>(),
                 }
             }
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;Can&#39;t set lines scanned on this StreamStatus.&quot;</span>),
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;Can&#39;t set lines scanned on this JobStreamStatus.&quot;</span>),
         }
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_total_lines</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">StreamStatus::New</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">StreamStatus::InProgress</span> {
+            <span class="ident">JobStreamStatus::New</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">JobStreamStatus::InProgress</span> {
                     <span class="ident">started</span>: <span class="ident">Utc::now</span>(),
                     <span class="ident">total_lines_scanned</span>: <span class="ident">count</span>,
                     <span class="ident">num_errors</span>: <span class="number">0</span>,
                     <span class="ident">files</span>: <span class="ident">HashMap::new</span>(),
                 };
             }
-            <span class="ident">StreamStatus::InProgress</span> {
+            <span class="ident">JobStreamStatus::InProgress</span> {
                 <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">total_lines_scanned</span>,
                 ..
             } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw-2">*</span><span class="ident">total_lines_scanned</span> <span class="op">=</span> <span class="ident">count</span>;
             }
-            <span class="ident">StreamStatus::Complete</span> {
+            <span class="ident">JobStreamStatus::Complete</span> {
                 <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">total_lines_scanned</span>,
                 ..
             } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw-2">*</span><span class="ident">total_lines_scanned</span> <span class="op">=</span> <span class="ident">count</span>;
             }
-            <span class="ident">StreamStatus::Error</span> { .. } <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">StreamStatus::InProgress</span> {
+            <span class="ident">JobStreamStatus::Error</span> { .. } <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">JobStreamStatus::InProgress</span> {
                     <span class="ident">started</span>: <span class="ident">Utc::now</span>(),
                     <span class="ident">total_lines_scanned</span>: <span class="ident">count</span>,
                     <span class="ident">num_errors</span>: <span class="number">0</span>,
@@ -784,21 +1084,21 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_total_lines</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">StreamStatus::New</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0_usize</span>,
-            <span class="ident">StreamStatus::InProgress</span> {
+            <span class="ident">JobStreamStatus::New</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0_usize</span>,
+            <span class="ident">JobStreamStatus::InProgress</span> {
                 <span class="kw-2">ref</span> <span class="ident">total_lines_scanned</span>,
                 ..
             } <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">*</span><span class="ident">total_lines_scanned</span>,
-            <span class="ident">StreamStatus::Complete</span> {
+            <span class="ident">JobStreamStatus::Complete</span> {
                 <span class="kw-2">ref</span> <span class="ident">total_lines_scanned</span>,
                 ..
             } <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">*</span><span class="ident">total_lines_scanned</span>,
-            <span class="ident">StreamStatus::Error</span> { <span class="kw-2">ref</span> <span class="ident">last_index</span>, .. } <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">*</span><span class="ident">last_index</span>,
+            <span class="ident">JobStreamStatus::Error</span> { <span class="kw-2">ref</span> <span class="ident">last_index</span>, .. } <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">*</span><span class="ident">last_index</span>,
         }
     }
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">incr_line</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">f_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">StreamStatus::New</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">JobStreamStatus::New</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">files</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
                 <span class="ident">files</span>.<span class="ident">insert</span>(
                     <span class="ident">f_name</span>.<span class="ident">to_owned</span>(),
@@ -807,14 +1107,14 @@
                         <span class="ident">num_ok</span>: <span class="number">1</span>,
                     },
                 );
-                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">StreamStatus::InProgress</span> {
+                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">JobStreamStatus::InProgress</span> {
                     <span class="ident">started</span>: <span class="ident">Utc::now</span>(),
                     <span class="ident">total_lines_scanned</span>: <span class="number">1</span>,
                     <span class="ident">num_errors</span>: <span class="number">0</span>,
                     <span class="ident">files</span>,
                 };
             }
-            <span class="ident">StreamStatus::InProgress</span> {
+            <span class="ident">JobStreamStatus::InProgress</span> {
                 <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">total_lines_scanned</span>,
                 <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">files</span>,
                 ..
@@ -822,7 +1122,7 @@
                 <span class="kw-2">*</span><span class="ident">total_lines_scanned</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                 <span class="ident">FileStatus::incr_file_line</span>(<span class="ident">files</span>, <span class="ident">f_name</span>);
             }
-            <span class="ident">StreamStatus::Complete</span> {
+            <span class="ident">JobStreamStatus::Complete</span> {
                 <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">total_lines_scanned</span>,
                 <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">files</span>,
                 ..
@@ -830,10 +1130,10 @@
                 <span class="kw-2">*</span><span class="ident">total_lines_scanned</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                 <span class="ident">FileStatus::incr_file_line</span>(<span class="ident">files</span>, <span class="ident">f_name</span>);
             }
-            <span class="ident">StreamStatus::Error</span> { .. } <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">JobStreamStatus::Error</span> { .. } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">files</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">FileStatus</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
                 <span class="ident">FileStatus::incr_file_line</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">files</span>, <span class="ident">f_name</span>);
-                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">StreamStatus::InProgress</span> {
+                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">JobStreamStatus::InProgress</span> {
                     <span class="ident">started</span>: <span class="ident">Utc::now</span>(),
                     <span class="ident">total_lines_scanned</span>: <span class="number">1</span>,
                     <span class="ident">num_errors</span>: <span class="number">0</span>,
@@ -845,28 +1145,28 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">incr_error</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">StreamStatus::New</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">JobStreamStatus::New</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">files</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">StreamStatus::InProgress</span> {
+                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">JobStreamStatus::InProgress</span> {
                     <span class="ident">started</span>: <span class="ident">Utc::now</span>(),
                     <span class="ident">total_lines_scanned</span>: <span class="number">0</span>,
                     <span class="ident">num_errors</span>: <span class="number">1</span>,
                     <span class="ident">files</span>,
                 };
             }
-            <span class="ident">StreamStatus::InProgress</span> {
+            <span class="ident">JobStreamStatus::InProgress</span> {
                 <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">num_errors</span>, ..
             } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw-2">*</span><span class="ident">num_errors</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
             }
-            <span class="ident">StreamStatus::Complete</span> {
+            <span class="ident">JobStreamStatus::Complete</span> {
                 <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">num_errors</span>, ..
             } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw-2">*</span><span class="ident">num_errors</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
             }
-            <span class="ident">StreamStatus::Error</span> { .. } <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">JobStreamStatus::Error</span> { .. } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">files</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">FileStatus</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">StreamStatus::InProgress</span> {
+                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">JobStreamStatus::InProgress</span> {
                     <span class="ident">started</span>: <span class="ident">Utc::now</span>(),
                     <span class="ident">total_lines_scanned</span>: <span class="number">0</span>,
                     <span class="ident">num_errors</span>: <span class="number">1</span>,
@@ -878,8 +1178,8 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_error</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">msg</span>: <span class="ident">T</span>, <span class="ident">last_index</span>: <span class="ident">usize</span>) {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">StreamStatus::New</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">StreamStatus::Error</span> {
+            <span class="ident">JobStreamStatus::New</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">JobStreamStatus::Error</span> {
                     <span class="ident">message</span>: <span class="ident">msg</span>.<span class="ident">into</span>(),
                     <span class="ident">datetime</span>: <span class="ident">Utc::now</span>(),
                     <span class="ident">last_index</span>,
@@ -887,12 +1187,12 @@
                     <span class="ident">files</span>: <span class="ident">HashMap::new</span>(),
                 };
             }
-            <span class="ident">StreamStatus::InProgress</span> {
+            <span class="ident">JobStreamStatus::InProgress</span> {
                 <span class="kw-2">ref</span> <span class="ident">files</span>,
                 <span class="kw-2">ref</span> <span class="ident">num_errors</span>,
                 ..
             } <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">StreamStatus::Error</span> {
+                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">JobStreamStatus::Error</span> {
                     <span class="ident">message</span>: <span class="ident">msg</span>.<span class="ident">into</span>(),
                     <span class="ident">datetime</span>: <span class="ident">Utc::now</span>(),
                     <span class="ident">last_index</span>,
@@ -900,12 +1200,12 @@
                     <span class="ident">files</span>: <span class="ident">files</span>.<span class="ident">clone</span>(),
                 };
             }
-            <span class="ident">StreamStatus::Complete</span> {
+            <span class="ident">JobStreamStatus::Complete</span> {
                 <span class="kw-2">ref</span> <span class="ident">files</span>,
                 <span class="kw-2">ref</span> <span class="ident">num_errors</span>,
                 ..
             } <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">StreamStatus::Error</span> {
+                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">JobStreamStatus::Error</span> {
                     <span class="ident">message</span>: <span class="ident">msg</span>.<span class="ident">into</span>(),
                     <span class="ident">datetime</span>: <span class="ident">Utc::now</span>(),
                     <span class="ident">last_index</span>,
@@ -913,12 +1213,12 @@
                     <span class="ident">files</span>: <span class="ident">files</span>.<span class="ident">clone</span>(),
                 };
             }
-            <span class="ident">StreamStatus::Error</span> {
+            <span class="ident">JobStreamStatus::Error</span> {
                 <span class="kw-2">ref</span> <span class="ident">files</span>,
                 <span class="kw-2">ref</span> <span class="ident">num_errors</span>,
                 ..
             } <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">StreamStatus::Error</span> {
+                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">JobStreamStatus::Error</span> {
                     <span class="ident">message</span>: <span class="ident">msg</span>.<span class="ident">into</span>(),
                     <span class="ident">datetime</span>: <span class="ident">Utc::now</span>(),
                     <span class="ident">last_index</span>,
