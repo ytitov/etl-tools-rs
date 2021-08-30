@@ -11,8 +11,10 @@ use std::fmt::Debug;
 
 pub mod command;
 pub mod handler;
+pub mod stream;
 use command::*;
 use handler::*;
+use stream::*;
 pub mod state;
 
 type JsonValue = serde_json::Value;
@@ -444,7 +446,8 @@ impl JobRunner {
         if let Err(_) = self.job_state.start_new_cmd(&name, &self.config) {
             return Ok(self);
         }
-        if let Some(JobCommandStatus::Complete { .. }) = self.job_state.get_command(&name)
+        if let Some(StepCommandStatus::Complete { .. }) =
+            self.job_state.get_command(&name)
         {
             self.log_info(
                 self.job_state.name(),

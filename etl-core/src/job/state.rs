@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "status")]
-pub enum JobStreamStatus {
+pub enum StepStreamStatus {
     New,
     Complete {
         started: DateTime<Utc>,
@@ -30,9 +30,9 @@ pub enum JobStreamStatus {
     },
 }
 
-impl Default for JobStreamStatus {
+impl Default for StepStreamStatus {
     fn default() -> Self {
-        JobStreamStatus::New
+        StepStreamStatus::New
     }
 }
 
@@ -84,7 +84,7 @@ pub const JOB_STATE_EXT: &'static str = "job.json";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JobStreamsState {
-    pub states: HashMap<String, JobStreamStatus>,
+    pub states: HashMap<String, StepStreamStatus>,
 }
 
 impl Default for JobStreamsState {
@@ -110,7 +110,7 @@ impl JobStreamsState {
 
     pub fn in_progress<N: Into<String>>(&mut self, name: N) -> anyhow::Result<()> {
         self.states
-            .insert(name.into(), JobStreamStatus::new_in_progress());
+            .insert(name.into(), StepStreamStatus::new_in_progress());
         Ok(())
     }
 
@@ -186,7 +186,7 @@ impl JobStreamsState {
     pub fn is_complete<N: Into<String>>(&mut self, name: N) -> anyhow::Result<bool> {
         match self.states.get(&name.into()) {
             Some(js) => match js {
-                JobStreamStatus::Complete { .. } => Ok(true),
+                StepStreamStatus::Complete { .. } => Ok(true),
                 _ => Ok(false),
             },
             None => Err(anyhow::anyhow!(
@@ -210,8 +210,8 @@ pub enum RunStatus {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "step_type")]
 pub enum JobStepStatus {
-    Stream(JobStreamStatus),
-    Command(JobCommandStatus),
+    Stream(StepStreamStatus),
+    Command(StepCommandStatus),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -223,7 +223,7 @@ pub struct JobStepDetails {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JobState {
-    commands: HashMap<String, JobCommandStatus>,
+    commands: HashMap<String, StepCommandStatus>,
     pub settings: HashMap<String, JsonValue>,
     #[serde(default)]
     pub streams: JobStreamsState,
@@ -248,11 +248,11 @@ impl JobState {
         }
     }
 
-    pub fn get_command(&self, cmd_name: &str) -> Option<&'_ JobCommandStatus> {
+    pub fn get_command(&self, cmd_name: &str) -> Option<&'_ StepCommandStatus> {
         self.commands.get(cmd_name)
     }
 
-    fn add_command<C: Into<String>>(&mut self, cmd_name: C, cmd: JobCommandStatus) {
+    fn add_command<C: Into<String>>(&mut self, cmd_name: C, cmd: StepCommandStatus) {
         self.commands.insert(cmd_name.into(), cmd);
     }
 
@@ -284,7 +284,7 @@ impl JobState {
         let started = Utc::now();
         match &self.run_status {
             RunStatus::InProgress => {
-                self.add_command(name, JobCommandStatus::InProgress { started });
+                self.add_command(name, StepCommandStatus::InProgress { started });
             }
             RunStatus::Completed => {}
             RunStatus::FatalError {
@@ -295,7 +295,7 @@ impl JobState {
                 if jrc.stop_on_error {
                     return Err(anyhow::anyhow!("Can't start the new job because stop_on_error flag is set to true"));
                 } else {
-                    self.add_command(name, JobCommandStatus::InProgress { started });
+                    self.add_command(name, StepCommandStatus::InProgress { started });
                 }
             }
         }
@@ -311,8 +311,8 @@ impl JobState {
         let n = name.into();
         if let Some(cmd) = self.commands.get_mut(&n) {
             match cmd {
-                JobCommandStatus::InProgress { started } => {
-                    *cmd = JobCommandStatus::Complete {
+                StepCommandStatus::InProgress { started } => {
+                    *cmd = StepCommandStatus::Complete {
                         started: *started,
                         finished: Utc::now(),
                     };
@@ -344,8 +344,8 @@ impl JobState {
         self.set_fatal_error(&n, &m);
         if let Some(cmd) = self.commands.get_mut(&n) {
             match cmd {
-                JobCommandStatus::InProgress { started } => {
-                    *cmd = JobCommandStatus::Error {
+                StepCommandStatus::InProgress { started } => {
+                    *cmd = StepCommandStatus::Error {
                         started: *started,
                         datetime: Utc::now(),
                         message: m,
@@ -397,9 +397,9 @@ impl JobState {
     }
 }
 
-impl JobStreamStatus {
+impl StepStreamStatus {
     pub fn new_in_progress() -> Self {
-        JobStreamStatus::InProgress {
+        StepStreamStatus::InProgress {
             started: Utc::now(),
             total_lines_scanned: 0,
             num_errors: 0,
@@ -408,19 +408,19 @@ impl JobStreamStatus {
     }
 
     pub fn in_progress(&mut self) {
-        *self = JobStreamStatus::new_in_progress();
+        *self = StepStreamStatus::new_in_progress();
     }
 
     pub fn complete(&mut self) {
         match self {
-            JobStreamStatus::InProgress {
+            StepStreamStatus::InProgress {
                 ref started,
                 ref total_lines_scanned,
                 ref files,
                 ref num_errors,
                 ..
             } => {
-                *self = JobStreamStatus::Complete {
+                *self = StepStreamStatus::Complete {
                     started: started.to_owned(),
                     finished: Utc::now(),
                     total_lines_scanned: *total_lines_scanned,
@@ -428,34 +428,34 @@ impl JobStreamStatus {
                     files: files.clone(),
                 }
             }
-            _ => panic!("Can't set lines scanned on this JobStreamStatus."),
+            _ => panic!("Can't set lines scanned on this StepStreamStatus."),
         }
     }
 
     pub fn set_total_lines(&mut self, count: usize) {
         match self {
-            JobStreamStatus::New => {
-                *self = JobStreamStatus::InProgress {
+            StepStreamStatus::New => {
+                *self = StepStreamStatus::InProgress {
                     started: Utc::now(),
                     total_lines_scanned: count,
                     num_errors: 0,
                     files: HashMap::new(),
                 };
             }
-            JobStreamStatus::InProgress {
+            StepStreamStatus::InProgress {
                 ref mut total_lines_scanned,
                 ..
             } => {
                 *total_lines_scanned = count;
             }
-            JobStreamStatus::Complete {
+            StepStreamStatus::Complete {
                 ref mut total_lines_scanned,
                 ..
             } => {
                 *total_lines_scanned = count;
             }
-            JobStreamStatus::Error { .. } => {
-                *self = JobStreamStatus::InProgress {
+            StepStreamStatus::Error { .. } => {
+                *self = StepStreamStatus::InProgress {
                     started: Utc::now(),
                     total_lines_scanned: count,
                     num_errors: 0,
@@ -467,21 +467,21 @@ impl JobStreamStatus {
 
     pub fn get_total_lines(&self) -> usize {
         match self {
-            JobStreamStatus::New => 0_usize,
-            JobStreamStatus::InProgress {
+            StepStreamStatus::New => 0_usize,
+            StepStreamStatus::InProgress {
                 ref total_lines_scanned,
                 ..
             } => *total_lines_scanned,
-            JobStreamStatus::Complete {
+            StepStreamStatus::Complete {
                 ref total_lines_scanned,
                 ..
             } => *total_lines_scanned,
-            JobStreamStatus::Error { ref last_index, .. } => *last_index,
+            StepStreamStatus::Error { ref last_index, .. } => *last_index,
         }
     }
     pub fn incr_line(&mut self, f_name: &str) {
         match self {
-            JobStreamStatus::New => {
+            StepStreamStatus::New => {
                 let mut files = HashMap::new();
                 files.insert(
                     f_name.to_owned(),
@@ -490,14 +490,14 @@ impl JobStreamStatus {
                         num_ok: 1,
                     },
                 );
-                *self = JobStreamStatus::InProgress {
+                *self = StepStreamStatus::InProgress {
                     started: Utc::now(),
                     total_lines_scanned: 1,
                     num_errors: 0,
                     files,
                 };
             }
-            JobStreamStatus::InProgress {
+            StepStreamStatus::InProgress {
                 ref mut total_lines_scanned,
                 ref mut files,
                 ..
@@ -505,7 +505,7 @@ impl JobStreamStatus {
                 *total_lines_scanned += 1;
                 FileStatus::incr_file_line(files, f_name);
             }
-            JobStreamStatus::Complete {
+            StepStreamStatus::Complete {
                 ref mut total_lines_scanned,
                 ref mut files,
                 ..
@@ -513,10 +513,10 @@ impl JobStreamStatus {
                 *total_lines_scanned += 1;
                 FileStatus::incr_file_line(files, f_name);
             }
-            JobStreamStatus::Error { .. } => {
+            StepStreamStatus::Error { .. } => {
                 let mut files: HashMap<String, FileStatus> = HashMap::new();
                 FileStatus::incr_file_line(&mut files, f_name);
-                *self = JobStreamStatus::InProgress {
+                *self = StepStreamStatus::InProgress {
                     started: Utc::now(),
                     total_lines_scanned: 1,
                     num_errors: 0,
@@ -528,28 +528,28 @@ impl JobStreamStatus {
 
     pub fn incr_error(&mut self) {
         match self {
-            JobStreamStatus::New => {
+            StepStreamStatus::New => {
                 let files = HashMap::new();
-                *self = JobStreamStatus::InProgress {
+                *self = StepStreamStatus::InProgress {
                     started: Utc::now(),
                     total_lines_scanned: 0,
                     num_errors: 1,
                     files,
                 };
             }
-            JobStreamStatus::InProgress {
+            StepStreamStatus::InProgress {
                 ref mut num_errors, ..
             } => {
                 *num_errors += 1;
             }
-            JobStreamStatus::Complete {
+            StepStreamStatus::Complete {
                 ref mut num_errors, ..
             } => {
                 *num_errors += 1;
             }
-            JobStreamStatus::Error { .. } => {
+            StepStreamStatus::Error { .. } => {
                 let files: HashMap<String, FileStatus> = HashMap::new();
-                *self = JobStreamStatus::InProgress {
+                *self = StepStreamStatus::InProgress {
                     started: Utc::now(),
                     total_lines_scanned: 0,
                     num_errors: 1,
@@ -561,8 +561,8 @@ impl JobStreamStatus {
 
     pub fn set_error<T: Into<String>>(&mut self, msg: T, last_index: usize) {
         match self {
-            JobStreamStatus::New => {
-                *self = JobStreamStatus::Error {
+            StepStreamStatus::New => {
+                *self = StepStreamStatus::Error {
                     message: msg.into(),
                     datetime: Utc::now(),
                     last_index,
@@ -570,12 +570,12 @@ impl JobStreamStatus {
                     files: HashMap::new(),
                 };
             }
-            JobStreamStatus::InProgress {
+            StepStreamStatus::InProgress {
                 ref files,
                 ref num_errors,
                 ..
             } => {
-                *self = JobStreamStatus::Error {
+                *self = StepStreamStatus::Error {
                     message: msg.into(),
                     datetime: Utc::now(),
                     last_index,
@@ -583,12 +583,12 @@ impl JobStreamStatus {
                     files: files.clone(),
                 };
             }
-            JobStreamStatus::Complete {
+            StepStreamStatus::Complete {
                 ref files,
                 ref num_errors,
                 ..
             } => {
-                *self = JobStreamStatus::Error {
+                *self = StepStreamStatus::Error {
                     message: msg.into(),
                     datetime: Utc::now(),
                     last_index,
@@ -596,12 +596,12 @@ impl JobStreamStatus {
                     files: files.clone(),
                 };
             }
-            JobStreamStatus::Error {
+            StepStreamStatus::Error {
                 ref files,
                 ref num_errors,
                 ..
             } => {
-                *self = JobStreamStatus::Error {
+                *self = StepStreamStatus::Error {
                     message: msg.into(),
                     datetime: Utc::now(),
                     last_index,

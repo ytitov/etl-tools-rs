@@ -49,7 +49,7 @@ async fn test_job_command_with_error() {
     // Make sure that the second command resulted in an error and verify the step index
     if let Some(cmd_status) = job_state.step_history.get("do_stuff_and_fail_2") {
         if let JobStepDetails {
-            step: JobStepStatus::Command(JobCommandStatus::Error { .. }),
+            step: JobStepStatus::Command(StepCommandStatus::Error { .. }),
             step_index,
             ..
         } = cmd_status
@@ -111,7 +111,7 @@ async fn test_job_command_with_error_2() {
     use state::*;
     if let Some(cmd_status) = job_state.step_history.get("do_stuff_and_not_fail_1") {
         if let JobStepDetails {
-            step: JobStepStatus::Command(JobCommandStatus::Complete { .. }),
+            step: JobStepStatus::Command(StepCommandStatus::Complete { .. }),
             step_index,
             ..
         } = cmd_status
@@ -127,7 +127,7 @@ async fn test_job_command_with_error_2() {
     // Make sure that the second command resulted in an error and verify the step index
     if let Some(cmd_status) = job_state.step_history.get("do_stuff_and_fail_2") {
         if let JobStepDetails {
-            step: JobStepStatus::Command(JobCommandStatus::Error { .. }),
+            step: JobStepStatus::Command(StepCommandStatus::Error { .. }),
             step_index,
             ..
         } = cmd_status
