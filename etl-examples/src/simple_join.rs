@@ -139,7 +139,7 @@ async fn main() -> anyhow::Result<()> {
         }),
         left_ds: Box::new(create_mock_data_source_left()),
         // how many lines to keep in memory
-        max_left_len: 2,
+        left_buf_len: 2,
         is_match: Box::new(|left, right| left.id == right.id),
     };
 

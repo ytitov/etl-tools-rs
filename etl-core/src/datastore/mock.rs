@@ -1,5 +1,8 @@
 use super::*;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 #[derive(Default)]
 /// Designed as a "null" datastore target.  Items received are not written anywhere
@@ -50,10 +53,19 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T>
 
 /// Used for testing, simply provide the json strings and this data store will
 /// stream them
-#[derive(Default)]
 pub struct MockJsonDataSource {
     pub lines: Vec<String>,
-    pub files: HashMap<String, String>,
+    //pub files: HashMap<String, String>,
+    pub files: Arc<Mutex<RefCell<HashMap<String, String>>>>,
+}
+
+impl Default for MockJsonDataSource {
+    fn default() -> Self {
+        MockJsonDataSource {
+            lines: Vec::new(),
+            files: Arc::new(Mutex::new(RefCell::new(HashMap::new()))),
+        }
+    }
 }
 
 #[async_trait]
@@ -107,18 +119,50 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
 {
     // TODO: add ability to look in files and return them (store as vec of strings)
     async fn load(&self, path: &str) -> Result<T, DataStoreError> {
-        println!("Loading from MockJsonDataSource will result as not found");
-        return Err(DataStoreError::NotExist {
-            key: path.to_owned(),
-            error: "Loading from MockJsonDataSource will always result in not found"
-                .to_string(),
-        });
+        println!("#### MockJsonDataSource load called: {}", path);
+        match self.files.lock() {
+            Ok(files) => {
+                let files_hs = files.borrow();
+                if let Some(content) = files_hs.get(path) {
+                    match serde_json::from_str::<T>(content) {
+                        Ok(result) => Ok(result),
+                        Err(er) => {
+                            return Err(DataStoreError::Deserialize {
+                                attempted_string: content.to_owned(),
+                                message: er.to_string(),
+                            });
+                        }
+                    }
+                } else {
+                    println!("Loading from MockJsonDataSource will result as not found");
+                    return Err(DataStoreError::NotExist {
+                        key: path.to_owned(),
+                        error: "Loading from MockJsonDataSource will always result in not found"
+                            .to_string()
+                    });
+                }
+            }
+            Err(er) => {
+                panic!("Got error calling files.lock(): {}", er);
+            }
+        }
     }
 
     async fn write(&self, path: &str, item: T) -> Result<(), DataStoreError> {
+        println!("#### MockJsonDataSource write called: {}", path);
         match serde_json::to_string_pretty(&item) {
             Ok(content) => {
-                println!("{} ==>\n{}", path, content);
+                match self.files.lock() {
+                    Ok(files) => {
+                        files.borrow_mut().insert(path.to_string(), content);
+                        for (_, f) in files.borrow().iter() {
+                            println!("FILE: {} ===>\n{}", path, f);
+                        }
+                    }
+                    Err(er) => {
+                        panic!("Got error calling files.lock(): {}", er);
+                    }
+                };
                 Ok(())
             }
             Err(err) => Err(DataStoreError::FatalIO(std::io::Error::new(

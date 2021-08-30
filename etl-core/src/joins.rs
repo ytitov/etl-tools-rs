@@ -18,13 +18,13 @@ pub struct LeftJoin<'a, L, R> {
     pub left_ds: Box<dyn DataSource<L>>,
     /// Number of rows from the left dataset to hold in memory.  Higher number means less scans
     /// on the right table
-    pub max_left_len: usize,
+    pub left_buf_len: usize,
     //NOTE: possibly add an async version of this.  Again, enriching the data or doing some lookups
-    //should probably happen in other steps, like in the JobHandler
+    //should probably happen in other steps, like in the StreamHandler
     pub is_match: Box<dyn Fn(&L, &R) -> bool + Send + Sync>,
 }
 
-async fn fill_left_stack<L,R>(
+async fn fill_left_stack<L, R>(
     v: &mut Vec<L>,
     left_rx: &mut DataSourceRx<L>,
     fw_tx: &Sender<Result<DataSourceMessage<(L, Option<R>)>, DataStoreError>>,
@@ -41,9 +41,10 @@ where
                 v.push(content);
             }
             Some(Err(er)) => {
-                fw_tx.send(Err(er.into())).await.map_err(|e| {
-                    DataStoreError::send_error("LeftJoin", "LeftSide", e)
-                })?;
+                fw_tx
+                    .send(Err(er.into()))
+                    .await
+                    .map_err(|e| DataStoreError::send_error("LeftJoin", "LeftSide", e))?;
                 // so it continues reading; a real zero means it is done
                 num_read += 1;
             }
@@ -154,7 +155,7 @@ where
         let (tx, rx) = channel(1);
         let (mut left_rx, _) = self.left_ds.start_stream().await?;
 
-        let max_left_len = self.max_left_len;
+        let max_left_len = self.left_buf_len;
         let matching_func = self.is_match;
         let create_right_ds = self.create_right_ds;
         let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> =

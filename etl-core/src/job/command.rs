@@ -43,8 +43,11 @@ impl<'a> JobCommand for SimpleCommand<'a> {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "state")]
+#[serde(tag = "status")]
 pub enum JobCommandStatus {
+    InProgress {
+        started: DateTime<Utc>,
+    },
     Complete {
         started: DateTime<Utc>,
         finished: DateTime<Utc>,

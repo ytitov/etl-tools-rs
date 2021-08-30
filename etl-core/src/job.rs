@@ -29,10 +29,16 @@ pub struct JobRunner {
     /// helps to await on DataOutput instances to complete writing
     data_output_handles: Vec<DataOutputJoinHandle>,
     job_state: JobState,
+    /// has the job started yet
+    is_running: bool,
 }
 
 pub struct JobRunnerConfig {
     //pub max_errors: usize,
+    /// Stop if any commands or streams result in an error.  Note that this does not count any
+    /// serialization/deserialization errors which happen when processing individual data
+    /// elements
+    pub stop_on_error: bool,
     /// The SimpleStore used by JobRunner to store state.  The default setting uses the
     /// MockJsonDataSource which does not persist, thus all pipelines will run every time.
     pub ds: Box<dyn SimpleStore<serde_json::Value>>,
@@ -42,6 +48,7 @@ impl Default for JobRunnerConfig {
     fn default() -> Self {
         JobRunnerConfig {
             //max_errors: 1000,
+            stop_on_error: true,
             ds: Box::new(MockJsonDataSource::default()),
         }
     }
@@ -68,34 +75,40 @@ impl JobRunner {
             config,
             data_output_handles: Vec::new(),
             job_state: JobState::new(id, name),
+            is_running: false,
         };
         jr.register()
             .expect("There was an error registering the job");
         jr
     }
 
-    async fn load_job_state(&self) -> Result<JobState, DataStoreError> {
-        let path = JobState::gen_name(&self.job_state.id, &self.job_state.name);
-        match self.config.ds.load(&path).await {
+    async fn load_job_state(&mut self) -> Result<JobState, DataStoreError> {
+        let path = JobState::gen_name(self.job_state.id(), self.job_state.name());
+        let mut job_state = match self.config.ds.load(&path).await {
             Ok(json) => match serde_json::from_value(json) {
                 Ok(job_state) => Ok(job_state),
                 Err(e) => {
                     println!("------> Fix or remove the file: {}", &path);
                     Err(DataStoreError::Deserialize {
-                        attempted_string: self.job_state.name.to_owned(),
+                        attempted_string: self.job_state.name().to_owned(),
                         message: e.to_string(),
                     })
                 }
             },
             Err(DataStoreError::NotExist { .. }) => {
-                Ok(JobState::new(&self.job_state.name, &self.job_state.id))
+                Ok(JobState::new(self.job_state.name(), self.job_state.id()))
             }
             Err(others) => Err(others),
+        }?;
+        if !self.is_running {
+            self.is_running = true;
+            job_state.reset_step_index();
         }
+        Ok(job_state)
     }
 
     async fn save_job_state(&self) -> anyhow::Result<()> {
-        let path = JobState::gen_name(&self.job_state.id, &self.job_state.name);
+        let path = JobState::gen_name(self.job_state.id(), self.job_state.name());
         self.config
             .ds
             .write(&path, serde_json::to_value(self.job_state.clone()).unwrap())
@@ -177,7 +190,7 @@ impl JobRunner {
     fn register(&self) -> Result<(), JobRunnerError> {
         match self
             .job_manager_tx
-            .send(Message::broadcast_job_start(&self.job_state.name))
+            .send(Message::broadcast_job_start(self.job_state.name()))
         {
             Ok(_) => Ok(()),
             Err(er) => Err(JobRunnerError::CompleteError(er.to_string())),
@@ -188,7 +201,7 @@ impl JobRunner {
     pub fn complete(self) -> Result<JobState, JobRunnerError> {
         match self
             .job_manager_tx
-            .send(Message::broadcast_job_end(&self.job_state.name))
+            .send(Message::broadcast_job_end(self.job_state.name()))
         {
             Ok(_) => Ok(self.job_state),
             Err(er) => Err(JobRunnerError::CompleteError(er.to_string())),
@@ -228,7 +241,7 @@ impl JobRunner {
         self.save_job_state().await?;
         let mut lines_scanned = 0_usize;
         loop {
-            let info = JobItemInfo::new((lines_scanned, &self.job_state.name));
+            let info = JobItemInfo::new((lines_scanned, self.job_state.name()));
             match input_rx.recv().await {
                 Some(Ok(DataSourceMessage::Data {
                     source,
@@ -286,7 +299,7 @@ impl JobRunner {
         O: Serialize + Debug + Send + Sync,
     {
         Ok(JRDataSource {
-            job_name: self.job_state.name.clone(),
+            job_name: self.job_state.name().to_owned(),
             transformer,
             input_ds: ds,
         })
@@ -310,7 +323,7 @@ impl JobRunner {
 
         match self.job_state.streams.is_complete(stream_name) {
             Ok(true) => {
-                self.log_info(&self.job_state.name, "Job already completed, skipping");
+                self.log_info(self.job_state.name(), "Job already completed, skipping");
                 return Ok(self);
             }
             Ok(false) => {
@@ -321,7 +334,7 @@ impl JobRunner {
             _ => (),
         };
 
-        self.log_info(&self.job_state.name, "Starting job");
+        self.log_info(self.job_state.name(), "Starting job");
         let jr_action = job_handler.init(&self).await?;
         let index_start = match &jr_action {
             JobRunnerAction::Start => 0,
@@ -330,7 +343,7 @@ impl JobRunner {
                 self.job_state.streams.complete(stream_name)?;
                 self.save_job_state().await?;
                 self.log_info(
-                    &self.job_state.name,
+                    self.job_state.name(),
                     "StreamHandler requested the job to be skipped",
                 );
                 return Ok(self);
@@ -354,7 +367,7 @@ impl JobRunner {
                             .process_item(
                                 JobItemInfo::new((
                                     self.num_processed_items,
-                                    &self.job_state.name,
+                                    self.job_state.name(),
                                 )),
                                 line,
                                 &self,
@@ -366,10 +379,10 @@ impl JobRunner {
                             }
                             Err(er) => {
                                 self.log_err(
-                                    &self.job_state.name,
+                                    self.job_state.name(),
                                     Some(&JobItemInfo::new((
                                         self.num_processed_items,
-                                        &self.job_state.name,
+                                        self.job_state.name(),
                                     ))),
                                     er.to_string(),
                                 );
@@ -382,10 +395,10 @@ impl JobRunner {
                 Some(Err(er)) => {
                     self.num_process_item_errors += 1;
                     self.log_err(
-                        &self.job_state.name,
+                        self.job_state.name(),
                         Some(&JobItemInfo::new((
                             self.num_processed_items,
-                            &self.job_state.name,
+                            self.job_state.name(),
                         ))),
                         er.to_string(),
                     );
@@ -428,22 +441,32 @@ impl JobRunner {
     pub async fn run_cmd(mut self, job_cmd: Box<dyn JobCommand>) -> anyhow::Result<Self> {
         self.job_state = self.load_job_state().await?;
         let name = job_cmd.name();
-        if let Some(JobCommandStatus::Complete { .. }) =
-            self.job_state.commands.get(&name)
+        if let Err(_) = self.job_state.start_new_cmd(&name, &self.config) {
+            return Ok(self);
+        }
+        if let Some(JobCommandStatus::Complete { .. }) = self.job_state.get_command(&name)
         {
             self.log_info(
-                &self.job_state.name,
+                self.job_state.name(),
                 format!("{} command previously ran, skipping", &name),
             );
         } else {
-            use chrono::Utc;
-            let started = Utc::now();
-            job_cmd.run(&self).await?;
-            let finished = Utc::now();
-            self.job_state.commands.insert(
-                name.clone(),
-                JobCommandStatus::Complete { started, finished },
-            );
+            match job_cmd.run(&self).await {
+                Ok(()) => {
+                    self.job_state.cmd_ok(name, &self.config)?;
+                }
+                Err(er) => {
+                    self.job_state.cmd_not_ok(&name, er.to_string())?;
+                    /*
+                    self.job_state.set_fatal_error(&name, er.to_string());
+                    */
+                    self.log_err(
+                        self.job_state.name(),
+                        None,
+                        format!("{} command ran into an error: {}", name, er),
+                    );
+                }
+            };
             self.save_job_state().await?;
         }
         Ok(self)
@@ -483,6 +506,8 @@ pub mod error {
     use thiserror::Error;
     #[derive(Error, Debug)]
     pub enum JobRunnerError {
+        /// Triggered when some particular DataSource or DataOutput reach a maximum amount of
+        /// errors
         #[error("Received TooManyErrors message from JobManager")]
         TooManyErrors,
         /// currently never returns this error because general use-cases call for
@@ -492,5 +517,11 @@ pub mod error {
         LoadedStateWithError,
         #[error("Job completed with an error: `{0}`")]
         CompleteError(String),
+        #[error("Step {name} at index {step_index} in the job returned: {message} ")]
+        JobStepError {
+            step_index: isize,
+            name: String,
+            message: String,
+        },
     }
 }
