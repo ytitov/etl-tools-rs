@@ -126,7 +126,6 @@ impl StreamHandler<TestSourceData> for TestJob {
         let TestJob {
             output: (output_tx, _),
         } = &self;
-        println!("{:?}", &item);
         let TestSourceData { id, name, .. } = item;
         output_tx
             .send(DataOutputMessage::new(TestOutputData { id, name }))
