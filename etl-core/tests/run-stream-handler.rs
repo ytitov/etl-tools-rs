@@ -125,18 +125,10 @@ impl StreamHandler<TestSourceData> for TestJob {
             output: (output_tx, _),
         } = &self;
         println!("{:?}", &item);
-        output_tx.send(DataOutputMessage::new(item.clone())).await?;
-        /*
-        target_json_tx
-            .send(DataOutputMessage::new(item.clone()))
+        let TestSourceData { id, name, .. } = item;
+        output_tx
+            .send(DataOutputMessage::new(TestOutputData { id, name }))
             .await?;
-        target_csv_tx
-            .send(DataOutputMessage::new(Info {
-                resource_type: Some("what".to_string()),
-                index: Some(jinfo.index),
-            }))
-            .await?;
-        */
         Ok(())
     }
 
