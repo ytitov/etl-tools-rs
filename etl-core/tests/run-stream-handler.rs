@@ -43,7 +43,9 @@ async fn basic_stream_handler_all_errors() {
         .expect("Error running stream")
         .complete()
         .expect("Job completed with an error");
-    jm_handle.await;
+    jm_handle
+        .await
+        .expect("Fatal error awaiting on JobManager handle");
     if let Some(cmd_status) = job_state.step_history.get("TestJob") {
         if let JobStepDetails {
             step:
@@ -117,7 +119,7 @@ impl StreamHandler<TestSourceData> for TestJob {
     }
     async fn process_item(
         &self,
-        jinfo: JobItemInfo,
+        _: JobItemInfo,
         item: TestSourceData,
         _: &JobRunner,
     ) -> anyhow::Result<()> {
@@ -132,7 +134,7 @@ impl StreamHandler<TestSourceData> for TestJob {
         Ok(())
     }
 
-    async fn shutdown(self: Box<Self>, jr: &mut JobRunner) -> anyhow::Result<()> {
+    async fn shutdown(self: Box<Self>, _: &mut JobRunner) -> anyhow::Result<()> {
         Ok(())
     }
 }
