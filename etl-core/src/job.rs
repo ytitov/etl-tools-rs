@@ -223,65 +223,65 @@ impl JobRunner {
         T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static,
     {
         self.job_state = self.load_job_state().await?;
-
-        match &self.job_state.streams.is_complete(stream_name) {
-            Ok(true) => {
-                self.log_info(stream_name, "Stream already completed, skipping");
-                return Ok(self);
-            }
-            Ok(false) => {
-                self.job_state.streams.in_progress(stream_name)?;
-            }
-            _ => (),
-        };
-
-        //self.log_info(&self.job_state.name, "Job started");
-        let input_name = input.name().to_string();
-        // no need to wait on input JoinHandle
-        let (mut input_rx, _) = input.start_stream().await?;
-        let (output_tx, output_jh) = output.start_stream(jm).await?;
-        self.save_job_state().await?;
-        let mut lines_scanned = 0_usize;
-        loop {
-            let info = JobItemInfo::new((lines_scanned, self.job_state.name()));
-            match input_rx.recv().await {
-                Some(Ok(DataSourceMessage::Data {
-                    source,
-                    content: input_item,
-                })) => {
-                    lines_scanned += 1;
-                    self.job_state.streams.incr_num_ok(stream_name, &source)?;
-                    output_tx.send(DataOutputMessage::new(input_item)).await?;
-                }
-                Some(Err(val)) => {
-                    lines_scanned += 1;
-                    self.job_state.streams.incr_error(stream_name)?;
-                    self.log_err(&input_name, Some(&info), val.to_string());
-                }
-                None => break,
-            };
-            match self.process_job_manager_rx() {
-                Err(JobRunnerError::TooManyErrors) => {
-                    self.job_state.streams.set_error(
-                        stream_name,
-                        "JobMonitor has reached maximum errors",
-                        lines_scanned,
-                    )?;
-                    self.save_job_state().await?;
-                    return Err(anyhow::anyhow!("{}", JobRunnerError::TooManyErrors));
-                }
-                Err(_) => {}
-                Ok(()) => {}
-            };
+        let name = stream_name.to_string();
+        if let Err(_) = self.job_state.start_new_stream(&name, &self.config) {
+            return Ok(self);
         }
-        drop(input_rx);
-        drop(output_tx);
-        output_jh.await??;
-        self.job_state
-            .streams
-            .set_total_lines(stream_name, lines_scanned)?;
-        self.job_state.streams.complete(stream_name)?;
-        self.save_job_state().await?;
+
+        if let Some(StepStreamStatus::Complete { .. }) = self.job_state.get_stream(&name)
+        {
+            self.log_info(
+                self.job_state.name(),
+                format!("{} stream previously ran, skipping", &name),
+            );
+        } else {
+            let input_name = input.name().to_string();
+            // no need to wait on input JoinHandle
+            let (mut input_rx, _) = input.start_stream().await?;
+            let (output_tx, output_jh) = output.start_stream(jm).await?;
+            self.save_job_state().await?;
+            let mut lines_scanned = 0_usize;
+            loop {
+                let info = JobItemInfo::new((lines_scanned, self.job_state.name()));
+                match input_rx.recv().await {
+                    Some(Ok(DataSourceMessage::Data {
+                        source,
+                        content: input_item,
+                    })) => {
+                        lines_scanned += 1;
+                        self.job_state.streams.incr_num_ok(stream_name, &source)?;
+                        output_tx.send(DataOutputMessage::new(input_item)).await?;
+                    }
+                    Some(Err(val)) => {
+                        lines_scanned += 1;
+                        self.job_state.streams.incr_error(stream_name)?;
+                        self.log_err(&input_name, Some(&info), val.to_string());
+                    }
+                    None => break,
+                };
+                match self.process_job_manager_rx() {
+                    Err(JobRunnerError::TooManyErrors) => {
+                        self.job_state.stream_not_ok(
+                            name,
+                            String::from("Reached too many errors"),
+                            lines_scanned,
+                        )?;
+                        self.save_job_state().await?;
+                        drop(input_rx);
+                        drop(output_tx);
+                        output_jh.await??;
+                        return Err(anyhow::anyhow!("{}", JobRunnerError::TooManyErrors));
+                    }
+                    Err(_) => {}
+                    Ok(()) => {}
+                };
+            }
+            self.job_state.stream_ok(name, &self.config)?;
+            drop(input_rx);
+            drop(output_tx);
+            output_jh.await??;
+            self.save_job_state().await?;
+        }
         Ok(self)
     }
 

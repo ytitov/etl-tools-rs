@@ -96,11 +96,18 @@ impl Default for JobStreamsState {
 }
 
 impl JobStreamsState {
-    pub fn complete<N: Into<String>>(&mut self, name: N) -> anyhow::Result<()> {
+    pub fn get(&self, name: &str) -> Option<&'_ StepStreamStatus> {
+        self.states.get(name)
+    }
+
+    pub fn complete<N: Into<String>>(
+        &mut self,
+        name: N,
+    ) -> anyhow::Result<StepStreamStatus> {
         match self.states.get_mut(&name.into()) {
             Some(js) => {
                 js.complete();
-                Ok(())
+                Ok(js.clone())
             }
             None => Err(anyhow::anyhow!(
                 "Tried completing a stream which was never started"
@@ -171,11 +178,11 @@ impl JobStreamsState {
         name: N,
         message: M,
         lines_scanned: usize,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<StepStreamStatus> {
         match self.states.get_mut(&name.into()) {
             Some(js) => {
                 js.set_error(message, lines_scanned);
-                Ok(())
+                Ok(js.clone())
             }
             None => Err(anyhow::anyhow!(
                 "Tried increment a line on a stream which never started"
@@ -226,6 +233,7 @@ pub struct JobState {
     commands: HashMap<String, StepCommandStatus>,
     pub settings: HashMap<String, JsonValue>,
     #[serde(default)]
+    //TODO: this needs to be private in order to move direct state manipulation out of job runner
     pub streams: JobStreamsState,
     name: String,
     id: String,
@@ -250,6 +258,10 @@ impl JobState {
 
     pub fn get_command(&self, cmd_name: &str) -> Option<&'_ StepCommandStatus> {
         self.commands.get(cmd_name)
+    }
+
+    pub fn get_stream(&self, cmd_name: &str) -> Option<&'_ StepStreamStatus> {
+        self.streams.get(cmd_name)
     }
 
     fn add_command<C: Into<String>>(&mut self, cmd_name: C, cmd: StepCommandStatus) {
@@ -302,6 +314,31 @@ impl JobState {
         self.cur_step_index += 1;
         Ok(())
     }
+    pub fn start_new_stream<N: Into<String>>(
+        &mut self,
+        name: N,
+        jrc: &JobRunnerConfig,
+    ) -> anyhow::Result<()> {
+        match &self.run_status {
+            RunStatus::InProgress => {
+                self.streams.in_progress(name)?;
+            }
+            RunStatus::Completed => {}
+            RunStatus::FatalError {
+                step_index: _,
+                step_name: _,
+                message: _,
+            } => {
+                if jrc.stop_on_error {
+                    return Err(anyhow::anyhow!("Can't start the new job because stop_on_error flag is set to true"));
+                } else {
+                    self.streams.in_progress(name)?;
+                }
+            }
+        }
+        self.cur_step_index += 1;
+        Ok(())
+    }
 
     pub fn cmd_ok<N: Into<String>>(
         &mut self,
@@ -332,6 +369,57 @@ impl JobState {
         Err(anyhow::anyhow!(
             "Fatal error: the command was never started"
         ))
+    }
+
+    pub fn stream_ok<N: Into<String>>(
+        &mut self,
+        name: N,
+        _: &JobRunnerConfig,
+    ) -> anyhow::Result<()> {
+        let n = name.into();
+        match self.streams.complete(&n) {
+            Ok(stream) => {
+                self.step_history.insert(
+                    n.clone(),
+                    JobStepDetails {
+                        name: n,
+                        step_index: self.cur_step_index as usize,
+                        step: JobStepStatus::Stream(stream.clone()),
+                    },
+                );
+                Ok(())
+            }
+            Err(er) => Err(anyhow::anyhow!(
+                "Fatal error: the stream was never started: {}",
+                er
+            )),
+        }
+    }
+
+    pub fn stream_not_ok<N: Into<String>, M: Into<String>>(
+        &mut self,
+        name: N,
+        m: M,
+        lines_scanned: usize,
+    ) -> anyhow::Result<()> {
+        let n = name.into();
+        match self.streams.set_error(&n, m, lines_scanned) {
+            Ok(stream) => {
+                self.step_history.insert(
+                    n.clone(),
+                    JobStepDetails {
+                        name: n,
+                        step_index: self.cur_step_index as usize,
+                        step: JobStepStatus::Stream(stream.clone()),
+                    },
+                );
+                Ok(())
+            }
+            Err(er) => Err(anyhow::anyhow!(
+                "Fatal error: the stream was never started: {}",
+                er
+            )),
+        }
     }
 
     pub fn cmd_not_ok<N: Into<String>, M: Into<String>>(

@@ -18,14 +18,6 @@ async fn test_simple_pipeline() {
         "test_simple_pipeline",
         jm_channel.clone(),
         JobRunnerConfig {
-            /*
-            ds: Box::new(LocalFsDataSource {
-                read_content: ReadContentOptions::Json,
-                write_content: WriteContentOptions::Json,
-                home: args.store_state,
-                ..Default::default()
-            }),
-            */
             ..Default::default()
         },
     );
@@ -47,12 +39,37 @@ async fn test_simple_pipeline() {
         .await
         .expect("Error running run_data_output");
     let job_state = jr.complete().expect("Error completing job");
-    let ds_state = job_state.streams.states.get("transformed-ds-1").unwrap();
-    let n = ds_state.get_total_lines();
-    assert_eq!(n, 5);
+    println!("job_state: {:?}", &job_state);
+    use state::*;
     jm_handle
         .await
         .expect("Error awaiting on job manager handle");
+    if let Some(cmd_status) = job_state.step_history.get("transformed-ds-1") {
+        if let JobStepDetails {
+            step:
+                JobStepStatus::Stream(StepStreamStatus::Complete {
+                    total_lines_scanned,
+                    num_errors,
+                    ..
+                }),
+            step_index,
+            ..
+        } = cmd_status
+        {
+            assert_eq!(0, *step_index);
+            assert_eq!(3, *total_lines_scanned);
+            assert_eq!(2, *num_errors);
+        } else {
+            panic!("transformed-ds-1 is not showing as completed");
+        }
+    } else {
+        panic!("Expected a step with name transformed-ds-1");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+async fn test_multiplestreams() {
+    panic!("Test not implemented");
 }
 
 pub struct TestTransformer;
