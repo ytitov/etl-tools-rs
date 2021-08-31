@@ -12,6 +12,7 @@ use std::fmt::Debug;
 pub mod command;
 pub mod handler;
 pub mod stream;
+pub mod stream_handler_builder;
 use command::*;
 use handler::*;
 //use stream::*;
