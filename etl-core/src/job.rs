@@ -118,6 +118,7 @@ impl JobRunner {
         Ok(())
     }
 
+    /// convenience method to await on any handles useful inside the StreamHandler
     pub fn await_data_output(&mut self, d: DataOutputJoinHandle) {
         self.data_output_handles.push(d);
     }
@@ -323,6 +324,9 @@ impl JobRunner {
         let stream_name = job_handler.name();
         self.job_state = self.load_job_state().await?;
 
+        if let Err(_) = self.job_state.start_new_stream(stream_name, &self.config) {
+            return Ok(self);
+        }
         match self.job_state.streams.is_complete(stream_name) {
             Ok(true) => {
                 self.log_info(self.job_state.name(), "Job already completed, skipping");
@@ -336,13 +340,13 @@ impl JobRunner {
             _ => (),
         };
 
-        self.log_info(self.job_state.name(), "Starting job");
         let jr_action = job_handler.init(&self).await?;
         let index_start = match &jr_action {
             JobRunnerAction::Start => 0,
             JobRunnerAction::Resume { index } => *index,
             JobRunnerAction::Skip => {
-                self.job_state.streams.complete(stream_name)?;
+                //self.job_state.streams.complete(stream_name)?;
+                self.job_state.stream_ok(stream_name, &self.config)?;
                 self.save_job_state().await?;
                 self.log_info(
                     self.job_state.name(),
@@ -364,7 +368,6 @@ impl JobRunner {
                 })) => {
                     if received_lines >= index_start {
                         lines_scanned += 1;
-                        self.job_state.streams.incr_num_ok(stream_name, &source)?;
                         match job_handler
                             .process_item(
                                 JobItemInfo::new((
@@ -378,6 +381,9 @@ impl JobRunner {
                         {
                             Ok(()) => {
                                 self.num_processed_items += 1;
+                                self.job_state
+                                    .streams
+                                    .incr_num_ok(stream_name, &source)?;
                             }
                             Err(er) => {
                                 self.log_err(
@@ -388,6 +394,7 @@ impl JobRunner {
                                     ))),
                                     er.to_string(),
                                 );
+                                self.job_state.streams.incr_error(stream_name)?;
                                 self.num_process_item_errors += 1;
                             }
                         }
@@ -404,6 +411,7 @@ impl JobRunner {
                         ))),
                         er.to_string(),
                     );
+                    self.job_state.streams.incr_error(stream_name)?;
                 }
                 None => {
                     break;
@@ -411,7 +419,7 @@ impl JobRunner {
             };
             match self.process_job_manager_rx() {
                 Err(JobRunnerError::TooManyErrors) => {
-                    self.job_state.streams.set_error(
+                    self.job_state.stream_not_ok(
                         stream_name,
                         "JobMonitor has reached maximum errors",
                         lines_scanned,
@@ -419,7 +427,9 @@ impl JobRunner {
                     self.save_job_state().await?;
                     return Err(anyhow::anyhow!("{}", JobRunnerError::TooManyErrors));
                 }
-                Err(_) => {}
+                Err(er) => {
+                    panic!("Unhandled error: {}", er);
+                }
                 Ok(()) => {}
             };
         }
@@ -427,7 +437,7 @@ impl JobRunner {
         self.job_state
             .streams
             .set_total_lines(stream_name, self.num_processed_items)?;
-        self.job_state.streams.complete(stream_name)?;
+        self.job_state.stream_ok(stream_name, &self.config)?;
         job_handler.shutdown(&mut self).await?;
 
         // only wait if everything is okay
@@ -460,9 +470,6 @@ impl JobRunner {
                 }
                 Err(er) => {
                     self.job_state.cmd_not_ok(&name, er.to_string())?;
-                    /*
-                    self.job_state.set_fatal_error(&name, er.to_string());
-                    */
                     self.log_err(
                         self.job_state.name(),
                         None,

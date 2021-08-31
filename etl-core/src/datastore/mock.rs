@@ -4,6 +4,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+pub mod mock_csv;
+
 #[derive(Default)]
 /// Designed as a "null" datastore target.  Items received are not written anywhere
 pub struct MockJsonDataOutput {
@@ -88,6 +90,7 @@ impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static>
                             tx.send(Ok(DataSourceMessage::new("MockJsonDataSource", r)))
                                 .await
                                 .map_err(|e| DataStoreError::send_error(&name, "", e))?;
+                            lines_scanned += 1;
                         }
                         Err(val) => {
                             match tx

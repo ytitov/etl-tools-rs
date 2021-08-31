@@ -167,9 +167,7 @@ impl JobStreamsState {
                 js.set_total_lines(num_lines);
                 Ok(())
             }
-            None => Err(anyhow::anyhow!(
-                "Tried increment a line on a stream which never started"
-            )),
+            None => Err(anyhow::anyhow!("set_total_lines failed")),
         }
     }
 
@@ -184,9 +182,7 @@ impl JobStreamsState {
                 js.set_error(message, lines_scanned);
                 Ok(js.clone())
             }
-            None => Err(anyhow::anyhow!(
-                "Tried increment a line on a stream which never started"
-            )),
+            None => Err(anyhow::anyhow!("set_error on stream failed")),
         }
     }
 
