@@ -125,6 +125,7 @@ impl StreamHandler<TestSourceData> for TestJob {
             output: (output_tx, _),
         } = &self;
         println!("{:?}", &item);
+        output_tx.send(DataOutputMessage::new(item.clone())).await?;
         /*
         target_json_tx
             .send(DataOutputMessage::new(item.clone()))
