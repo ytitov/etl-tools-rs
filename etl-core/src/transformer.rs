@@ -13,34 +13,6 @@ pub struct Transformer<I, O> {
     //pub map: Box<dyn Fn(I) -> DataOutputItemResult<O> + Send + Sync + 'static>,
     pub map: fn(I) -> DataOutputItemResult<O>,
 }
-/*
- * started doing some work on an async version but decided to stop and finish
- * this at another time.  The simple mapper should suffice because can do these
- * final modifications at the job handler trait
-pub struct Transformer<I, O> {
-    pub input: Box<dyn DataSource<I>>,
-    //pub output: Box<dyn DataSource<O>>,
-    //pub map: Box<dyn Fn(I) -> DataOutputItemResult<O> + Send + Sync + 'static>,
-    //pub map: fn(I) -> DataOutputItemResult<O>,
-    pub map: Box<dyn MapItem<I, O> + Send + Sync>,
-}
-
-#[async_trait]
-pub trait MapItem<I: 'static + Send, O: Send>: Sync + Send {
-    async fn map(&self, _: I) -> DataOutputItemResult<O> {
-        unimplemented!();
-    }
-}
-
-#[async_trait]
-impl<I: 'static + Send, O: Send> MapItem<I, O>
-    for Box<dyn Fn(I) -> DataOutputItemResult<O> + Send + Sync>
-{
-    async fn map(&self, i: I) -> DataOutputItemResult<O> {
-        (self)(i)
-    }
-}
-*/
 
 #[async_trait]
 impl<
