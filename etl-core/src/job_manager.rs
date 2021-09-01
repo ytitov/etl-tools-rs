@@ -51,7 +51,8 @@ pub enum Message {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JobManagerConfig {
     /// When max_errors is reached, a shutdown message is sent, which stops all
-    /// of the jobs currently running.
+    /// of the jobs currently running. There is no guarantee that this message will arrive at a
+    /// specific time, so max_errors inside the JobRunner is the local allowable errors.
     pub max_errors: usize,
     /// If set to None, the output will go to stdout
     pub log_path: Option<String>,
@@ -177,7 +178,7 @@ impl JobManager {
                                 if self.num_log_errors >= self.config.max_errors {
                                     log_err(
                                         &self.logger_tx,
-                                        "Reached too many errors, shutting down",
+                                        "Reached too many global errors, shutting down",
                                     );
                                     self.tx
                                         .send(Message::ToJobRunner(

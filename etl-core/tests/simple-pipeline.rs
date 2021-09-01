@@ -32,7 +32,6 @@ async fn test_simple_pipeline() {
     let jr = jr
         .run_stream(
             "transformed-ds-1",
-            //Box::new(transformed_ds) as Box<dyn DataSource<TestOutputData> + Send + Sync>,
             Box::new(transformed_ds) as Box<dyn DataSource<TestOutputData>>,
             Box::new(MockJsonDataOutput::default()),
             jm_channel.clone(),
@@ -69,8 +68,45 @@ async fn test_simple_pipeline() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn test_multiplestreams() {
-    panic!("Test not implemented");
+async fn test_simple_pipeline_max_error_with_failure() {
+    let job_manager = JobManager::new(JobManagerConfig {
+        max_errors: 100,
+        ..Default::default()
+    })
+    .expect("Could not initialize job_manager");
+    let (jm_handle, jm_channel) = job_manager.start();
+    let jr = JobRunner::new(
+        "test_simple_pipeline_id",
+        "test_simple_pipeline",
+        jm_channel.clone(),
+        JobRunnerConfig {
+            max_errors: 2, // do a hard fail at error 2
+            ..Default::default()
+        },
+    );
+    // transform mock data source using TestTransformer and
+    // create a new data source
+    let transformed_ds = jr
+        .as_datasource(
+            Box::new(create_mock_data_source_many_errors()),
+            Box::new(TestTransformer {}),
+        )
+        .expect("Error creating transformed_ds");
+    let jr = jr
+        .run_stream(
+            "transformed-ds-1",
+            Box::new(transformed_ds) as Box<dyn DataSource<TestOutputData>>,
+            Box::new(MockJsonDataOutput::default()),
+            jm_channel.clone(),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(JobRunnerError::TooManyErrors, jr);
+    //let job_result = jr.complete().expect("Error completing job");
+    //use state::*;
+    jm_handle
+        .await
+        .expect("Error awaiting on job manager handle");
 }
 
 pub struct TestTransformer;
@@ -116,6 +152,46 @@ fn create_mock_data_source() -> MockJsonDataSource {
             })
             .unwrap(),
             "1 this is a malformed json".to_string(),
+            "2 this is a malformed json".to_string(),
+            serde_json::to_string(&TestSourceData {
+                name: Some(String::from("Angela")),
+                todo: vec![String::from("paint the barn")],
+                id: String::from("ang23"),
+            })
+            .unwrap(),
+            serde_json::to_string(&TestSourceData {
+                name: Some(String::from("Martin")),
+                todo: vec![String::from("code something up")],
+                id: String::from("mrt1"),
+            })
+            .unwrap(),
+        ],
+        ..Default::default()
+    }
+}
+
+fn create_mock_data_source_many_errors() -> MockJsonDataSource {
+    MockJsonDataSource {
+        lines: vec![
+            serde_json::to_string(&TestSourceData {
+                name: Some(String::from("Bob")),
+                todo: Vec::new(),
+                id: String::from("bob1"),
+            })
+            .unwrap(),
+            "1 this is a malformed json".to_string(),
+            "2 this is a malformed json".to_string(),
+            "2 this is a malformed json".to_string(),
+            "2 this is a malformed json".to_string(),
+            "2 this is a malformed json".to_string(),
+            "2 this is a malformed json".to_string(),
+            "2 this is a malformed json".to_string(),
+            "2 this is a malformed json".to_string(),
+            "2 this is a malformed json".to_string(),
+            "2 this is a malformed json".to_string(),
+            "2 this is a malformed json".to_string(),
+            "2 this is a malformed json".to_string(),
+            "2 this is a malformed json".to_string(),
             "2 this is a malformed json".to_string(),
             serde_json::to_string(&TestSourceData {
                 name: Some(String::from("Angela")),

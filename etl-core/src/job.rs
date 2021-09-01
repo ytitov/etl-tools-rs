@@ -7,6 +7,7 @@ use mock::*;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use state::*;
+use std::fmt;
 use std::fmt::Debug;
 
 pub mod command;
@@ -36,8 +37,18 @@ pub struct JobRunner {
     is_running: bool,
 }
 
+impl fmt::Debug for JobRunner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("JobRunner")
+            .field("job_state", &self.job_state)
+            .finish()
+    }
+}
+
 pub struct JobRunnerConfig {
-    //pub max_errors: usize,
+    /// maximum number of errors to tolerate in this particular pipeline.  Different from
+    /// JobManager max_errors which counts number of errors from all pipelines reporting
+    pub max_errors: usize,
     /// Stop if any commands or streams result in an error.  Note that this does not count any
     /// serialization/deserialization errors which happen when processing individual data
     /// elements
@@ -50,7 +61,7 @@ pub struct JobRunnerConfig {
 impl Default for JobRunnerConfig {
     fn default() -> Self {
         JobRunnerConfig {
-            //max_errors: 1000,
+            max_errors: 1000,
             stop_on_error: true,
             ds: Box::new(MockJsonDataSource::default()),
         }
@@ -168,7 +179,9 @@ impl JobRunner {
         }
     }
 
-    /// process messages from the JobManager
+    /// Checks if the job must exist by processing messages from JobManager and also checking
+    /// whether the JobRunner has reached maximum number of errors allowed.  If it must exit, it
+    /// will notify JobManager of the fact and return a JobRunnerError
     fn process_job_manager_rx(&mut self) -> Result<(), JobRunnerError> {
         loop {
             if let Ok(message) = self.job_manager_rx.try_recv() {
@@ -187,6 +200,11 @@ impl JobRunner {
                 break;
             }
         }
+        if self.config.max_errors <= self.num_process_item_errors {
+            // notify JobManager that we are exiting
+            self.un_register()?;
+            return Err(JobRunnerError::TooManyErrors);
+        }
         Ok(())
     }
 
@@ -195,6 +213,17 @@ impl JobRunner {
         match self
             .job_manager_tx
             .send(Message::broadcast_job_start(self.job_state.name()))
+        {
+            Ok(_) => Ok(()),
+            Err(er) => Err(JobRunnerError::CompleteError(er.to_string())),
+        }
+    }
+
+    /// Notify JobManager that this job was added
+    fn un_register(&self) -> Result<(), JobRunnerError> {
+        match self
+            .job_manager_tx
+            .send(Message::broadcast_job_end(self.job_state.name()))
         {
             Ok(_) => Ok(()),
             Err(er) => Err(JobRunnerError::CompleteError(er.to_string())),
@@ -220,7 +249,7 @@ impl JobRunner {
         input: Box<dyn DataSource<T>>,
         mut output: Box<dyn DataOutput<T>>,
         jm: JobManagerChannel,
-    ) -> anyhow::Result<Self>
+    ) -> Result<Self, JobRunnerError>
     where
         T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static,
     {
@@ -258,6 +287,7 @@ impl JobRunner {
                         lines_scanned += 1;
                         self.job_state.streams.incr_error(stream_name)?;
                         self.log_err(&input_name, Some(&info), val.to_string());
+                        self.num_process_item_errors += 1;
                     }
                     None => break,
                 };
@@ -272,7 +302,7 @@ impl JobRunner {
                         drop(input_rx);
                         drop(output_tx);
                         output_jh.await??;
-                        return Err(anyhow::anyhow!("{}", JobRunnerError::TooManyErrors));
+                        return Err(JobRunnerError::TooManyErrors);
                     }
                     Err(_) => {}
                     Ok(()) => {}
@@ -317,7 +347,7 @@ impl JobRunner {
         mut self,
         ds: Box<dyn DataSource<I>>,
         mut job_handler: Box<dyn StreamHandler<I>>,
-    ) -> anyhow::Result<Self>
+    ) -> Result<Self, JobRunnerError>
     where
         I: DeserializeOwned + Serialize + Debug + Send + Sync + 'static,
     {
@@ -403,7 +433,6 @@ impl JobRunner {
                     received_lines += 1;
                 }
                 Some(Err(er)) => {
-                    self.num_process_item_errors += 1;
                     self.log_err(
                         self.job_state.name(),
                         Some(&JobItemInfo::new((
@@ -413,6 +442,7 @@ impl JobRunner {
                         er.to_string(),
                     );
                     self.job_state.streams.incr_error(stream_name)?;
+                    self.num_process_item_errors += 1;
                 }
                 None => {
                     break;
@@ -426,7 +456,7 @@ impl JobRunner {
                         lines_scanned,
                     )?;
                     self.save_job_state().await?;
-                    return Err(anyhow::anyhow!("{}", JobRunnerError::TooManyErrors));
+                    return Err(JobRunnerError::TooManyErrors);
                 }
                 Err(er) => {
                     panic!("Unhandled error: {}", er);
@@ -451,7 +481,10 @@ impl JobRunner {
         Ok(self)
     }
 
-    pub async fn run_cmd(mut self, job_cmd: Box<dyn JobCommand>) -> anyhow::Result<Self> {
+    pub async fn run_cmd(
+        mut self,
+        job_cmd: Box<dyn JobCommand>,
+    ) -> Result<Self, JobRunnerError> {
         self.job_state = self.load_job_state().await?;
         let name = job_cmd.name();
         if let Err(_) = self.job_state.start_new_cmd(&name, &self.config) {
@@ -515,7 +548,9 @@ pub enum JobRunnerAction {
 
 pub mod error {
     use thiserror::Error;
-    #[derive(Error, Debug)]
+    /// These are all fatal errors which can stop the execution of a pipeline defined by the
+    /// JobRunner
+    #[derive(Error, Debug, PartialEq)]
     pub enum JobRunnerError {
         /// Triggered when some particular DataSource or DataOutput reach a maximum amount of
         /// errors
@@ -534,5 +569,42 @@ pub mod error {
             name: String,
             message: String,
         },
+        #[error("Encounter a fatal error: {message} ")]
+        GenericError { message: String },
+    }
+
+    impl From<anyhow::Error> for JobRunnerError {
+        fn from(er: anyhow::Error) -> Self {
+            JobRunnerError::GenericError {
+                message: er.to_string(),
+            }
+        }
+    }
+
+    use crate::datastore::error::DataStoreError;
+    impl From<DataStoreError> for JobRunnerError {
+        fn from(er: DataStoreError) -> Self {
+            JobRunnerError::GenericError {
+                message: er.to_string(),
+            }
+        }
+    }
+
+    use tokio::task::JoinError;
+    impl From<JoinError> for JobRunnerError {
+        fn from(er: JoinError) -> Self {
+            JobRunnerError::GenericError {
+                message: er.to_string(),
+            }
+        }
+    }
+
+    use tokio::sync::mpsc::error::SendError;
+    impl<T> From<SendError<T>> for JobRunnerError {
+        fn from(er: SendError<T>) -> Self {
+            JobRunnerError::GenericError {
+                message: er.to_string(),
+            }
+        }
     }
 }
