@@ -295,8 +295,8 @@ impl JobRunner {
     // semantically to be done by the JobRunner
     pub fn as_datasource<I, O>(
         &self,
-        ds: Box<dyn DataSource<I> + Send + Sync>,
-        transformer: Box<dyn TransformHandler<I, O> + Send + Sync>,
+        ds: Box<dyn DataSource<I>>,
+        transformer: Box<dyn TransformHandler<I, O>>,
     ) -> anyhow::Result<JRDataSource<I, O>>
     where
         I: DeserializeOwned + Debug + Send + Sync,
@@ -315,8 +315,8 @@ impl JobRunner {
     /// shutdown step give extra options.  See the relevant docs on that
     pub async fn run_stream_handler<I>(
         mut self,
-        ds: Box<dyn DataSource<I> + Send + Sync>,
-        mut job_handler: Box<dyn StreamHandler<I> + Send + Sync>,
+        ds: Box<dyn DataSource<I>>,
+        mut job_handler: Box<dyn StreamHandler<I>>,
     ) -> anyhow::Result<Self>
     where
         I: DeserializeOwned + Serialize + Debug + Send + Sync + 'static,

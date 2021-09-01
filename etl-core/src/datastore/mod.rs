@@ -2,11 +2,11 @@ use self::error::*;
 use crate::preamble::*;
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
+use serde::de::Deserializer;
 use serde::Serialize;
 use std::fmt::Debug;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinHandle;
-use serde::de::Deserializer;
 
 /// Local file system data stores
 pub mod fs;
@@ -92,7 +92,10 @@ pub trait DataSource<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send 
     /// TODO: this is not integrated yet because this doesn't get the JobManagerChannel because I'm
     /// not completely convinced this is necessary.  After all, JobRunner can close the rx end of
     /// the channel provided by the data source
-    fn process_job_manager_rx(&self, rx: &mut JobManagerRx) -> Result<(), DataStoreError> {
+    fn process_job_manager_rx(
+        &self,
+        rx: &mut JobManagerRx,
+    ) -> Result<(), DataStoreError> {
         loop {
             if let Ok(message) = rx.try_recv() {
                 use crate::job_manager::Message::*;
@@ -112,6 +115,11 @@ pub trait DataSource<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send 
         }
         Ok(())
     }
+    /*
+    fn boxed(self: Box<Self>) -> Box<dyn DataSource<T> + Send + Sync> {
+        Box::new(self)
+    }
+    */
 }
 
 /// Helps with creating DataOutput's during run-time.
@@ -234,7 +242,7 @@ pub mod error {
         #[error("JoinError: `{0}`")]
         JoinError(#[from] tokio::task::JoinError),
         #[error("Shutting down.  JobManager sent a global TooManyErrors message.")]
-        TooManyErrors
+        TooManyErrors,
     }
 
     impl DataStoreError {

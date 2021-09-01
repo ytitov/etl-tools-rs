@@ -32,7 +32,8 @@ async fn test_simple_pipeline() {
     let jr = jr
         .run_stream(
             "transformed-ds-1",
-            Box::new(transformed_ds) as Box<dyn DataSource<TestOutputData> + Send + Sync>,
+            //Box::new(transformed_ds) as Box<dyn DataSource<TestOutputData> + Send + Sync>,
+            Box::new(transformed_ds) as Box<dyn DataSource<TestOutputData>>,
             Box::new(MockJsonDataOutput::default()),
             jm_channel.clone(),
         )
