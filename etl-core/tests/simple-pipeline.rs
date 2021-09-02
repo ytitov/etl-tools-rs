@@ -30,9 +30,10 @@ async fn test_simple_pipeline() {
         )
         .expect("Error creating transformed_ds");
     let jr = jr
-        .run_stream(
+        .run_stream::<TestOutputData>(
             "transformed-ds-1",
-            Box::new(transformed_ds) as Box<dyn DataSource<TestOutputData>>,
+            //Box::new(transformed_ds) as Box<dyn DataSource<TestOutputData>>,
+            Box::new(transformed_ds),
             Box::new(MockJsonDataOutput::default()),
         )
         .await
