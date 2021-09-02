@@ -122,7 +122,6 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
 {
     // TODO: add ability to look in files and return them (store as vec of strings)
     async fn load(&self, path: &str) -> Result<T, DataStoreError> {
-        println!("#### MockJsonDataSource load called: {}", path);
         match self.files.lock() {
             Ok(files) => {
                 let files_hs = files.borrow();
@@ -152,7 +151,6 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
     }
 
     async fn write(&self, path: &str, item: T) -> Result<(), DataStoreError> {
-        println!("#### MockJsonDataSource write called: {}", path);
         match serde_json::to_string_pretty(&item) {
             Ok(content) => {
                 match self.files.lock() {

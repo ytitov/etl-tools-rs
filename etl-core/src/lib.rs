@@ -4,7 +4,7 @@ pub mod preamble {
     pub use crate::datastore::job_runner::JRDataSource;
     pub use crate::job::error::*;
     pub use crate::job::{handler::*, JobRunner, JobRunnerConfig};
-    pub use crate::job_manager::{JobManager, JobManagerChannel, Message};
+    pub use crate::job_manager::{JobManager, JobManagerChannel, JobManagerConfig, Message};
     pub use anyhow;
     pub use async_trait::async_trait;
     pub use serde;

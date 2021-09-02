@@ -248,6 +248,8 @@ impl JobRunner {
         stream_name: &str,
         input: Box<dyn DataSource<T>>,
         mut output: Box<dyn DataOutput<T>>,
+        //TODO: this can be cloned from the job runner, except job runner doesn't use the job
+        //manager channel type, but individual channels
         jm: JobManagerChannel,
     ) -> Result<Self, JobRunnerError>
     where
