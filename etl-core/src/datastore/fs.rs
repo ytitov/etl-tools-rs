@@ -90,15 +90,9 @@ impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static>
         match serde_json::to_string_pretty(&item) {
             Ok(content) => match file.write_all(content.as_bytes()).await {
                 Ok(()) => Ok(()),
-                Err(err) => Err(DataStoreError::FatalIO(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    err.to_string(),
-                ))),
+            Err(err) => Err(DataStoreError::FatalIO(err.to_string())),
             },
-            Err(err) => Err(DataStoreError::FatalIO(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                err.to_string(),
-            ))),
+            Err(err) => Err(DataStoreError::FatalIO(err.to_string())),
         }
     }
 }

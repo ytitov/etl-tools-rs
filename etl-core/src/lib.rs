@@ -16,3 +16,5 @@ pub mod job;
 pub mod job_manager;
 pub mod joins;
 pub mod transformer;
+/// for splitting streams into many identical DataSources
+pub mod splitter;

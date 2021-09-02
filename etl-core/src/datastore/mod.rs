@@ -19,6 +19,7 @@ pub mod mock;
 pub type DataOutputItemResult<T> = Result<T, DataStoreError>;
 
 pub type DataSourceRx<T> = Receiver<Result<DataSourceMessage<T>, DataStoreError>>;
+pub type DataSourceTx<T> = Sender<DataOutputMessage<T>>;
 pub type DataSourceTask<T> = (
     DataSourceRx<T>,
     JoinHandle<Result<DataSourceStats, DataStoreError>>,
@@ -210,7 +211,7 @@ where
 
 pub mod error {
     use thiserror::Error;
-    #[derive(Error, Debug)]
+    #[derive(Error, Debug, Clone)]
     pub enum DataStoreError {
         #[error(
             "There was a problem deserializing: `{message:?}`, The string: `{attempted_string:?}`"
@@ -222,9 +223,11 @@ pub mod error {
         #[error("Could not decode utf8: `{0}`")]
         FatalUtf8(#[from] std::str::Utf8Error),
         #[error("There was a fatal problem: `{0}`")]
-        FatalIO(#[from] std::io::Error),
+        //FatalIO(#[from] std::io::Error),
+        FatalIO(String),
         #[error("Error: `{0}`")]
-        Generic(#[from] anyhow::Error),
+        //Generic(#[from] anyhow::Error),
+        Generic(String),
         #[error("SendError from `{from:?}` to `{to:?}` reason: `{reason:?}`")]
         SendError {
             from: String,
@@ -240,7 +243,8 @@ pub mod error {
         )]
         TransformerError { job_name: String, error: String },
         #[error("JoinError: `{0}`")]
-        JoinError(#[from] tokio::task::JoinError),
+        //JoinError(#[from] tokio::task::JoinError),
+        JoinError(String),
         #[error("Shutting down.  JobManager sent a global TooManyErrors message.")]
         TooManyErrors,
     }
@@ -256,6 +260,25 @@ pub mod error {
                 to: to.into(),
                 reason: reason.to_string(),
             }
+        }
+    }
+
+    use tokio::task::JoinError;
+    impl From<JoinError> for DataStoreError {
+        fn from(er: JoinError) -> Self {
+            DataStoreError::JoinError(er.to_string())
+        }
+    }
+
+    impl From<std::io::Error> for DataStoreError {
+        fn from(er: std::io::Error) -> Self {
+            DataStoreError::FatalIO(er.to_string())
+        }
+    }
+
+    impl From<anyhow::Error> for DataStoreError {
+        fn from(er: anyhow::Error) -> Self {
+            DataStoreError::Generic(er.to_string())
         }
     }
 }

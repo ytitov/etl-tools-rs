@@ -3,27 +3,36 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::time::Duration;
 
 pub mod mock_csv;
 
-#[derive(Default)]
 /// Designed as a "null" datastore target.  Items received are not written anywhere
 pub struct MockJsonDataOutput {
     pub name: String,
+    pub sleep_duration: Duration,
+}
+
+impl Default for MockJsonDataOutput {
+    fn default() -> Self {
+        MockJsonDataOutput {
+            name: String::from("MockJsonDataOutput"),
+            sleep_duration: Duration::from_millis(0),
+        }
+    }
 }
 
 #[async_trait]
-impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T>
-    for MockJsonDataOutput
-{
-    async fn start_stream(
-        &mut self,
-        _: JobManagerChannel,
-    ) -> anyhow::Result<DataOutputTask<T>> {
+impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for MockJsonDataOutput {
+    async fn start_stream(&mut self, _: JobManagerChannel) -> anyhow::Result<DataOutputTask<T>> {
         use tokio::sync::mpsc::channel;
         let (tx, mut rx): (Sender<DataOutputMessage<T>>, _) = channel(1);
+        let sleep_duration = self.sleep_duration;
+        let name = self.name.clone();
         let jh: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
+            let name = name;
             loop {
+                tokio::time::sleep(sleep_duration).await;
                 match rx.recv().await {
                     Some(m) => {
                         match m {
@@ -31,10 +40,10 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T>
                                 // serialize
                                 match serde_json::to_string(&data) {
                                     Ok(line) => {
-                                        println!("MockDataOutput received: {}", line);
+                                        println!("{} received: {}", &name, line);
                                     }
                                     Err(e) => {
-                                        println!("MockDataOutput ERROR {}", e);
+                                        println!("{} ERROR {}", &name, e);
                                     }
                                 }
                             }
@@ -71,8 +80,8 @@ impl Default for MockJsonDataSource {
 }
 
 #[async_trait]
-impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static>
-    DataSource<T> for MockJsonDataSource
+impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static> DataSource<T>
+    for MockJsonDataSource
 {
     async fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         use tokio::sync::mpsc::channel;
@@ -81,37 +90,36 @@ impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static>
         let (tx, rx) = channel(1);
         let name = String::from("MockJsonDataSource");
         let lines = self.lines.clone();
-        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> =
-            tokio::spawn(async move {
-                let mut lines_scanned = 0_usize;
-                for line in lines {
-                    match serde_json::from_str::<T>(&line) {
-                        Ok(r) => {
-                            tx.send(Ok(DataSourceMessage::new("MockJsonDataSource", r)))
-                                .await
-                                .map_err(|e| DataStoreError::send_error(&name, "", e))?;
-                            lines_scanned += 1;
-                        }
-                        Err(val) => {
-                            match tx
-                                .send(Err(DataStoreError::Deserialize {
-                                    message: val.to_string(),
-                                    attempted_string: line.to_string(),
-                                }))
-                                .await
-                            {
-                                Ok(_) => {
-                                    lines_scanned += 1;
-                                }
-                                Err(e) => {
-                                    return Err(DataStoreError::send_error(&name, "", e));
-                                }
+        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
+            let mut lines_scanned = 0_usize;
+            for line in lines {
+                match serde_json::from_str::<T>(&line) {
+                    Ok(r) => {
+                        tx.send(Ok(DataSourceMessage::new("MockJsonDataSource", r)))
+                            .await
+                            .map_err(|e| DataStoreError::send_error(&name, "", e))?;
+                        lines_scanned += 1;
+                    }
+                    Err(val) => {
+                        match tx
+                            .send(Err(DataStoreError::Deserialize {
+                                message: val.to_string(),
+                                attempted_string: line.to_string(),
+                            }))
+                            .await
+                        {
+                            Ok(_) => {
+                                lines_scanned += 1;
+                            }
+                            Err(e) => {
+                                return Err(DataStoreError::send_error(&name, "", e));
                             }
                         }
-                    };
-                }
-                Ok(DataSourceStats { lines_scanned })
-            });
+                    }
+                };
+            }
+            Ok(DataSourceStats { lines_scanned })
+        });
         Ok((rx, jh))
     }
 }
@@ -140,7 +148,7 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
                     return Err(DataStoreError::NotExist {
                         key: path.to_owned(),
                         error: "Loading from MockJsonDataSource will always result in not found"
-                            .to_string()
+                            .to_string(),
                     });
                 }
             }
@@ -166,10 +174,7 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
                 };
                 Ok(())
             }
-            Err(err) => Err(DataStoreError::FatalIO(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                err.to_string(),
-            ))),
+            Err(err) => Err(DataStoreError::FatalIO(err.to_string())),
         }
     }
 }
