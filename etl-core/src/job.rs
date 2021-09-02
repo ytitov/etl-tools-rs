@@ -26,8 +26,7 @@ use self::error::*;
 /// multiple pipelines in parallel, use separate JobRunner for each pipeline.
 pub struct JobRunner {
     config: JobRunnerConfig,
-    job_manager_tx: JobManagerTx,
-    job_manager_rx: JobManagerRx,
+    job_manager_channel: JobManagerChannel,
     num_process_item_errors: usize,
     num_processed_items: usize,
     /// helps to await on DataOutput instances to complete writing
@@ -35,14 +34,6 @@ pub struct JobRunner {
     job_state: JobState,
     /// has the job started yet
     is_running: bool,
-}
-
-impl fmt::Debug for JobRunner {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("JobRunner")
-            .field("job_state", &self.job_state)
-            .finish()
-    }
 }
 
 pub struct JobRunnerConfig {
@@ -82,8 +73,7 @@ impl JobRunner {
         B: Into<String>,
     {
         let jr = JobRunner {
-            job_manager_rx: job_manager_channel.rx,
-            job_manager_tx: job_manager_channel.tx,
+            job_manager_channel,
             num_process_item_errors: 0,
             num_processed_items: 0,
             config,
@@ -141,7 +131,8 @@ impl JobRunner {
         B: Into<String>,
     {
         match self
-            .job_manager_tx
+            .job_manager_channel
+            .tx
             .send(Message::log_info(name, msg.into()))
         {
             Ok(_) => {}
@@ -161,7 +152,8 @@ impl JobRunner {
             None => format!("{}", msg.into()),
         };
         match self
-            .job_manager_tx
+            .job_manager_channel
+            .tx
             .send(Message::log_err(name.into(), message))
         {
             Ok(_) => {}
@@ -184,7 +176,7 @@ impl JobRunner {
     /// will notify JobManager of the fact and return a JobRunnerError
     fn process_job_manager_rx(&mut self) -> Result<(), JobRunnerError> {
         loop {
-            if let Ok(message) = self.job_manager_rx.try_recv() {
+            if let Ok(message) = self.job_manager_channel.rx.try_recv() {
                 use crate::job_manager::Message::*;
                 match message {
                     // message broadcasted from JobManager when there are too many errors and its
@@ -211,7 +203,8 @@ impl JobRunner {
     /// Notify JobManager that this job was added
     fn register(&self) -> Result<(), JobRunnerError> {
         match self
-            .job_manager_tx
+            .job_manager_channel
+            .tx
             .send(Message::broadcast_job_start(self.job_state.name()))
         {
             Ok(_) => Ok(()),
@@ -222,7 +215,8 @@ impl JobRunner {
     /// Notify JobManager that this job was added
     fn un_register(&self) -> Result<(), JobRunnerError> {
         match self
-            .job_manager_tx
+            .job_manager_channel
+            .tx
             .send(Message::broadcast_job_end(self.job_state.name()))
         {
             Ok(_) => Ok(()),
@@ -233,7 +227,8 @@ impl JobRunner {
     /// must be run once the JobRunner is done otherwise JobManager will not exit
     pub fn complete(self) -> Result<JobState, JobRunnerError> {
         match self
-            .job_manager_tx
+            .job_manager_channel
+            .tx
             .send(Message::broadcast_job_end(self.job_state.name()))
         {
             Ok(_) => Ok(self.job_state),
@@ -248,9 +243,6 @@ impl JobRunner {
         stream_name: &str,
         input: Box<dyn DataSource<T>>,
         mut output: Box<dyn DataOutput<T>>,
-        //TODO: this can be cloned from the job runner, except job runner doesn't use the job
-        //manager channel type, but individual channels
-        jm: JobManagerChannel,
     ) -> Result<Self, JobRunnerError>
     where
         T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static,
@@ -261,8 +253,7 @@ impl JobRunner {
             return Ok(self);
         }
 
-        if let Some(StepStreamStatus::Complete { .. }) = self.job_state.get_stream(&name)
-        {
+        if let Some(StepStreamStatus::Complete { .. }) = self.job_state.get_stream(&name) {
             self.log_info(
                 self.job_state.name(),
                 format!("{} stream previously ran, skipping", &name),
@@ -271,7 +262,9 @@ impl JobRunner {
             let input_name = input.name().to_string();
             // no need to wait on input JoinHandle
             let (mut input_rx, _) = input.start_stream().await?;
-            let (output_tx, output_jh) = output.start_stream(jm).await?;
+            let (output_tx, output_jh) = output
+                .start_stream(self.job_manager_channel.clone())
+                .await?;
             self.save_job_state().await?;
             let mut lines_scanned = 0_usize;
             loop {
@@ -403,10 +396,7 @@ impl JobRunner {
                         lines_scanned += 1;
                         match job_handler
                             .process_item(
-                                JobItemInfo::new((
-                                    self.num_processed_items,
-                                    self.job_state.name(),
-                                )),
+                                JobItemInfo::new((self.num_processed_items, self.job_state.name())),
                                 line,
                                 &self,
                             )
@@ -414,9 +404,7 @@ impl JobRunner {
                         {
                             Ok(()) => {
                                 self.num_processed_items += 1;
-                                self.job_state
-                                    .streams
-                                    .incr_num_ok(stream_name, &source)?;
+                                self.job_state.streams.incr_num_ok(stream_name, &source)?;
                             }
                             Err(er) => {
                                 self.log_err(
@@ -483,18 +471,13 @@ impl JobRunner {
         Ok(self)
     }
 
-    pub async fn run_cmd(
-        mut self,
-        job_cmd: Box<dyn JobCommand>,
-    ) -> Result<Self, JobRunnerError> {
+    pub async fn run_cmd(mut self, job_cmd: Box<dyn JobCommand>) -> Result<Self, JobRunnerError> {
         self.job_state = self.load_job_state().await?;
         let name = job_cmd.name();
         if let Err(_) = self.job_state.start_new_cmd(&name, &self.config) {
             return Ok(self);
         }
-        if let Some(StepCommandStatus::Complete { .. }) =
-            self.job_state.get_command(&name)
-        {
+        if let Some(StepCommandStatus::Complete { .. }) = self.job_state.get_command(&name) {
             self.log_info(
                 self.job_state.name(),
                 format!("{} command previously ran, skipping", &name),
@@ -535,6 +518,14 @@ impl JobItemInfo {
             index,
             path: path.into(),
         }
+    }
+}
+
+impl fmt::Debug for JobRunner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("JobRunner")
+            .field("job_state", &self.job_state)
+            .finish()
     }
 }
 

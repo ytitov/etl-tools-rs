@@ -88,7 +88,6 @@ async fn main() -> anyhow::Result<()> {
         "stream1",
         Box::new(create_mock_data_source()),
         Box::new(MockJsonDataOutput::default()),
-        jm_channel,
     )
     .await?
     .complete()?;

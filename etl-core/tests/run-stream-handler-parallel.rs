@@ -19,7 +19,6 @@ async fn run_two_jobs_fail_one() {
             "transformed-ds-1a",
             Box::new(create_mock_data_source()),
             Box::new(MockJsonDataOutput::default()),
-            jm_channel.clone(),
         )
         .await
         .expect("Should not have failed")
@@ -32,7 +31,6 @@ async fn run_two_jobs_fail_one() {
             "transformed-ds-1b",
             Box::new(create_mock_data_source()),
             Box::new(MockJsonDataOutput::default()),
-            jm_channel,
         )
         .await
         .unwrap_err();

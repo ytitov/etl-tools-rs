@@ -34,12 +34,10 @@ async fn test_simple_pipeline() {
             "transformed-ds-1",
             Box::new(transformed_ds) as Box<dyn DataSource<TestOutputData>>,
             Box::new(MockJsonDataOutput::default()),
-            jm_channel.clone(),
         )
         .await
         .expect("Error running run_data_output");
     let job_state = jr.complete().expect("Error completing job");
-    println!("job_state: {:?}", &job_state);
     use state::*;
     jm_handle
         .await
@@ -97,7 +95,6 @@ async fn test_simple_pipeline_max_error_with_failure() {
             "transformed-ds-1",
             Box::new(transformed_ds) as Box<dyn DataSource<TestOutputData>>,
             Box::new(MockJsonDataOutput::default()),
-            jm_channel.clone(),
         )
         .await
         .unwrap_err();

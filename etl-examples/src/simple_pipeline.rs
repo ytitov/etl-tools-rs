@@ -138,7 +138,6 @@ async fn main() -> anyhow::Result<()> {
             "transformed-ds-1",
             Box::new(transformed_ds) as Box<dyn DataSource<TestOutputData> + Send + Sync>,
             Box::new(MockJsonDataOutput::default()),
-            jm_channel.clone(),
         )
         .await?;
 
@@ -153,7 +152,6 @@ async fn main() -> anyhow::Result<()> {
             "transformed-ds-2",
             Box::new(transformed_ds) as Box<dyn DataSource<TestOutputData> + Send + Sync>,
             Box::new(MockJsonDataOutput::default()),
-            jm_channel.clone(),
         )
         .await?;
 

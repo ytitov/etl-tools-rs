@@ -149,7 +149,6 @@ async fn main() -> anyhow::Result<()> {
         Box::new(join)
             as Box<dyn DataSource<(LeftTestData, Option<RightTestData>)> + Send + Sync>,
         Box::new(MockJsonDataOutput::default()),
-        jm_channel,
     )
     .await?
     .complete()?;
