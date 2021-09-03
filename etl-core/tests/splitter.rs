@@ -7,7 +7,15 @@ use mock::*;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-// TODO: finish this test
+// TODO: 
+// STATUS: when reaching max_errors on one pipeline, the second pipeline shuts down gracefully but
+// does not receive that information.  The issue with that is, it saves a successful state.
+// As a result, the split probably needs to be moved into the JobRunner, and some sort of
+// dependency connections should be added
+// - since the job runner shuts things down, no way for the copied data sources to know
+// - in the end StreamHandler trait is best to handle this use case and this may be overkill and
+// not really providing any new features.  Mainly because, all of the extra boiler plate needed
+// with having to spawn separate tasks, then dealing with the join handle
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_splitter() {
     let job_manager = JobManager::new(JobManagerConfig {
@@ -16,49 +24,52 @@ async fn test_splitter() {
     })
     .expect("Could not initialize job_manager");
     let (jm_handle, jm_channel) = job_manager.start();
-    let jr1 = JobRunner::new(
-        "jr1_id",
-        "Copy1",
-        jm_channel.clone(),
-        JobRunnerConfig {
-            max_errors: 2, // do a hard fail at error 2
-            ..Default::default()
-        },
-    );
-    let jr2 = JobRunner::new(
-        "jr2_id",
-        "Copy2",
-        jm_channel.clone(),
-        JobRunnerConfig {
-            //max_errors: 2, // do a hard fail at error 2
-            ..Default::default()
-        },
-    );
     let (s_handle, mut datasources) =
         split_datasources::<TestSourceData>(Box::new(create_mock_data_source_many_errors()), 2)
             .await;
 
     let ds1 = datasources.remove(0);
     let ds2 = datasources.remove(0);
+    let jr1_jm_channel = jm_channel.clone();
     tokio::spawn(async move {
-        let jr1_err = jr1.run_stream::<TestSourceData>(
-            "stream-jr1-ds",
-            ds1,
-            Box::new(MockJsonDataOutput {
-                name: String::from("fast-ds"),
-                sleep_duration: Duration::from_secs(1),
+        let jr1 = JobRunner::new(
+            "jr1_id",
+            "Copy1",
+            jr1_jm_channel,
+            JobRunnerConfig {
+                max_errors: 2, // do a hard fail at error 2
                 ..Default::default()
-            }),
-        )
-        .await
-        .unwrap_err();
+            },
+        );
+        let jr1_err = jr1
+            .run_stream::<TestSourceData>(
+                "stream-jr1-ds",
+                ds1,
+                Box::new(MockJsonDataOutput {
+                    name: String::from("fast-ds"),
+                    sleep_duration: Duration::from_secs(1),
+                    ..Default::default()
+                }),
+            )
+            .await
+            .unwrap_err();
         //.expect("error processing stream 1")
         //.complete()
         //.expect("error completeing");
     });
 
+    let jr2_jm_channel = jm_channel.clone();
     tokio::spawn(async move {
-        jr2.run_stream::<TestSourceData>(
+        JobRunner::new(
+            "jr2_id",
+            "Copy2",
+            jr2_jm_channel,
+            JobRunnerConfig {
+                //max_errors: 2, // do a hard fail at error 2
+                ..Default::default()
+            },
+        )
+        .run_stream::<TestSourceData>(
             "stream-jr2-ds",
             ds2,
             Box::new(MockJsonDataOutput {
@@ -72,7 +83,7 @@ async fn test_splitter() {
         .complete()
         .expect("error completeing");
     });
-    //s_handle.await.expect("error waiting on split handle");
+    s_handle.await.expect("error waiting on split handle");
     jm_handle.await.expect("error waiting on handle");
 }
 

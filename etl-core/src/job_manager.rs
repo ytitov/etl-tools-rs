@@ -1,3 +1,4 @@
+use crate::job::JobRunner;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{
     broadcast,
@@ -22,8 +23,14 @@ pub enum NotifyJobManager {
     TaskStarted { sender: String },
     TaskFinished { sender: String },
     JobStarted { sender: String },
-    JobFinished { sender: String },
+    JobFinished { sender: SenderDetails },
     ShutdownJobManager,
+}
+
+#[derive(Debug, Clone)]
+pub struct SenderDetails {
+    pub id: String,
+    pub name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -163,16 +170,10 @@ impl JobManager {
                         use NotifyJobManager::*;
                         match m {
                             LogInfo { sender, message } => {
-                                log_info(
-                                    &self.logger_tx,
-                                    format!("{}: {} ", sender, message),
-                                );
+                                log_info(&self.logger_tx, format!("{}: {} ", sender, message));
                             }
                             LogError { sender, message } => {
-                                log_err(
-                                    &self.logger_tx,
-                                    format!("{}: {} ", sender, message),
-                                );
+                                log_err(&self.logger_tx, format!("{}: {} ", sender, message));
                                 self.num_log_errors += 1;
 
                                 if self.num_log_errors >= self.config.max_errors {
@@ -181,9 +182,7 @@ impl JobManager {
                                         "Reached too many global errors, shutting down",
                                     );
                                     self.tx
-                                        .send(Message::ToJobRunner(
-                                            NotifyJobRunner::TooManyErrors,
-                                        ))
+                                        .send(Message::ToJobRunner(NotifyJobRunner::TooManyErrors))
                                         .expect("Fatal");
                                 }
                             }
@@ -191,17 +190,14 @@ impl JobManager {
                                 self.num_tasks_started += 1;
                                 let s = format!(
                                     "Started {} tasks: {}/{}",
-                                    sender,
-                                    self.num_tasks_finished,
-                                    self.num_tasks_started
+                                    sender, self.num_tasks_finished, self.num_tasks_started
                                 );
 
                                 self.tx
                                     .send(Message::ToJob(NotifyJob::Scale {
                                         started: self.num_tasks_started,
                                         finished: self.num_tasks_finished,
-                                        running: self.num_tasks_started
-                                            - self.num_tasks_finished,
+                                        running: self.num_tasks_started - self.num_tasks_finished,
                                     }))
                                     .expect("Fatal");
                                 log_info(&self.logger_tx, s);
@@ -212,15 +208,12 @@ impl JobManager {
                                     .send(Message::ToJob(NotifyJob::Scale {
                                         started: self.num_tasks_started,
                                         finished: self.num_tasks_finished,
-                                        running: self.num_tasks_started
-                                            - self.num_tasks_finished,
+                                        running: self.num_tasks_started - self.num_tasks_finished,
                                     }))
                                     .expect("Fatal");
                                 let s = format!(
                                     "Finished {} tasks: {}/{}",
-                                    sender,
-                                    self.num_tasks_finished,
-                                    self.num_tasks_started
+                                    sender, self.num_tasks_finished, self.num_tasks_started
                                 );
                                 log_info(&self.logger_tx, s);
                             }
@@ -326,12 +319,12 @@ impl Message {
         })
     }
 
-    pub fn broadcast_job_end<A>(sender: A) -> Self
-    where
-        A: Into<String>,
-    {
+    pub fn broadcast_job_end(job: &JobRunner) -> Self {
         Message::ToJobManager(NotifyJobManager::JobFinished {
-            sender: sender.into(),
+            sender: SenderDetails {
+                id: String::from(job.id()),
+                name: String::from(job.name()),
+            },
         })
     }
 

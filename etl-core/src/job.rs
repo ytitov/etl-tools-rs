@@ -86,6 +86,14 @@ impl JobRunner {
         jr
     }
 
+    pub fn name(&self) -> &'_ str {
+        self.job_state.name()
+    }
+
+    pub fn id(&self) -> &'_ str {
+        self.job_state.id()
+    }
+
     async fn load_job_state(&mut self) -> Result<JobState, DataStoreError> {
         let path = JobState::gen_name(self.job_state.id(), self.job_state.name());
         let mut job_state = match self.config.ds.load(&path).await {
@@ -217,7 +225,7 @@ impl JobRunner {
         match self
             .job_manager_channel
             .tx
-            .send(Message::broadcast_job_end(self.job_state.name()))
+            .send(Message::broadcast_job_end(&self))
         {
             Ok(_) => Ok(()),
             Err(er) => Err(JobRunnerError::CompleteError(er.to_string())),
@@ -229,7 +237,7 @@ impl JobRunner {
         match self
             .job_manager_channel
             .tx
-            .send(Message::broadcast_job_end(self.job_state.name()))
+            .send(Message::broadcast_job_end(&self))
         {
             Ok(_) => Ok(self.job_state),
             Err(er) => Err(JobRunnerError::CompleteError(er.to_string())),
@@ -288,6 +296,7 @@ impl JobRunner {
                 };
                 match self.process_job_manager_rx() {
                     Err(JobRunnerError::TooManyErrors) => {
+                        println!("handling TooManyErrors");
                         self.job_state.stream_not_ok(
                             name,
                             String::from("Reached too many errors"),
@@ -299,7 +308,9 @@ impl JobRunner {
                         output_jh.await??;
                         return Err(JobRunnerError::TooManyErrors);
                     }
-                    Err(_) => {}
+                    Err(e) => {
+                        panic!("Received an unforseen error {}", e);
+                    }
                     Ok(()) => {}
                 };
             }

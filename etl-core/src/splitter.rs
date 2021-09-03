@@ -100,7 +100,7 @@ where
         let (mut input_rx, input_jh) = data_source
             .start_stream()
             .await
-            .expect("error starting stream");
+            .expect("error starting source stream");
         let mut lines_scanned = 0_usize;
         loop {
             match input_rx.recv().await {
@@ -108,7 +108,11 @@ where
                     source,
                     content: input_item,
                 })) => {
+                    lines_scanned += 1;
+                    let mut fx_tx_idx = 0;
                     for fw_tx in &outputs_tx {
+                        //println!("SENDING TO: {}", fx_tx_idx);
+                        fx_tx_idx += 1;
                         fw_tx
                             .send(Ok(DataSourceMessage::new("Splitter", input_item.clone())))
                             .await
@@ -118,6 +122,7 @@ where
                     }
                 }
                 Some(Err(err)) => {
+                    lines_scanned += 1;
                     for fw_tx in &outputs_tx {
                         fw_tx
                             .send(Err(err.clone()))
@@ -127,23 +132,9 @@ where
                 }
                 None => break,
             };
-            lines_scanned += 1;
         }
         input_jh.await??;
         Ok(DataSourceStats { lines_scanned })
     });
     (jh, dup_data_sources)
 }
-
-/*
-pub struct Splitter<I: Serialize + DeserializeOwned + Sync + Send + Debug + 'static> {
-    pub input: Box<dyn DataSource<I>>,
-    pub outputs: Vec<DataSourceTx<I>>,
-}
-
-impl<I: Serialize + DeserializeOwned + Sync + Send + Debug + 'static> Splitter<I> {
-    pub fn split(self) -> Vec<Box<dyn DataSource<I>>> {
-        Vec::new()
-    }
-}
-*/
