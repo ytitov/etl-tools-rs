@@ -148,7 +148,7 @@ impl S3DataSource {
                         .map_err(|e| DataStoreError::send_error(&name, "", e))?;
                     }
                     Err(e) => {
-                        tx.send(Err(DataStoreError::Generic(anyhow::Error::from(e))))
+                        tx.send(Err(DataStoreError::from(anyhow::Error::from(e))))
                             .await
                             .map_err(|e| DataStoreError::send_error(&name, "", e))?;
                     }
@@ -274,7 +274,7 @@ impl S3DataSource {
                         .map_err(|e| DataStoreError::send_error(&name, "", e))?;
                     }
                     Err(e) => {
-                        tx.send(Err(DataStoreError::Generic(anyhow::Error::from(e))))
+                        tx.send(Err(DataStoreError::from(anyhow::Error::from(e))))
                             .await
                             .map_err(|e| DataStoreError::send_error(&name, "", e))?;
                     }

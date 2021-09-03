@@ -155,6 +155,7 @@ async fn main() -> anyhow::Result<()> {
     let testjob2 = TestJob2 {
         target: mock::MockJsonDataOutput {
             name: "Job2".to_owned(),
+            ..Default::default()
         }
         .start_stream(jm_channel.clone())
         .await?,
