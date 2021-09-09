@@ -22,6 +22,10 @@ impl Default for MockCsvDataSource {
 impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static>
     DataSource<T> for MockCsvDataSource
 {
+    fn name(&self) -> String {
+        format!("MockCsvDataSource-{}", &self.name)
+    }
+
     async fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         use tokio::task::JoinHandle;

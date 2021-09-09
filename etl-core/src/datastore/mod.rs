@@ -13,6 +13,8 @@ pub mod fs;
 pub mod job_runner;
 /// various data stores used for testing
 pub mod mock;
+/// creates generated data sources
+pub mod generate;
 
 //pub type DataOutputItemResult = Result<String, Box<dyn std::error::Error + Send>>;
 
@@ -85,9 +87,8 @@ use crate::job_manager::JobManagerRx;
 
 #[async_trait]
 pub trait DataSource<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send {
-    fn name(&self) -> &'static str {
-        "Unnamed DataSource"
-    }
+    fn name(&self) -> String;
+
     async fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError>;
 
     /// TODO: this is not integrated yet because this doesn't get the JobManagerChannel because I'm

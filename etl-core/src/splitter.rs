@@ -18,6 +18,10 @@ pub struct DuplicateDataSource<I: Serialize + DeserializeOwned + Debug + Send + 
 impl<I: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource<I>
     for DuplicateDataSource<I>
 {
+    fn name(&self) -> String {
+        format!("{}-DuplicatedDataSource", &self.name)
+    }
+
     async fn start_stream(self: Box<Self>) -> Result<DataSourceTask<I>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         let (fw_tx, fw_rx): (_, Receiver<Result<DataSourceMessage<I>, DataStoreError>>) =

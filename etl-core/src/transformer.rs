@@ -9,8 +9,6 @@ use tokio::task::JoinHandle;
 
 pub struct Transformer<I, O> {
     pub input: Box<dyn DataSource<I>>,
-    //pub output: Box<dyn DataSource<O>>,
-    //pub map: Box<dyn Fn(I) -> DataOutputItemResult<O> + Send + Sync + 'static>,
     pub map: fn(I) -> DataOutputItemResult<O>,
 }
 
@@ -20,6 +18,10 @@ impl<
         O: DeserializeOwned + Debug + Send + Sync + 'static,
     > DataSource<O> for Transformer<I, O>
 {
+    fn name(&self) -> String {
+        format!("Transformer-{}", self.input.name())
+    }
+
     async fn start_stream(self: Box<Self>) -> Result<DataSourceTask<O>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         let (tx, rx): (_, Receiver<Result<DataSourceMessage<O>, DataStoreError>>) =

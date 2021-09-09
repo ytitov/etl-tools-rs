@@ -47,15 +47,9 @@ impl Default for MySqlDataOutputPool {
 }
 
 #[async_trait]
-impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T>
-    for MySqlDataOutput
-{
-    async fn start_stream(
-        &mut self,
-        jm: JobManagerChannel,
-    ) -> anyhow::Result<DataOutputTask<T>> {
-        let (tx, mut rx): (Sender<DataOutputMessage<T>>, _) =
-            channel(self.on_put_num_rows_max * 2);
+impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for MySqlDataOutput {
+    async fn start_stream(&mut self, jm: JobManagerChannel) -> anyhow::Result<DataOutputTask<T>> {
+        let (tx, mut rx): (Sender<DataOutputMessage<T>>, _) = channel(self.on_put_num_rows_max * 2);
 
         let table_name = self.table_name.clone();
         let on_put_num_rows_orig = *&self.on_put_num_rows;
@@ -65,6 +59,7 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T>
         let db_name = self.db_name.clone();
         let pool_config = self.pool.clone();
         let join_handle: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
+            let mut time_started = std::time::Instant::now();
             let mut value_rows: Vec<String> = Vec::with_capacity(on_put_num_rows_max);
             let pool = match pool_config {
                 MySqlDataOutputPool::Pool(p) => p.clone(),
@@ -78,9 +73,7 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T>
                     // TODO: pass these params into config
                     .max_connections(max_connections as u32)
                     // 3 hours timeout
-                    .connect_timeout(std::time::Duration::from_secs(
-                        60_u64 * 60_u64 * 3_u64,
-                    ))
+                    //.connect_timeout(std::time::Duration::from_secs(60))
                     //.min_connections(1)
                     .idle_timeout(Some(std::time::Duration::from_secs(60 * 10)))
                     .max_lifetime(Some(std::time::Duration::from_secs(60 * 60 * 2)))
@@ -90,72 +83,68 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T>
                             Ok(())
                         })
                     })
+                    /*
+                    // connect lazy appears to be massively slowing things down
                     .connect_lazy(&format!(
                         "mysql://{}:{}@{}:{}/{}",
                         user, pw, host, port, &db_name
                     ))?,
+                    */
+                    .connect(&format!(
+                        "mysql://{}:{}@{}:{}/{}",
+                        user, pw, host, port, &db_name
+                    )).await?,
             };
             let mut columns: Vec<String> = vec![];
             let mut num_bytes = 0_usize;
             let mut total_inserted = 0_usize;
             let /*mut*/ on_put_num_rows = on_put_num_rows_orig;
+            let mut source_finished_sending = false;
             loop {
-                // check for any messages from JobMonitor
-                // TODO: this needs to be adjusted to receive
-                // the DataOutputMessage
-                /*
-                on_put_num_rows = check_monitor_rx(
-                    &mut job_manager_rx,
-                    &job_manager_tx,
-                    &table_name,
-                    on_put_num_rows,
-                    on_put_num_rows_max,
-                    on_put_num_rows_orig,
-                )
-                .await?;
-                */
-                // avoid the default packet size limit
                 if num_bytes >= 4_000_000 {
                     job_manager_tx.send(Message::log_err(&table_name, "Packet exceeded 4mb consider reducing max commit size or setting the server max_allowed_packet"))?;
                 }
-                // TODO: if there are less rows total than on_put_num_rows then
-                // this will never finish... logic needs to be checked
-                if value_rows.len() < on_put_num_rows && num_bytes < 4_000_000 {
-                    match rx.recv().await {
-                        Some(DataOutputMessage::Data(data)) => {
-                            let mut vals = vec![];
-                            if let Ok(keyvals) = utils::key_values(&data) {
-                                columns.clear();
-                                for (key, val) in keyvals {
-                                    columns.push(key);
-                                    vals.push(val.clone());
+                // 1. loop until we have enough rows
+                loop {
+                    if value_rows.len() < on_put_num_rows && num_bytes < 4_000_000 {
+                        match rx.recv().await {
+                            Some(DataOutputMessage::Data(data)) => {
+                                println!("received some data");
+                                let mut vals = vec![];
+                                if let Ok(keyvals) = utils::key_values(&data) {
+                                    columns.clear();
+                                    for (key, val) in keyvals {
+                                        columns.push(key);
+                                        vals.push(val.clone());
+                                    }
+                                    let v = vals.join(",");
+                                    num_bytes += std::mem::size_of_val(&v);
+                                    value_rows.push(v);
                                 }
-                                let v = vals.join(",");
-                                num_bytes += std::mem::size_of_val(&v);
-                                value_rows.push(v);
+                            }
+                            None => {
+                                source_finished_sending = true;
+                                // get out because source is done
+                                break;
+                            }
+                            _ => {
+                                // TODO: implement scaling here
                             }
                         }
-                        None => {
-                            break;
-                        }
-                        _ => {
-                            // TODO: implement scaling here
-                        }
+                    } else {
+                        // break out so we can write the rows to db
+                        break;
                     }
-                } else if value_rows.len() > 0 {
-                    match exec_rows_mysql(
-                        &pool,
-                        &db_name,
-                        &table_name,
-                        &columns,
-                        &value_rows,
-                        0,
-                    )
-                    .await
+                }
+                // 2. if there are rows, send them to db
+                if value_rows.len() >= on_put_num_rows || source_finished_sending {
+                    match exec_rows_mysql(&pool, &db_name, &table_name, &columns, &value_rows, 0)
+                        .await
                     {
                         Ok(r) => {
                             total_inserted += r.inserted;
-                            if total_inserted % 100_000 == 0 {
+                            if time_started.elapsed().as_secs() >= 60 {
+                                time_started = std::time::Instant::now();
                                 job_manager_tx.send(Message::log_info(
                                     "mysql-datastore",
                                     format!(
@@ -167,49 +156,24 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T>
                             }
                         }
                         Err(e) => {
-                            let m = format!(
-                                "Error inserting rows into {}: {} ",
-                                &table_name, e
-                            );
-                            job_manager_tx
-                                .send(Message::log_err("mysql-datastore", m))?;
+                            let m = format!("Error inserting rows into {}: {} ", &table_name, e);
+                            job_manager_tx.send(Message::log_err("mysql-datastore", m))?;
                         }
                     };
                     value_rows.clear();
                     num_bytes = 0;
                 }
+                if source_finished_sending {
+                    break;
+                }
             } // end loop
               // finish the inserts if there are any more rows left
             let msg = format!(
-            "Finished receiving for {}.  Inserting remaining {} records into db to finish up",
-            &table_name,
-            value_rows.len()
-        );
+                "Finished receiving for {}.  Inserting remaining {} records into db to finish up",
+                &table_name,
+                value_rows.len()
+            );
             job_manager_tx.send(Message::log_info("mysql-datastore", msg))?;
-            if value_rows.len() > 0 {
-                match exec_rows_mysql(
-                    &pool,
-                    &db_name,
-                    &table_name,
-                    &columns,
-                    &value_rows,
-                    0,
-                )
-                .await
-                {
-                    Ok(r) => {
-                        total_inserted += r.inserted;
-                    }
-                    Err(e) => {
-                        println!(
-                        "Error finishing up: {}.  Trying again.  Still have {} records to insert ",
-                        e,
-                        value_rows.len()
-                    );
-                    }
-                };
-                value_rows.clear();
-            }
             drop(pool);
             job_manager_tx.send(Message::broadcast_task_end(&table_name))?;
             drop(job_manager_tx);

@@ -13,6 +13,11 @@ impl<
         O: Serialize + DeserializeOwned + Debug + Send + Sync + 'static,
     > DataSource<O> for JRDataSource<I, O>
 {
+
+    fn name(&self) -> String {
+        format!("JobRunner-{}", &self.job_name)
+    }
+
     async fn start_stream(
         mut self: Box<Self>,
     ) -> Result<DataSourceTask<O>, DataStoreError> {

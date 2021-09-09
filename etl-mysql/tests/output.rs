@@ -41,8 +41,8 @@ async fn test_simple_mysql_output() {
         Box::new(create_mock_data_source()),
         Box::new(MySqlDataOutput {
             on_put_num_rows_max: 20,
-            //on_put_num_rows: 10,
-            on_put_num_rows: 1,
+            on_put_num_rows: 2,
+            //on_put_num_rows: 1,
             table_name: "Info".to_owned(),
             db_name: "default".to_owned(),
             pool: MySqlDataOutputPool::CreatePool {

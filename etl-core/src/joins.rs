@@ -143,8 +143,8 @@ where
     R: DeserializeOwned + Debug + Clone + 'static + Send + Sync,
     L: DeserializeOwned + Debug + Clone + 'static + Send + Sync,
 {
-    fn name(&self) -> &'static str {
-        "joins::LeftJoin"
+    fn name(&self) -> String {
+        format!("LeftJoin-{}", self.left_ds.name())
     }
 
     async fn start_stream(

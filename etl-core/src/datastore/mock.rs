@@ -24,6 +24,7 @@ impl Default for MockJsonDataOutput {
 
 #[async_trait]
 impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for MockJsonDataOutput {
+
     async fn start_stream(&mut self, _: JobManagerChannel) -> anyhow::Result<DataOutputTask<T>> {
         use tokio::sync::mpsc::channel;
         let (tx, mut rx): (Sender<DataOutputMessage<T>>, _) = channel(1);
@@ -83,6 +84,11 @@ impl Default for MockJsonDataSource {
 impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static> DataSource<T>
     for MockJsonDataSource
 {
+
+    fn name(&self) -> String {
+        format!("MockJsonDataSource")
+    }
+
     async fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         use tokio::task::JoinHandle;

@@ -24,6 +24,11 @@ impl Default for LocalFsDataSource {
 impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static>
     DataSource<T> for LocalFsDataSource
 {
+
+    fn name(&self) -> String {
+        format!("LocalFsDataSource-{}", &self.home)
+    }
+
     async fn start_stream(
         mut self: Box<Self>,
     ) -> Result<DataSourceTask<T>, DataStoreError> {
