@@ -69,31 +69,34 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                     pw,
                     host,
                     port,
-                } => MySqlPoolOptions::new()
-                    // TODO: pass these params into config
-                    .max_connections(max_connections as u32)
-                    // 3 hours timeout
-                    //.connect_timeout(std::time::Duration::from_secs(60))
-                    //.min_connections(1)
-                    .idle_timeout(Some(std::time::Duration::from_secs(60 * 10)))
-                    .max_lifetime(Some(std::time::Duration::from_secs(60 * 60 * 2)))
-                    .after_connect(|_conn| {
-                        Box::pin(async move {
-                            println!("MySql connection established");
-                            Ok(())
+                } => {
+                    MySqlPoolOptions::new()
+                        // TODO: pass these params into config
+                        .max_connections(max_connections as u32)
+                        // 3 hours timeout
+                        //.connect_timeout(std::time::Duration::from_secs(60))
+                        //.min_connections(1)
+                        .idle_timeout(Some(std::time::Duration::from_secs(60 * 10)))
+                        .max_lifetime(Some(std::time::Duration::from_secs(60 * 60 * 2)))
+                        .after_connect(|_conn| {
+                            Box::pin(async move {
+                                println!("MySql connection established");
+                                Ok(())
+                            })
                         })
-                    })
-                    /*
-                    // connect lazy appears to be massively slowing things down
-                    .connect_lazy(&format!(
-                        "mysql://{}:{}@{}:{}/{}",
-                        user, pw, host, port, &db_name
-                    ))?,
-                    */
-                    .connect(&format!(
-                        "mysql://{}:{}@{}:{}/{}",
-                        user, pw, host, port, &db_name
-                    )).await?,
+                        /*
+                        // connect lazy appears to be massively slowing things down
+                        .connect_lazy(&format!(
+                            "mysql://{}:{}@{}:{}/{}",
+                            user, pw, host, port, &db_name
+                        ))?,
+                        */
+                        .connect(&format!(
+                            "mysql://{}:{}@{}:{}/{}",
+                            user, pw, host, port, &db_name
+                        ))
+                        .await?
+                }
             };
             let mut columns: Vec<String> = vec![];
             let mut num_bytes = 0_usize;
@@ -109,7 +112,6 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                     if value_rows.len() < on_put_num_rows && num_bytes < 4_000_000 {
                         match rx.recv().await {
                             Some(DataOutputMessage::Data(data)) => {
-                                println!("received some data");
                                 let mut vals = vec![];
                                 if let Ok(keyvals) = utils::key_values(&data) {
                                     columns.clear();
@@ -137,7 +139,9 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                     }
                 }
                 // 2. if there are rows, send them to db
-                if value_rows.len() >= on_put_num_rows || source_finished_sending {
+                if (value_rows.len() >= on_put_num_rows || source_finished_sending)
+                    && value_rows.len() > 0
+                {
                     match exec_rows_mysql(&pool, &db_name, &table_name, &columns, &value_rows, 0)
                         .await
                     {

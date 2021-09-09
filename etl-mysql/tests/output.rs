@@ -1,12 +1,13 @@
 use command::*;
+//use etl_core::datastore::enumerate::EnumerateStream;
+use etl_core::datastore::enumerate::EnumerateStreamAsync;
 use etl_core::datastore::*;
+use etl_core::job::state::*;
 use etl_core::job::*;
 use etl_core::job_manager::*;
 use etl_core::preamble::*;
 use etl_mysql::datastore::*;
-use mock::*;
 use serde::{Deserialize, Serialize};
-use etl_core::job::state::*;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_simple_mysql_output() {
@@ -38,7 +39,51 @@ async fn test_simple_mysql_output() {
     .expect("Error running command")
     .run_stream::<TestOutputData>(
         "move to db",
-        Box::new(create_mock_data_source()),
+        /*
+        Box::new(EnumerateStream {
+            max: Some(100),
+            name: String::from("MakeSomeThings"),
+            pause: None,
+            //pause: Some(std::time::Duration::from_secs(1)),
+            //state: create_pool("admin", "admin", "localhost", "3306").await.expect("could not make pool"),
+            state: (),
+            create: |_, idx| {
+                Ok(TestOutputData {
+                    resource_type: Some(String::from("Bob")),
+                    index: Some(idx),
+                })
+            },
+        }),
+        */
+        /*
+        Box::new(EnumerateStreamAsync {
+            max: Some(100),
+            name: String::from("MakeSomeThingsAsync"),
+            pause: None,
+            state: (),
+            create: Box::new(|_, idx| {
+                Box::pin(async move {
+                    Ok(TestOutputData {
+                        resource_type: Some(String::from("Bob")),
+                        index: Some(idx),
+                    })
+                })
+            }),
+        }),
+        */
+        Box::new(EnumerateStreamAsync::with_max(
+            "MakeSomeThingsAsync",
+            100,
+            (),
+            |_, idx| {
+                Box::pin(async move {
+                    Ok(TestOutputData {
+                        resource_type: Some(String::from("Bob")),
+                        index: Some(idx),
+                    })
+                })
+            },
+        )),
         Box::new(MySqlDataOutput {
             on_put_num_rows_max: 20,
             on_put_num_rows: 2,
@@ -72,8 +117,8 @@ async fn test_simple_mysql_output() {
         } = cmd_status
         {
             assert_eq!(1, *step_index);
-            assert_eq!(3, *total_lines_scanned);
-            assert_eq!(1, *num_errors);
+            assert_eq!(100, *total_lines_scanned);
+            assert_eq!(0, *num_errors);
         } else {
             panic!("move to db is not showing as completed");
         }
@@ -118,27 +163,3 @@ struct TestOutputData {
     index: Option<usize>,
 }
 
-fn create_mock_data_source() -> MockJsonDataSource {
-    MockJsonDataSource {
-        lines: vec![
-            serde_json::to_string(&TestOutputData {
-                resource_type: Some(String::from("Bob")),
-                index: Some(100),
-            })
-            .unwrap(),
-            "1 this is a malformed json".to_string(),
-            //"2 this is a malformed json".to_string(),
-            serde_json::to_string(&TestOutputData {
-                resource_type: Some(String::from("Bus")),
-                index: Some(900),
-            })
-            .unwrap(),
-            serde_json::to_string(&TestOutputData {
-                resource_type: Some(String::from("Pencil")),
-                index: Some(303),
-            })
-            .unwrap(),
-        ],
-        ..Default::default()
-    }
-}

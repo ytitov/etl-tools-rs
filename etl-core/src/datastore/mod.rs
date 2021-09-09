@@ -14,7 +14,7 @@ pub mod job_runner;
 /// various data stores used for testing
 pub mod mock;
 /// creates generated data sources
-pub mod generate;
+pub mod enumerate;
 
 //pub type DataOutputItemResult = Result<String, Box<dyn std::error::Error + Send>>;
 
