@@ -118,6 +118,8 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T>
                 if num_bytes >= 4_000_000 {
                     job_manager_tx.send(Message::log_err(&table_name, "Packet exceeded 4mb consider reducing max commit size or setting the server max_allowed_packet"))?;
                 }
+                // TODO: if there are less rows total than on_put_num_rows then
+                // this will never finish... logic needs to be checked
                 if value_rows.len() < on_put_num_rows && num_bytes < 4_000_000 {
                     match rx.recv().await {
                         Some(DataOutputMessage::Data(data)) => {
@@ -260,6 +262,7 @@ pub async fn exec_rows_mysql(
                         .collect::<Vec<String>>()
                         .join(",")
                 );
+                println!("QUERY: {}", &query);
                 match sqlx::query(&query).execute(pool).await {
                     Ok(_) => {
                         count_ok += value_rows_buf.len(); //println!(" ** OK ** ");
@@ -355,7 +358,8 @@ impl CreateMySqlDataOutput {
     }
     /// 3 hours default
     pub fn def_timeout_sec_connect() -> u64 {
-        60_u64 * 60_u64 * 3_u64
+        //60_u64 * 60_u64 * 3_u64
+        60_u64
     }
     /// 1 hr default
     pub fn def_timeout_sec_idle() -> u64 {
