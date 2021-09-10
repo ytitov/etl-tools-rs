@@ -7,7 +7,7 @@ use mock::*;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-// TODO: 
+// TODO:
 // STATUS: when reaching max_errors on one pipeline, the second pipeline shuts down gracefully but
 // does not receive that information.  The issue with that is, it saves a successful state.
 // As a result, the split probably needs to be moved into the JobRunner, and some sort of
