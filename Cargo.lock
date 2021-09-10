@@ -421,6 +421,7 @@ dependencies = [
  "bytes",
  "csv",
  "etl-core",
+ "http",
  "rusoto_core",
  "rusoto_credential",
  "rusoto_s3",

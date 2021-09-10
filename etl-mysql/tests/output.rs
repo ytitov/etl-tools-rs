@@ -1,7 +1,5 @@
 use command::*;
-//use etl_core::datastore::enumerate::EnumerateStream;
 use etl_core::datastore::enumerate::EnumerateStreamAsync;
-use etl_core::datastore::*;
 use etl_core::job::state::*;
 use etl_core::job::*;
 use etl_core::job_manager::*;

@@ -44,9 +44,7 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource
         format!("S3DataSource-{}", &self.s3_bucket)
     }
 
-    async fn start_stream(
-        mut self: Box<Self>,
-    ) -> Result<DataSourceTask<T>, DataStoreError> {
+    async fn start_stream(mut self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         use ReadContentOptions::*;
         match self.read_content.clone() {
             Json => self.start_stream_json::<T>().await,
@@ -83,6 +81,31 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
             Err(err) => Err(DataStoreError::NotExist {
                 key: s3_key.to_owned(),
                 error: err.to_string(),
+            }),
+        }
+    }
+
+    async fn write(&self, key: &str, item: T) -> Result<(), DataStoreError> {
+        let p = ProfileProvider::with_default_configuration(&self.credentials);
+        match serde_json::to_string_pretty(&item) {
+            Ok(body) => {
+                s3_write_text_file(p, &self.s3_bucket, key, body).await?;
+            }
+            Err(err) => {
+                return Err(DataStoreError::FatalIO(err.to_string()));
+            }
+        };
+        Ok(())
+    }
+
+    async fn load(&self, key: &str) -> Result<T, DataStoreError> {
+        let p = ProfileProvider::with_default_configuration(&self.credentials);
+        let text = s3_load_text_file(&p, &self.s3_bucket, key, &self.region).await?;
+        match serde_json::from_str::<T>(&text) {
+            Ok::<T, _>(obj) => Ok(obj),
+            Err(e) => Err(DataStoreError::Deserialize {
+                attempted_string: format!("Could not deserialize {}", key),
+                message: e.to_string(),
             }),
         }
     }
@@ -132,9 +155,7 @@ impl S3DataSource {
                                             attempted_string: line.to_string(),
                                         }))
                                         .await
-                                        .map_err(|e| {
-                                            DataStoreError::send_error(&name, "", e)
-                                        })?;
+                                        .map_err(|e| DataStoreError::send_error(&name, "", e))?;
                                     }
                                 };
                             } else {
@@ -230,29 +251,22 @@ impl S3DataSource {
                                     match iter.next() {
                                         Some(result) => match result {
                                             Ok(item) => {
-                                                tx.send(Ok(DataSourceMessage::new(
-                                                    &s3_key, item,
-                                                )))
-                                                .await
-                                                .map_err(|e| {
-                                                    DataStoreError::send_error(
-                                                        &name, &s3_key, e,
-                                                    )
-                                                })?;
+                                                tx.send(Ok(DataSourceMessage::new(&s3_key, item)))
+                                                    .await
+                                                    .map_err(|e| {
+                                                        DataStoreError::send_error(
+                                                            &name, &s3_key, e,
+                                                        )
+                                                    })?;
                                             }
                                             Err(val) => {
-                                                tx.send(Err(
-                                                    DataStoreError::Deserialize {
-                                                        message: val.to_string(),
-                                                        attempted_string: line
-                                                            .to_string(),
-                                                    },
-                                                ))
+                                                tx.send(Err(DataStoreError::Deserialize {
+                                                    message: val.to_string(),
+                                                    attempted_string: line.to_string(),
+                                                }))
                                                 .await
                                                 .map_err(|e| {
-                                                    DataStoreError::send_error(
-                                                        &name, "", e,
-                                                    )
+                                                    DataStoreError::send_error(&name, "", e)
                                                 })?;
                                             }
                                         },
@@ -342,8 +356,7 @@ impl S3DataOutput {
             let mut num_lines_sent = 0_usize;
             let (s3_tx, s3_rx) = channel(1);
             let p = ProfileProvider::with_default_configuration(credentials);
-            let s3_jh =
-                s3_write_bytes_multipart(p, &s3_bucket, &s3_key, s3_rx, region).await?;
+            let s3_jh = s3_write_bytes_multipart(p, &s3_bucket, &s3_key, s3_rx, region).await?;
             loop {
                 let mut wtr = match num_lines_sent {
                     // headers on only the first line
@@ -395,9 +408,7 @@ impl S3DataOutput {
                                 }
                             }
                             DataOutputMessage::NoMoreData => {
-                                println!(
-                                    "S3DataOutput got DataOutputMessage::NoMoreData"
-                                );
+                                println!("S3DataOutput got DataOutputMessage::NoMoreData");
                                 break;
                             }
                         };
@@ -427,8 +438,7 @@ impl S3DataOutput {
         let jh: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
             let (s3_tx, s3_rx) = channel(1);
             let p = ProfileProvider::with_default_configuration(credentials);
-            let s3_jh =
-                s3_write_bytes_multipart(p, &s3_bucket, &s3_key, s3_rx, region).await?;
+            let s3_jh = s3_write_bytes_multipart(p, &s3_bucket, &s3_key, s3_rx, region).await?;
             loop {
                 match rx.recv().await {
                     Some(m) => {
@@ -450,9 +460,7 @@ impl S3DataOutput {
                                 }
                             }
                             DataOutputMessage::NoMoreData => {
-                                println!(
-                                    "S3DataOutput got DataOutputMessage::NoMoreData"
-                                );
+                                println!("S3DataOutput got DataOutputMessage::NoMoreData");
                                 break;
                             }
                         };
@@ -470,15 +478,10 @@ impl S3DataOutput {
 
 #[async_trait]
 impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for S3DataOutput {
-    async fn start_stream(
-        &mut self,
-        jm: JobManagerChannel,
-    ) -> anyhow::Result<DataOutputTask<T>> {
+    async fn start_stream(&mut self, jm: JobManagerChannel) -> anyhow::Result<DataOutputTask<T>> {
         match self.write_content.clone() {
             WriteContentOptions::Json => self.start_stream_output_json::<T>(jm).await,
-            WriteContentOptions::Csv(opts) => {
-                self.start_stream_output_csv::<T>(jm, opts).await
-            }
+            WriteContentOptions::Csv(opts) => self.start_stream_output_csv::<T>(jm, opts).await,
             WriteContentOptions::Text => {
                 unimplemented!()
             }
@@ -563,14 +566,12 @@ pub async fn s3_write_bytes_multipart(
                                 Err(er) => {
                                     println!("ERROR: s3_write_bytes_multipart: {}", &er);
                                     client
-                                        .abort_multipart_upload(
-                                            AbortMultipartUploadRequest {
-                                                bucket: s3_bucket.to_owned(),
-                                                key: s3_key.to_owned(),
-                                                upload_id: upload_id.clone(),
-                                                ..Default::default()
-                                            },
-                                        )
+                                        .abort_multipart_upload(AbortMultipartUploadRequest {
+                                            bucket: s3_bucket.to_owned(),
+                                            key: s3_key.to_owned(),
+                                            upload_id: upload_id.clone(),
+                                            ..Default::default()
+                                        })
                                         .await?;
                                     return Err(anyhow::anyhow!(
                                         "Error uploading part to s3: {}",
@@ -600,10 +601,7 @@ pub async fn s3_write_bytes_multipart(
                             }
                             Err(er) => {
                                 println!("ERROR: s3_write_bytes_multipart {}", &er);
-                                return Err(anyhow::anyhow!(
-                                    "Error uploading part to s3: {}",
-                                    er
-                                ));
+                                return Err(anyhow::anyhow!("Error uploading part to s3: {}", er));
                             }
                         }
                         break;
@@ -629,4 +627,94 @@ pub async fn s3_write_bytes_multipart(
     });
     //Ok(join_handle)
     Ok(join_handle)
+}
+
+/// overwrites the file if it exists already, with built in retry
+pub async fn s3_write_text_file(
+    profile_provider: ProfileProvider,
+    s3_bucket: &str,
+    s3_key: &str,
+    body: String,
+) -> anyhow::Result<()> {
+    use anyhow::anyhow;
+    use http::status::StatusCode;
+    use rusoto_core::ByteStream;
+    use rusoto_core::RusotoError;
+
+    let client = S3Client::new_with(
+        HttpClient::new().unwrap(),
+        profile_provider,
+        rusoto_core::Region::UsEast1,
+    );
+    let request = PutObjectRequest {
+        bucket: s3_bucket.to_owned(),
+        key: s3_key.to_owned(),
+        body: Some(ByteStream::from(body.into_bytes())),
+        ..Default::default()
+    };
+    let result: Result<PutObjectOutput, RusotoError<PutObjectError>> =
+        client.put_object(request).await;
+    let status_503 = StatusCode::from_u16(503).expect("Incorrect status code");
+    let mut wait_ms = 100_usize;
+    let mut count = 100_u8; // max number of retries
+    let mut num_tries = 1_u32;
+    let max_wait_ms = 10_000_usize;
+    while count > 0 {
+        match result {
+            Ok(_) => {
+                return Ok(());
+            }
+            Err(RusotoError::Unknown(ref e)) => {
+                if e.status == *&status_503 {
+                    //println!("Retrying after 503: {:?}", e);
+                    println!("Retrying after 503: {}", &s3_key);
+                }
+            }
+            Err(e) => {
+                //println!("ERROR: s3_write_text_file {}", &e);
+                return Err(anyhow!("Error: s3_write_text_file: {}", e));
+            }
+        };
+        count -= 1;
+        num_tries += 1;
+        wait_ms = 2_usize.pow(num_tries) * wait_ms;
+        if wait_ms > max_wait_ms {
+            wait_ms = max_wait_ms;
+        }
+        println!("waiting {} ms", wait_ms);
+        tokio::time::sleep(std::time::Duration::from_millis(wait_ms as u64)).await;
+    }
+    Err(anyhow!(
+        "Error: s3_write_text_file: timed out trying to put_object"
+    ))
+}
+
+pub async fn s3_load_text_file(
+    profile_provider: &ProfileProvider,
+    s3_bucket: &str,
+    s3_key: &str,
+    region: &Region,
+) -> Result<String, DataStoreError> {
+    use tokio::io::AsyncReadExt;
+    let client = create_client(profile_provider.to_owned(), region)?;
+    let request = GetObjectRequest {
+        bucket: s3_bucket.to_owned(),
+        key: s3_key.to_owned(),
+        ..Default::default()
+    };
+    let result = client.get_object(request).await;
+    match result {
+        Ok(res) => {
+            let reader = res.body.unwrap().into_async_read();
+            let mut r = BufReader::new(reader);
+            let mut buf = Vec::new();
+            r.read_to_end(&mut buf).await?;
+            let body_str = std::string::String::from_utf8_lossy(&buf);
+            Ok((*body_str).to_owned())
+        }
+        Err(err) => Err(DataStoreError::NotExist {
+            key: s3_key.to_owned(),
+            error: err.to_string(),
+        }),
+    }
 }

@@ -42,6 +42,22 @@ impl<'a> JobCommand for SimpleCommand<'a> {
     }
 }
 
+/*
+use core::future::Future;
+use core::pin::Pin;
+#[async_trait]
+impl<'a> JobCommand for Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send + Sync + 'static>> {
+    async fn run(self: Box<Self>, _: &JobRunner) -> anyhow::Result<()> {
+        self.await?;
+        Ok(())
+    }
+
+    fn name(&self) -> String {
+       String::from("BoxFuture") 
+    }
+}
+*/
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "status")]
 pub enum StepCommandStatus {
