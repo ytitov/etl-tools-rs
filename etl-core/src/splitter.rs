@@ -113,10 +113,10 @@ where
                     content: input_item,
                 })) => {
                     lines_scanned += 1;
-                    let mut fx_tx_idx = 0;
+                    //let mut fx_tx_idx = 0;
                     for fw_tx in &outputs_tx {
                         //println!("SENDING TO: {}", fx_tx_idx);
-                        fx_tx_idx += 1;
+                        //fx_tx_idx += 1;
                         fw_tx
                             .send(Ok(DataSourceMessage::new("Splitter", input_item.clone())))
                             .await

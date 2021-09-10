@@ -40,6 +40,10 @@ impl Default for S3DataSource {
 impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource<T>
     for S3DataSource
 {
+    fn name(&self) -> String {
+        format!("S3DataSource-{}", &self.s3_bucket)
+    }
+
     async fn start_stream(
         mut self: Box<Self>,
     ) -> Result<DataSourceTask<T>, DataStoreError> {
