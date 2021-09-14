@@ -2,7 +2,8 @@ use clap::Clap;
 use etl_core::preamble::*;
 use etl_core::utils;
 use serde::{Deserialize, Serialize};
-use ssh2;
+
+use etl_sftp::*;
 
 #[derive(Clap, Debug)]
 #[clap(version = "1.0", author = "Yuri Titov <ytitov@gmail.com>")]
@@ -20,7 +21,9 @@ pub struct Args {
 pub struct Config {
     pub url: String,
     /// uses "contains" matching, so partial is fine
-    pub ssh_key_path: String,
+    pub ssh_key_path: Option<String>,
+    pub username: String,
+    pub password: Option<String>,
 }
 
 #[tokio::main(worker_threads = 1)]
@@ -29,40 +32,30 @@ async fn main() -> anyhow::Result<()> {
     let Config {
         ref url,
         ref ssh_key_path,
+        ref username,
+        ref password,
     } = utils::load_toml(&args.config, true)?;
 
-    use ssh2::Session;
-    use std::net::TcpStream;
-    use std::net::ToSocketAddrs;
-
-    // Connect to the local SSH server
-    /*
-     */
-    let mut addr = url.to_socket_addrs()?;
-    let addr1 = addr.next().unwrap();
-    println!("using ip: {:?}", &addr1);
-    let tcp = TcpStream::connect(addr1).unwrap();
-    let mut sess = Session::new().unwrap();
-    let mut agent = sess.agent()?;
-    agent.connect()?;
-    agent.list_identities()?;
-    let list = agent.identities()?;
-    let key = list
-        .iter()
-        // find the key
-        .find(|i| {
-            println!("see key {}", i.comment());
-            i.comment().contains(ssh_key_path)
-        })
-        .expect("did not find key");
-    sess.set_tcp_stream(tcp);
-    sess.handshake().unwrap();
-    // perform the handshake using agent
-    agent.userauth("kpiTransfer", &key)?;
-
-    let client = sess.sftp()?;
+    let client = match (password, ssh_key_path) {
+        (Some(ref password), None) => ssh_connect(
+            url,
+            Credentials::UserPassword {
+                username: username.to_string(),
+                pw: password.to_string(),
+            },
+        )?,
+        (None, Some(ref ssh_key_path)) => ssh_connect(
+            url,
+            Credentials::SshKeyPath {
+                username: username.to_string(),
+                ssh_key_path: ssh_key_path.to_string(),
+            },
+        )?,
+        _ => panic!("Need either username and password OR username and ssh_key_path"),
+    };
 
     use std::path::Path;
+    println!("Reading files from root directory");
     let files = client.readdir(Path::new("/"))?;
 
     for file in files {
