@@ -32,13 +32,12 @@ pub fn ssh_connect(url: &str, creds: Credentials) -> Result<Sftp, ssh2::Error> {
     let mut addr = url.to_socket_addrs().expect("Given bad url");
     let addr1 = addr.next().expect("Could not generate propper address");
     let tcp = TcpStream::connect(addr1).expect("Error starting stream");
-    let mut sess = Session::new().expect("Could not create a Session");
+    let mut sess = Session::new()?;
     match creds {
         Credentials::UserPassword { username, pw } => {
             sess.set_tcp_stream(tcp);
-            sess.handshake().expect("Error performing handshake");
-            sess.userauth_password(&username, &pw)
-                .expect("Error running userauth_password");
+            sess.handshake()?;
+            sess.userauth_password(&username, &pw)?;
             sess.sftp()
         }
         Credentials::SshKeyPath {
@@ -58,10 +57,8 @@ pub fn ssh_connect(url: &str, creds: Credentials) -> Result<Sftp, ssh2::Error> {
                 })
                 .expect("The supplied key path did not match, try using ssh-add");
             sess.set_tcp_stream(tcp);
-            sess.handshake().unwrap();
-            // perform the handshake using agent
+            sess.handshake()?;
             agent.userauth(&username, &key)?;
-
             sess.sftp()
         }
     }
