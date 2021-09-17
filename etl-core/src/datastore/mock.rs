@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
+use std::fmt::Debug;
 
 pub mod mock_csv;
 
@@ -23,7 +24,7 @@ impl Default for MockJsonDataOutput {
 }
 
 #[async_trait]
-impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for MockJsonDataOutput {
+impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockJsonDataOutput {
 
     async fn start_stream(&mut self, _: JobManagerChannel) -> anyhow::Result<DataOutputTask<T>> {
         use tokio::sync::mpsc::channel;
@@ -81,7 +82,7 @@ impl Default for MockJsonDataSource {
 }
 
 #[async_trait]
-impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static> DataSource<T>
+impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource<T>
     for MockJsonDataSource
 {
 

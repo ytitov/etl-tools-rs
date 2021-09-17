@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use enumerate::EnumerateStreamAsync;
 use etl_core::datastore::*;
-use etl_core::decoder::*;
+use etl_core::decoder::csv::*;
 use etl_core::job::*;
 use etl_core::job_manager::*;
 use etl_core::preamble::*;
@@ -23,32 +23,31 @@ async fn test_basic_csv_decoder() {
             ..Default::default()
         },
     );
-    use DecodeStream;
-    let lame_csv = Box::new(EnumerateStreamAsync::with_max(
-        "create some byte lines",
-        10,
-        (),
-        |_, idx| {
-            Box::pin(async move {
-                if idx == 0 {
-                    Ok(Bytes::from("index,words"))
-                } else {
-                    Ok(Bytes::from(format!("{},stuff", idx)))
-                }
-            })
-        },
-    ));
     jr.run_stream::<TestCsv>(
         "basic csv",
-        Box::new(
-            DecodeStream::as_datasource(
-                Box::new(CsvDecoder {
-                    csv_options: CsvReadOptions::default(),
-                }),
-                lame_csv,
-            )
-            .await,
-        ),
+        CsvDecoder::new(
+            CsvReadOptions::default(),
+            // generate a pretty boring csv stream
+            Box::new(EnumerateStreamAsync::with_max(
+                "create some byte lines",
+                10,
+                (),
+                |_, idx| {
+                    Box::pin(async move {
+                        if idx == 0 {
+                            Ok(Bytes::from("index,words"))
+                        } else {
+                            if idx == 7 {
+                                Ok(Bytes::from(format!("{},stuff,\"should error\"", idx)))
+                            } else {
+                                Ok(Bytes::from(format!("{},stuff", idx)))
+                            }
+                        }
+                    })
+                },
+            )),
+        )
+        .await,
         Box::new(mock::MockJsonDataOutput::default()),
     )
     .await
