@@ -76,7 +76,7 @@ where
             return Err(e.into());
         }
         Ok(right_ds) => {
-            let (mut right_rx, _) = right_ds.start_stream().await?;
+            let (mut right_rx, _) = right_ds.start_stream()?;
             loop {
                 match right_rx.recv().await {
                     Some(Ok(DataSourceMessage::Data {
@@ -137,7 +137,6 @@ where
     Ok(num_read)
 }
 
-#[async_trait]
 impl<L, R> DataSource<(L, Option<R>)> for LeftJoin<'static, L, R>
 where
     R: DeserializeOwned + Debug + Clone + 'static + Send + Sync,
@@ -147,13 +146,13 @@ where
         format!("LeftJoin-{}", self.left_ds.name())
     }
 
-    async fn start_stream(
+    fn start_stream(
         self: Box<Self>,
     ) -> Result<DataSourceTask<(L, Option<R>)>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         use tokio::task::JoinHandle;
         let (tx, rx) = channel(1);
-        let (mut left_rx, _) = self.left_ds.start_stream().await?;
+        let (mut left_rx, _) = self.left_ds.start_stream()?;
 
         let max_left_len = self.left_buf_len;
         let matching_func = self.is_match;

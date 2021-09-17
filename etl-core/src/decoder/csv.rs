@@ -31,7 +31,7 @@ impl<T: DeserializeOwned + Debug + 'static + Send + Sync> DecodeStream<T> for Cs
 
         //let (mut source_rx, source_stream_jh) = source.start_stream().await?;
 
-        match source.start_stream().await {
+        match source.start_stream() {
             Ok((mut source_rx, source_stream_jh)) => {
                 let CsvReadOptions {
                     delimiter,

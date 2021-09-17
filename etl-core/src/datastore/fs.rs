@@ -29,14 +29,14 @@ impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static>
         format!("LocalFsDataSource-{}", &self.home)
     }
 
-    async fn start_stream(
+    fn start_stream(
         mut self: Box<Self>,
     ) -> Result<DataSourceTask<T>, DataStoreError> {
         use ReadContentOptions::*;
         let name = String::from("LocalFsDataSource");
         match self.read_content.clone() {
-            Json => self.start_stream_json::<T>(name).await,
-            Csv(options) => self.start_stream_csv::<T>(options, name).await,
+            Json => self.start_stream_json::<T>(name),
+            Csv(options) => self.start_stream_csv::<T>(options, name),
             Text => {
                 unimplemented!()
             }
@@ -133,7 +133,7 @@ impl LocalFsDataSource {
         }
     }
 
-    async fn start_stream_json<T>(
+    fn start_stream_json<T>(
         &mut self,
         name: String,
     ) -> Result<DataSourceTask<T>, DataStoreError>
@@ -197,7 +197,7 @@ impl LocalFsDataSource {
         Ok((rx, jh))
     }
 
-    async fn start_stream_csv<T>(
+    fn start_stream_csv<T>(
         &mut self,
         csv_options: CsvReadOptions,
         name: String,

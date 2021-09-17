@@ -1,7 +1,6 @@
 use crate::datastore::error::DataStoreError;
 use crate::datastore::*;
 use crate::preamble::*;
-use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 use tokio::sync::mpsc::Receiver;
@@ -12,7 +11,6 @@ pub struct Transformer<I, O> {
     pub map: fn(I) -> DataOutputItemResult<O>,
 }
 
-#[async_trait]
 impl<
         I: DeserializeOwned + Debug + Send + Sync + 'static,
         O: DeserializeOwned + Debug + Send + Sync + 'static,
@@ -22,11 +20,11 @@ impl<
         format!("Transformer-{}", self.input.name())
     }
 
-    async fn start_stream(self: Box<Self>) -> Result<DataSourceTask<O>, DataStoreError> {
+    fn start_stream(self: Box<Self>) -> Result<DataSourceTask<O>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         let (tx, rx): (_, Receiver<Result<DataSourceMessage<O>, DataStoreError>>) =
             channel(1);
-        let (mut input_rx, _) = self.input.start_stream().await?;
+        let (mut input_rx, _) = self.input.start_stream()?;
         let map_func = self.map;
         let name = String::from("Transformer");
         let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> =

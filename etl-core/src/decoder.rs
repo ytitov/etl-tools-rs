@@ -24,14 +24,13 @@ pub struct DecodedSource<T: DeserializeOwned + Debug + 'static + Send + Send> {
     ds_task_result: Result<DataSourceTask<T>, DataStoreError>,
 }
 
-#[async_trait]
 impl<T: DeserializeOwned + Debug + Send + Sync + 'static> DataSource<T>
     for DecodedSource<T>
 {
     fn name(&self) -> String {
         format!("DecodedSource-{}", &self.source_name)
     }
-    async fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
+    fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         self.ds_task_result
     }
 }

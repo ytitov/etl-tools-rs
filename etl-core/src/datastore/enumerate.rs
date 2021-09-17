@@ -1,5 +1,4 @@
 use crate::datastore::*;
-use async_trait::async_trait;
 use futures_core::future::BoxFuture;
 use std::time::Duration;
 
@@ -12,7 +11,6 @@ pub struct EnumerateStream<S, O> {
     pub create: fn(&'_ S, usize) -> DataOutputItemResult<O>,
 }
 
-#[async_trait]
 impl<S: Send + Sync + 'static, O: DeserializeOwned + Debug + Send + Sync + 'static> DataSource<O>
     for EnumerateStream<S, O>
 {
@@ -20,7 +18,7 @@ impl<S: Send + Sync + 'static, O: DeserializeOwned + Debug + Send + Sync + 'stat
         format!("{}", &self.name)
     }
 
-    async fn start_stream(self: Box<Self>) -> Result<DataSourceTask<O>, DataStoreError> {
+    fn start_stream(self: Box<Self>) -> Result<DataSourceTask<O>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         let (tx, rx): (_, Receiver<Result<DataSourceMessage<O>, DataStoreError>>) = channel(1);
         let create_func = self.create;
@@ -89,7 +87,6 @@ impl<S,O> EnumerateStreamAsync<S,O> {
     }
 }
 
-#[async_trait]
 impl<S: Send + Sync + 'static, O: DeserializeOwned + Debug + Send + Sync + 'static> DataSource<O>
     for EnumerateStreamAsync<S, O>
 {
@@ -97,7 +94,7 @@ impl<S: Send + Sync + 'static, O: DeserializeOwned + Debug + Send + Sync + 'stat
         format!("{}", &self.name)
     }
 
-    async fn start_stream(self: Box<Self>) -> Result<DataSourceTask<O>, DataStoreError> {
+    fn start_stream(self: Box<Self>) -> Result<DataSourceTask<O>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         let (tx, rx): (_, Receiver<Result<DataSourceMessage<O>, DataStoreError>>) = channel(1);
         let create_func = self.create;
