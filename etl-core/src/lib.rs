@@ -1,5 +1,6 @@
 pub mod datastore;
 pub mod utils;
+pub mod decoder;
 pub mod preamble {
     pub use crate::datastore::job_runner::JRDataSource;
     pub use crate::job::error::*;
