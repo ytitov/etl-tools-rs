@@ -85,11 +85,10 @@ pub trait SimpleStore<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send
 
 use crate::job_manager::JobManagerRx;
 
-#[async_trait]
 pub trait DataSource<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send {
     fn name(&self) -> String;
 
-    async fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError>;
+    fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError>;
 
     /// TODO: this is not integrated yet because this doesn't get the JobManagerChannel because I'm
     /// not completely convinced this is necessary.  After all, JobRunner can close the rx end of

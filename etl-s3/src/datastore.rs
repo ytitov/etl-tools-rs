@@ -44,11 +44,11 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource
         format!("S3DataSource-{}", &self.s3_bucket)
     }
 
-    async fn start_stream(mut self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
+    fn start_stream(mut self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         use ReadContentOptions::*;
         match self.read_content.clone() {
-            Json => self.start_stream_json::<T>().await,
-            Csv(options) => self.start_stream_csv::<T>(options).await,
+            Json => self.start_stream_json::<T>(),
+            Csv(options) => self.start_stream_csv::<T>(options),
             Text => {
                 unimplemented!()
             }
@@ -112,7 +112,7 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
 }
 
 impl S3DataSource {
-    async fn start_stream_json<T>(&mut self) -> Result<DataSourceTask<T>, DataStoreError>
+    fn start_stream_json<T>(&mut self) -> Result<DataSourceTask<T>, DataStoreError>
     where
         T: DeserializeOwned + Send + 'static,
     {
@@ -185,7 +185,7 @@ impl S3DataSource {
         Ok((rx, jh))
     }
 
-    async fn start_stream_csv<T>(
+    fn start_stream_csv<T>(
         &mut self,
         csv_options: CsvReadOptions,
     ) -> Result<DataSourceTask<T>, DataStoreError>

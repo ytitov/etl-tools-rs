@@ -22,7 +22,7 @@ impl<I: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource
         format!("{}-DuplicatedDataSource", &self.name)
     }
 
-    async fn start_stream(self: Box<Self>) -> Result<DataSourceTask<I>, DataStoreError> {
+    fn start_stream(self: Box<Self>) -> Result<DataSourceTask<I>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         let (fw_tx, fw_rx): (_, Receiver<Result<DataSourceMessage<I>, DataStoreError>>) =
             channel(1);
@@ -102,9 +102,7 @@ where
     }
     let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
         let (mut input_rx, input_jh) = data_source
-            .start_stream()
-            .await
-            .expect("error starting source stream");
+            .start_stream()?;
         let mut lines_scanned = 0_usize;
         loop {
             match input_rx.recv().await {

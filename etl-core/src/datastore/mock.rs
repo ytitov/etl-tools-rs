@@ -90,7 +90,7 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource
         format!("MockJsonDataSource")
     }
 
-    async fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
+    fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         use tokio::task::JoinHandle;
         // could make this configurable

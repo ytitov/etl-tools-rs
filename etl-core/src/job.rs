@@ -269,7 +269,7 @@ impl JobRunner {
         } else {
             let input_name = input.name().to_string();
             // no need to wait on input JoinHandle
-            let (mut input_rx, _) = input.start_stream().await?;
+            let (mut input_rx, _) = input.start_stream()?;
             let (output_tx, output_jh) = output
                 .start_stream(self.job_manager_channel.clone())
                 .await?;
@@ -357,7 +357,7 @@ impl JobRunner {
     where
         I: DeserializeOwned + Serialize + Debug + Send + Sync + 'static,
     {
-        let (mut rx, source_stream_jh) = ds.start_stream().await?;
+        let (mut rx, source_stream_jh) = ds.start_stream()?;
         let stream_name = job_handler.name();
         self.job_state = self.load_job_state().await?;
 
