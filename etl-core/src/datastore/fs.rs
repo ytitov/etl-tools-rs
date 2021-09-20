@@ -40,6 +40,9 @@ impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static>
             Text => {
                 unimplemented!()
             }
+            Byte => {
+                unimplemented!("Streaming Bytes Not Implemented")
+            }
         }
     }
 }

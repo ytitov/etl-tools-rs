@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use enumerate::EnumerateStreamAsync;
 use etl_core::datastore::*;
 use etl_core::decoder::csv::*;
@@ -42,12 +41,12 @@ async fn test_basic_csv_decoder() {
                 |_, idx| {
                     Box::pin(async move {
                         if idx == 0 {
-                            Ok(Bytes::from("index,words"))
+                            Ok(String::from("index,words"))
                         } else {
                             if idx == 7 {
-                                Ok(Bytes::from(format!("{},stuff,\"should error\"", idx)))
+                                Ok(format!("{},stuff,\"should error\"", idx))
                             } else {
-                                Ok(Bytes::from(format!("{},stuff", idx)))
+                                Ok(format!("{},stuff", idx))
                             }
                         }
                     })

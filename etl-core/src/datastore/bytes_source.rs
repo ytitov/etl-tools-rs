@@ -1,68 +1,47 @@
-use self::error::*;
-use crate::preamble::*;
-use async_trait::async_trait;
-use serde::de::DeserializeOwned;
-use serde::de::Deserializer;
-use serde::Serialize;
-use std::fmt::Debug;
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::task::JoinHandle;
+use super::*;
+use bytes::Bytes;
 
-/// Local file system data stores
-pub mod fs;
-pub mod job_runner;
-/// various data stores used for testing
-pub mod mock;
-/// creates generated data sources
-pub mod enumerate;
-pub mod bytes_source;
-
-//pub type DataOutputItemResult = Result<String, Box<dyn std::error::Error + Send>>;
-
-pub type DataOutputItemResult<T> = Result<T, DataStoreError>;
-
-pub type DataSourceRx<T> = Receiver<Result<DataSourceMessage<T>, DataStoreError>>;
-pub type DataSourceTx<T> = Sender<DataOutputMessage<T>>;
-pub type DataSourceTask<T> = (
-    DataSourceRx<T>,
-    JoinHandle<Result<DataSourceStats, DataStoreError>>,
+pub type BytesSourceRx = Receiver<Result<BytesSourceMessage, DataStoreError>>;
+pub type BytesSourceTx = Sender<BytesOutputMessage>;
+pub type BytesSourceTask = (
+    BytesSourceRx,
+    JoinHandle<Result<BytesSourceStats, DataStoreError>>,
 );
 
-pub type DataOutputJoinHandle = JoinHandle<anyhow::Result<()>>;
+pub type BytesOutputJoinHandle = JoinHandle<anyhow::Result<()>>;
 
-pub struct DataSourceStats {
+pub struct BytesSourceStats {
     pub lines_scanned: usize,
 }
 
-pub type DataOutputTask<T> =
-    (Sender<DataOutputMessage<T>>, JoinHandle<anyhow::Result<()>>);
+pub type BytesOutputTask = (Sender<BytesOutputMessage>, JoinHandle<anyhow::Result<()>>);
 
 #[derive(Debug)]
-pub enum DataSourceMessage<T: DeserializeOwned + Send> {
-    Data { source: String, content: T },
+pub enum BytesSourceMessage {
+    Data { source: String, content: Bytes },
 }
 
-impl<T: DeserializeOwned + Send> DataSourceMessage<T> {
-    pub fn new<S: Into<String>>(s: S, data: T) -> Self {
-        DataSourceMessage::Data {
+impl BytesSourceMessage {
+    pub fn new<S: Into<String>, T: Into<Bytes>>(s: S, data: T) -> Self {
+        BytesSourceMessage::Data {
             source: s.into(),
-            content: data,
+            content: data.into(),
         }
     }
 }
 
 #[derive(Debug)]
-pub enum DataOutputMessage<T: Serialize + Debug + Send + Sync> {
-    Data(T),
+pub enum BytesOutputMessage {
+    Data(Bytes),
     NoMoreData,
 }
 
-impl<T: Serialize + Debug + Send + Sync> DataOutputMessage<T> {
-    pub fn new(data: T) -> Self {
-        DataOutputMessage::Data(data)
+impl BytesOutputMessage {
+    pub fn new<T: Into<Bytes>>(data: T) -> Self {
+        BytesOutputMessage::Data(data.into())
     }
     pub fn no_more_data() -> Self {
-        DataOutputMessage::NoMoreData
+        BytesOutputMessage::NoMoreData
     }
 }
 
@@ -86,28 +65,28 @@ pub trait SimpleStore<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send
 
 use crate::job_manager::JobManagerRx;
 
-pub trait DataSource<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send {
+pub trait BytesSource: Sync + Send {
     fn name(&self) -> String;
 
-    fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError>;
+    fn start_stream(self: Box<Self>) -> Result<BytesSourceTask, DataStoreError>;
 
     /// TODO: this is not integrated yet because this doesn't get the JobManagerChannel because I'm
     /// not completely convinced this is necessary.  After all, JobRunner can close the rx end of
     /// the channel provided by the data source
-    fn process_job_manager_rx(
-        &self,
-        rx: &mut JobManagerRx,
-    ) -> Result<(), DataStoreError> {
+    fn process_job_manager_rx(&self, rx: &mut JobManagerRx) -> Result<(), DataStoreError> {
         loop {
             if let Ok(message) = rx.try_recv() {
-                use crate::job_manager::Message::*;
-                use crate::job_manager::NotifyDataSource;
+                //use crate::job_manager::Message::*;
+                //use crate::job_manager::NotifyBytesSource;
+                // TODO: handle this
                 match message {
                     // this is a global message which means need to shutdown and stop
                     // what we are doing
-                    ToDataSource(NotifyDataSource::TooManyErrors) => {
+                    /*
+                    ToBytesSource(NotifyBytesSource::TooManyErrors) => {
                         return Err(DataStoreError::TooManyErrors);
                     }
+                    */
                     _ => {}
                 }
             } else {
@@ -118,38 +97,35 @@ pub trait DataSource<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send 
         Ok(())
     }
     /*
-    fn boxed(self: Box<Self>) -> Box<dyn DataSource<T> + Send + Sync> {
+    fn boxed(self: Box<Self>) -> Box<dyn BytesSource<T> + Send + Sync> {
         Box::new(self)
     }
     */
 }
 
-/// Helps with creating DataOutput's during run-time.
+/// Helps with creating BytesOutput's during run-time.
 #[async_trait]
-pub trait CreateDataOutput<'de, C, T>: Sync + Send
+pub trait CreateBytesOutput<'de, C, T>: Sync + Send
 where
     C: Deserializer<'de>,
     T: Serialize + Debug + 'static + Send,
 {
-    async fn create_data_output(_: C) -> anyhow::Result<Box<dyn DataOutput<T>>>;
+    async fn create_data_output(_: C) -> anyhow::Result<Box<dyn BytesOutput>>;
 }
 
-/// Helps with creating DataSource's during run-time.
+/// Helps with creating BytesSource's during run-time.
 #[async_trait]
-pub trait CreateDataSource<'de, C, T>: Sync + Send
+pub trait CreateBytesSource<'de, C, T>: Sync + Send
 where
     C: Deserializer<'de>,
     T: DeserializeOwned + Debug + 'static + Send,
 {
-    async fn create_data_source(_: C) -> anyhow::Result<Box<dyn DataSource<T>>>;
+    async fn create_data_source(_: C) -> anyhow::Result<Box<dyn BytesSource>>;
 }
 
 #[async_trait]
-pub trait DataOutput<T: Serialize + Debug + 'static + Sync + Send>: Sync + Send {
-    async fn start_stream(
-        &mut self,
-        _: JobManagerChannel,
-    ) -> anyhow::Result<DataOutputTask<T>> {
+pub trait BytesOutput: Sync + Send {
+    async fn start_stream(&mut self, _: JobManagerChannel) -> anyhow::Result<BytesOutputTask> {
         unimplemented!();
     }
 
@@ -159,7 +135,7 @@ pub trait DataOutput<T: Serialize + Debug + 'static + Sync + Send>: Sync + Send 
 
     async fn data_output_shutdown(
         self: Box<Self>,
-        dot: DataOutputTask<T>,
+        dot: BytesOutputTask,
         jr: &JobRunner,
     ) -> anyhow::Result<()> {
         let (c, jh) = dot;
@@ -167,8 +143,7 @@ pub trait DataOutput<T: Serialize + Debug + 'static + Sync + Send>: Sync + Send 
         match jh.await {
             Ok(Ok(())) => Ok(()),
             Ok(Err(e)) => {
-                let msg =
-                    format!("Waiting for task to finish resulted in an error: {}", e);
+                let msg = format!("Waiting for task to finish resulted in an error: {}", e);
                 jr.log_err("JobManager", None, msg);
                 Ok(())
             }
@@ -188,10 +163,7 @@ pub trait DataOutput<T: Serialize + Debug + 'static + Sync + Send>: Sync + Send 
 /// --
 /// Update: I am thinking this should not really fail, but still report the errors;
 /// possibly take a pointer to job manager?
-pub async fn data_output_shutdown<T>(
-    jr: &JobRunner,
-    (c, jh): DataOutputTask<T>,
-) -> anyhow::Result<()>
+pub async fn data_output_shutdown<T>(jr: &JobRunner, (c, jh): BytesOutputTask) -> anyhow::Result<()>
 where
     T: Serialize + Debug + Send + Sync,
 {
@@ -239,9 +211,7 @@ pub mod error {
         StreamingLines { key: String, error: String },
         #[error("Key or path `{key:?}` was not found.  Reason: `{error:?}`")]
         NotExist { key: String, error: String },
-        #[error(
-            "Error returned from transform_item `{job_name:?}`.  Reason: `{error:?}`"
-        )]
+        #[error("Error returned from transform_item `{job_name:?}`.  Reason: `{error:?}`")]
         TransformerError { job_name: String, error: String },
         #[error("JoinError: `{0}`")]
         //JoinError(#[from] tokio::task::JoinError),
@@ -282,87 +252,4 @@ pub mod error {
             DataStoreError::Generic(er.to_string())
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub enum LineType {
-    Csv,
-    Json,
-    Text,
-}
-
-use csv;
-#[derive(Debug, Clone)]
-pub struct CsvReadOptions {
-    pub delimiter: u8,     // b','
-    pub has_headers: bool, // true
-    /// number of fields can change
-    pub flexible: bool, // false, if num fields changes
-    pub terminator: csv::Terminator, // csv::Terminator::CLRF
-    /// quote character to use
-    pub quote: u8, // b'"'
-    /// escape character
-    pub escape: Option<u8>, //None
-    /// enable/disable double quotes are escapes
-    pub double_quote: bool, //true
-    /// enable/disable quoting
-    pub quoting: bool, //true
-    pub comment: Option<u8>, //None
-}
-
-#[derive(Debug, Clone)]
-pub struct CsvWriteOptions {
-    pub delimiter: u8,               // b','
-    pub has_headers: bool,           // true
-    pub terminator: csv::Terminator, // csv::Terminator::CLRF
-    pub quote_style: csv::QuoteStyle,
-    /// quote character to use
-    pub quote: u8, // b'"'
-    /// escape character
-    pub escape: u8, // default to b'\'
-    /// enable/disable double quotes are escapes
-    pub double_quote: bool, //true
-}
-
-impl Default for CsvReadOptions {
-    fn default() -> Self {
-        CsvReadOptions {
-            delimiter: b',',
-            has_headers: true,
-            flexible: false,
-            terminator: csv::Terminator::CRLF,
-            quote: b'"',
-            escape: None,
-            double_quote: true,
-            quoting: true,
-            comment: None,
-        }
-    }
-}
-
-impl Default for CsvWriteOptions {
-    fn default() -> Self {
-        CsvWriteOptions {
-            delimiter: b',',
-            has_headers: true,
-            terminator: csv::Terminator::CRLF,
-            quote_style: csv::QuoteStyle::Necessary,
-            quote: b'"',
-            escape: b'\\',
-            double_quote: false,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum ReadContentOptions {
-    Csv(CsvReadOptions),
-    Json,
-    Text,
-}
-#[derive(Debug, Clone)]
-pub enum WriteContentOptions {
-    Csv(CsvWriteOptions),
-    Json,
-    Text,
 }
