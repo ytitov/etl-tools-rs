@@ -398,18 +398,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "etl-examples"
-version = "0.1.0"
-dependencies = [
- "clap",
- "etl-core",
- "etl-mysql",
- "etl-s3",
- "rusoto_core",
- "serde",
-]
-
-[[package]]
 name = "etl-mysql"
 version = "0.1.0"
 dependencies = [

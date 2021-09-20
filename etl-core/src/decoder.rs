@@ -12,7 +12,8 @@ pub mod json;
 
 
 #[async_trait]
-pub trait DecodeStream<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send {
+//pub trait DecodeStream<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send {
+pub trait DecodeStream<T: Debug + 'static + Send>: Sync + Send {
     async fn decode_source(
         self: Box<Self>,
         source: Box<dyn BytesSource>,
