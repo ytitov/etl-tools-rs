@@ -38,11 +38,11 @@ pub type DataOutputTask<T> =
     (Sender<DataOutputMessage<T>>, JoinHandle<anyhow::Result<()>>);
 
 #[derive(Debug)]
-pub enum DataSourceMessage<T: DeserializeOwned + Send> {
+pub enum DataSourceMessage<T: Send> {
     Data { source: String, content: T },
 }
 
-impl<T: DeserializeOwned + Send> DataSourceMessage<T> {
+impl<T: Send> DataSourceMessage<T> {
     pub fn new<S: Into<String>>(s: S, data: T) -> Self {
         DataSourceMessage::Data {
             source: s.into(),
