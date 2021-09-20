@@ -8,6 +8,7 @@ use std::fmt::Debug;
 use crate::datastore::bytes_source::*;
 
 pub mod csv;
+pub mod json;
 
 
 #[async_trait]
