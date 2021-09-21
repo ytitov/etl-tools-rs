@@ -462,7 +462,7 @@ impl JobState {
         Ok(())
     }
 
-    pub fn get<V: DeserializeOwned>(&mut self, key: &str) -> anyhow::Result<Option<V>> {
+    pub fn get<V: DeserializeOwned>(&self, key: &str) -> anyhow::Result<Option<V>> {
         if let Some(val) = self.settings.get(key) {
             Ok(Some(serde_json::from_value(val.to_owned())?))
         } else {

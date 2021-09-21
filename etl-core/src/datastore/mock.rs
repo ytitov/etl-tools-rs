@@ -160,6 +160,7 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
                 }
             }
             Err(er) => {
+                //TODO: this should return a DataStoreError
                 panic!("Got error calling files.lock(): {}", er);
             }
         }
@@ -176,6 +177,7 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
                         }
                     }
                     Err(er) => {
+                        //TODO: this should return a DataStoreError
                         panic!("Got error calling files.lock(): {}", er);
                     }
                 };

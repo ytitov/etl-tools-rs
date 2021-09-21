@@ -100,7 +100,11 @@ impl JobRunner {
             Ok(json) => match serde_json::from_value(json) {
                 Ok(job_state) => Ok(job_state),
                 Err(e) => {
-                    println!("------> Fix or remove the file: {}", &path);
+                    self.log_err(
+                        "JobRunner",
+                        None,
+                        format!("Fix or remove the file: {}", &path),
+                    );
                     Err(DataStoreError::Deserialize {
                         attempted_string: self.job_state.name().to_owned(),
                         message: e.to_string(),
@@ -167,6 +171,22 @@ impl JobRunner {
             Ok(_) => {}
             Err(er) => println!("Could not send to job_manager {}", er),
         };
+    }
+
+    pub fn set_state<K: Into<String>, V: Serialize>(mut self, key: K, val: &V) -> Self {
+        if let Ok(_) = self.job_state.set(key.into(), val) {
+        } else {
+            println!("JobRunner::set_state: error saving state");
+        }
+        self
+    }
+
+    pub fn get_state<V: DeserializeOwned + Default>(&self, key: &str) -> anyhow::Result<V> {
+        match self.job_state.get(key) {
+            Ok(Some(val)) => Ok(val),
+            Ok(None) => Ok(V::default()),
+            Err(e) => panic!("Fatal error JobRunner::get_state for {} error: {}", key, e),
+        }
     }
 
     fn _log_if_err<T>(&self, name: &str, item_info: Result<(), T>)
@@ -296,7 +316,6 @@ impl JobRunner {
                 };
                 match self.process_job_manager_rx() {
                     Err(JobRunnerError::TooManyErrors) => {
-                        println!("handling TooManyErrors");
                         self.job_state.stream_not_ok(
                             name,
                             String::from("Reached too many errors"),
