@@ -29,7 +29,6 @@ struct TestCsv {
 /// test loading and saving state with default trait
 /// it would be good to test with file system so we could have an existing state
 /// also to test with bad serialization situations
-/// - TODO: should implement json loading with mock loader
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_state() {
     let job_manager = JobManager::new(JobManagerConfig {
