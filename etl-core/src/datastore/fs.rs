@@ -1,11 +1,11 @@
-use std::path::Path;
+use super::error::*;
 use crate::datastore::bytes_source::*;
 use crate::datastore::SimpleStore;
 use async_trait::async_trait;
-use super::error::*;
-use tokio::task::JoinHandle;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::path::Path;
+use tokio::task::JoinHandle;
 
 pub struct LocalFs {
     pub files: Vec<String>,
@@ -28,7 +28,11 @@ impl BytesSource for LocalFs {
         let jh: JoinHandle<Result<BytesSourceStats, DataStoreError>> = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             for fname in files {
-                let file = File::open(Path::new(&home).join(&fname)).await?;
+                //TODO: would prefer this to fail higher, but the test is not handled properly
+                //higher up.  must create a test then rectify this
+                let file = File::open(Path::new(&home).join(&fname))
+                    .await
+                    .expect("File not found");
                 // 68 mb in size
                 let mut lines = BufReader::with_capacity(1 << 26, file).lines();
                 loop {
@@ -49,8 +53,8 @@ impl BytesSource for LocalFs {
 }
 
 #[async_trait]
-impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static>
-    SimpleStore<T> for LocalFs
+impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static> SimpleStore<T>
+    for LocalFs
 {
     async fn load(&self, path: &str) -> Result<T, DataStoreError> {
         use std::path::Path;
@@ -90,7 +94,7 @@ impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static>
         match serde_json::to_string_pretty(&item) {
             Ok(content) => match file.write_all(content.as_bytes()).await {
                 Ok(()) => Ok(()),
-            Err(err) => Err(DataStoreError::FatalIO(err.to_string())),
+                Err(err) => Err(DataStoreError::FatalIO(err.to_string())),
             },
             Err(err) => Err(DataStoreError::FatalIO(err.to_string())),
         }
