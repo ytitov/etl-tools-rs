@@ -1,21 +1,22 @@
-/// DecodeStream trait is designed to be used with any DataSource<Bytes> to decode a CSV.  This is
-/// useful in cases where a new DataSource is implemented without having to reimplement repetitive
-/// decoders.
+/// DecodeStream trait is designed to be used with any BytesSource to decode a CSV. When adding new
+/// kinds of DataSources (like S3) one needs to simply implement a stream which produces Bytes
 use crate::datastore::error::*;
 use crate::datastore::*;
 use async_trait::async_trait;
-use bytes::Bytes;
 use serde::de::DeserializeOwned;
-//use serde::Serialize;
 use std::fmt::Debug;
+use crate::datastore::bytes_source::*;
 
 pub mod csv;
+pub mod json;
+
 
 #[async_trait]
-pub trait DecodeStream<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send {
+//pub trait DecodeStream<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send {
+pub trait DecodeStream<T: Debug + 'static + Send>: Sync + Send {
     async fn decode_source(
         self: Box<Self>,
-        source: Box<dyn DataSource<Bytes>>,
+        source: Box<dyn BytesSource>,
     ) -> Box<dyn DataSource<T>>;
 }
 
