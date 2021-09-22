@@ -43,6 +43,39 @@ impl<'a> JobCommand for SimpleCommand<'a> {
 }
 
 /*
+pub struct Command<'a> {
+    name: String,
+    run_command:
+        Box<dyn Fn() -> BoxFuture<'a, anyhow::Result<()>> + 'static + Send + Sync>,
+}
+
+impl<'a> Command<'a> {
+    pub fn new<S, F>(name: S, callback: F) -> Box<dyn JobCommand + 'a>
+    where
+        S: Into<String>,
+        F: Fn() -> BoxFuture<'a, anyhow::Result<()>> + 'static + Send + Sync,
+    {
+        Box::new(Command {
+            name: name.into(),
+            run_command: Box::new(callback),
+        })
+    }
+}
+
+#[async_trait]
+impl<'a> JobCommand for Command<'a> {
+    async fn run(self: Box<Self>, _: &JobRunner) -> anyhow::Result<()> {
+        (self.run_command)().await?;
+        Ok(())
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+}
+*/
+
+/*
 use core::future::Future;
 use core::pin::Pin;
 #[async_trait]

@@ -225,6 +225,7 @@ pub struct JobStepDetails {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+// TODO: when JobRunner completes it doesn't set the run_status to complete
 pub struct JobState {
     commands: HashMap<String, StepCommandStatus>,
     pub settings: HashMap<String, JsonValue>,
@@ -294,7 +295,9 @@ impl JobState {
             RunStatus::InProgress => {
                 self.add_command(name, StepCommandStatus::InProgress { started });
             }
-            RunStatus::Completed => {}
+            RunStatus::Completed => {
+                // TODO: this should possibly panic
+            }
             RunStatus::FatalError {
                 step_index: _,
                 step_name: _,

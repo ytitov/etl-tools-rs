@@ -7,6 +7,7 @@ use etl_core::job_manager::*;
 use etl_core::preamble::*;
 use fs::LocalFs;
 use serde::{Deserialize, Serialize};
+use command::*;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -46,6 +47,10 @@ async fn test_basic_fs_json_decoder() {
         )
         .await
         .expect("Failed run_stream")
+        .run_cmd(SimpleCommand::new("does nothing", || {
+            Box::pin(async {Ok(())})
+        }))
+        .await.expect("Command failed")
         .complete()
         .expect("Fail completing");
     if let Some(cmd_status) = job_state.step_history.get("basic json fs") {
