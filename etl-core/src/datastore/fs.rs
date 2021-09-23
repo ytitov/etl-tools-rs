@@ -100,3 +100,35 @@ impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static> 
         }
     }
 }
+
+impl LocalFs {
+    pub fn load_toml<T>(p: &str, autocreate: bool) -> anyhow::Result<T>
+    where
+        T: Serialize + DeserializeOwned + std::fmt::Debug + Default,
+    {
+        use anyhow::anyhow;
+        use std::fs::File;
+        use std::io::prelude::*;
+        match File::open(Path::new(&p)) {
+            Ok(mut file) => {
+                let mut cont = String::new();
+                file.read_to_string(&mut cont)?;
+                match toml::from_str(&cont) {
+                    Ok(cfg) => Ok(cfg),
+                    Err(err) => Err(anyhow!("There is an error in your config: {}", err)),
+                }
+            }
+            Err(err) => {
+                if autocreate == true {
+                    let cfg = T::default();
+                    println!("Creating default config: {:?}", &cfg);
+                    let mut f = File::create(&p)?;
+                    f.write_all(toml::Value::try_from(&cfg)?.to_string().as_bytes())?;
+                    Ok(cfg)
+                } else {
+                    Err(anyhow!("Error opening Configuration file: {}", err))
+                }
+            }
+        }
+    }
+}
