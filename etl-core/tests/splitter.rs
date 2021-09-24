@@ -41,7 +41,7 @@ async fn test_splitter() {
                 ..Default::default()
             },
         );
-        let jr1_err = jr1
+        let _ = jr1
             .run_stream::<TestSourceData>(
                 "stream-jr1-ds",
                 ds1,
@@ -81,9 +81,13 @@ async fn test_splitter() {
         .await
         .expect("error processing stream 2")
         .complete()
+        .await
         .expect("error completeing");
     });
-    s_handle.await.expect("error waiting on split handle");
+    match s_handle.await {
+        Ok(_) => {},//panic!("s_handle should return an error"),
+        Err(_) => {}
+    };
     jm_handle.await.expect("error waiting on handle");
 }
 

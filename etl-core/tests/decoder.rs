@@ -60,6 +60,7 @@ async fn test_basic_csv_decoder() {
     .await
     .expect("Failed run_stream")
     .complete()
+    .await
     .expect("Fail completing");
     jm_handle.await.expect("failure waiting for jm");
 }
@@ -112,6 +113,7 @@ async fn test_basic_json_decoder() {
     .await
     .expect("Failed run_stream")
     .complete()
+    .await
     .expect("Fail completing");
     if let Some(cmd_status) = job_state.step_history.get("basic json") {
         if let JobStepDetails {

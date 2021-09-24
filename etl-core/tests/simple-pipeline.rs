@@ -38,7 +38,7 @@ async fn test_simple_pipeline() {
         )
         .await
         .expect("Error running run_data_output");
-    let job_state = jr.complete().expect("Error completing job");
+    let job_state = jr.complete().await.expect("Error completing job");
     use state::*;
     jm_handle
         .await

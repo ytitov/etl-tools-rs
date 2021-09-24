@@ -52,6 +52,7 @@ async fn test_basic_fs_json_decoder() {
         }))
         .await.expect("Command failed")
         .complete()
+        .await
         .expect("Fail completing");
     if let Some(cmd_status) = job_state.step_history.get("basic json fs") {
         if let JobStepDetails {
@@ -111,6 +112,7 @@ async fn test_basic_fs_csv_decoder() {
         .await
         .expect("Failed run_stream")
         .complete()
+        .await
         .expect("Fail completing");
     use etl_core::job::state::*;
     if let Some(cmd_status) = job_state.step_history.get("basic csv fs") {

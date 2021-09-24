@@ -42,7 +42,7 @@ async fn test_job_command_with_error() {
         }))
         .await
         .expect("Failed run_cmd");
-    let job_state = jr.complete().expect("Error completing job");
+    let job_state = jr.complete().await.expect("Error completing job");
     jm_handle.await.expect("Failed waiting on handle");
     use command::*;
     use state::*;
@@ -105,7 +105,7 @@ async fn test_job_command_with_error_2() {
         }))
         .await
         .expect("Failed run_cmd");
-    let job_state = jr.complete().expect("Error completing job");
+    let job_state = jr.complete().await.expect("Error completing job");
     jm_handle.await.expect("Failed waiting on handle");
     use command::*;
     use state::*;

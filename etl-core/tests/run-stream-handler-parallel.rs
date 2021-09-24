@@ -22,6 +22,7 @@ async fn run_two_jobs_fail_one() {
         .await
         .expect("Should not have failed")
         .complete()
+        .await
         .expect("Should not have failed");
 
     let jr_not_ok = create_jr(jm_channel.clone(), 1);

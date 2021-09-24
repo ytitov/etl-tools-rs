@@ -42,6 +42,7 @@ async fn basic_stream_handler_all_errors() {
         .await
         .expect("Error running stream")
         .complete()
+        .await
         .expect("Job completed with an error");
     jm_handle
         .await
