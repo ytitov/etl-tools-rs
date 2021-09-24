@@ -95,6 +95,8 @@ impl JobRunner {
     }
 
     async fn load_job_state(&mut self) -> Result<JobState, DataStoreError> {
+        // TODO: can optimise here by flagging if this is needed
+        self.save_job_state().await?;
         let path = JobState::gen_name(self.job_state.id(), self.job_state.name());
         let mut job_state = match self.config.ds.load(&path).await {
             Ok(json) => match serde_json::from_value(json) {
@@ -181,10 +183,24 @@ impl JobRunner {
         self
     }
 
-    pub fn get_state<V: DeserializeOwned + Default>(&self, key: &str) -> anyhow::Result<V> {
+    pub fn get_state_or_default<V: DeserializeOwned + Serialize + Default>(
+        &mut self,
+        key: &str,
+    ) -> anyhow::Result<V> {
         match self.job_state.get(key) {
             Ok(Some(val)) => Ok(val),
-            Ok(None) => Ok(V::default()),
+            Ok(None) => {
+                self.job_state.set::<String, V>(key.into(), &V::default())?;
+                Ok(V::default())
+            },
+            Err(e) => panic!("Fatal error JobRunner::get_state for {} error: {}", key, e),
+        }
+    }
+
+    pub fn get_state<V: DeserializeOwned + Default>(&self, key: &str) -> anyhow::Result<Option<V>> {
+        match self.job_state.get(key) {
+            Ok(Some(val)) => Ok(Some(val)),
+            Ok(None) => Ok(None),
             Err(e) => panic!("Fatal error JobRunner::get_state for {} error: {}", key, e),
         }
     }
@@ -253,7 +269,8 @@ impl JobRunner {
     }
 
     /// must be run once the JobRunner is done otherwise JobManager will not exit
-    pub fn complete(self) -> Result<JobState, JobRunnerError> {
+    pub async fn complete(self) -> Result<JobState, JobRunnerError> {
+        self.save_job_state().await?;
         match self
             .job_manager_channel
             .tx

@@ -102,6 +102,7 @@ impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static> 
 }
 
 impl LocalFs {
+    // TODO: convert to async
     pub fn load_toml<T>(p: &str, autocreate: bool) -> anyhow::Result<T>
     where
         T: Serialize + DeserializeOwned + std::fmt::Debug + Default,
