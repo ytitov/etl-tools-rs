@@ -1,6 +1,6 @@
 [package]
 name = "etl-core"
-version = "0.1.8-a"
+version = "0.1.9-a"
 authors = ["Yuri Titov <ytitov@gmail.com>"]
 edition = "2018"
 
