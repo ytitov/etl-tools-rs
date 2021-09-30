@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 /// any other side effect
 pub trait JobCommand: Sync + Send {
     fn name(&self) -> String;
-    async fn run(self: Box<Self>, job: &JobRunner) -> anyhow::Result<()>;
+    async fn run(self: Box<Self>, job: &mut JobRunner) -> anyhow::Result<()>;
 }
 
 pub struct SimpleCommand<'a> {
@@ -32,7 +32,7 @@ impl<'a> SimpleCommand<'a> {
 
 #[async_trait]
 impl<'a> JobCommand for SimpleCommand<'a> {
-    async fn run(self: Box<Self>, _: &JobRunner) -> anyhow::Result<()> {
+    async fn run(self: Box<Self>, _: &mut JobRunner) -> anyhow::Result<()> {
         (self.run_command)().await?;
         Ok(())
     }

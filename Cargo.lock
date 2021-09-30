@@ -381,8 +381,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 
 [[package]]
+name = "etl-aws-utils"
+version = "0.1.0"
+dependencies = [
+ "etl-core",
+ "etl-s3",
+ "http",
+ "rusoto_athena",
+ "rusoto_core",
+ "rusoto_credential",
+ "serde",
+ "uuid",
+]
+
+[[package]]
 name = "etl-core"
-version = "0.1.8-a"
+version = "0.1.9-a"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1346,6 +1360,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusoto_athena"
+version = "0.47.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "411466c548d56284d65ea369b4170e1843859f6d728b4209548a15b39d1ee9fc"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures",
+ "rusoto_core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "rusoto_core"
 version = "0.47.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2011,6 +2039,15 @@ dependencies = [
  "idna",
  "matches",
  "percent-encoding",
+]
+
+[[package]]
+name = "uuid"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+dependencies = [
+ "getrandom",
 ]
 
 [[package]]

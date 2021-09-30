@@ -46,7 +46,7 @@ async fn test_state() {
         },
     );
 
-    let jr = jr
+    let mut jr = jr
         .run_stream::<TestCsv>(
             "basic csv",
             CsvDecoder::new(
@@ -77,7 +77,7 @@ async fn test_state() {
         .await
         .expect("Failed run_stream");
 
-    let jr = jr.set_state("offset", &State { offset: 3 });
+    jr.set_state("offset", &State { offset: 3 });
     let saved = jr
         .get_state::<State>("offset")
         .expect("Error with get_state")
@@ -136,10 +136,10 @@ async fn test_state_existing() {
     let saved = jr
         .get_state_or_default::<State>("offset")
         .expect("Error with get_state");
-    assert_eq!(saved.offset, 1000);
+    assert_eq!(saved.offset, 10);
     let job_state = jr.complete().await.expect("Fail completing");
     if let Ok(Some(saved)) = job_state.get::<State>("offset") {
-        assert_eq!(saved.offset, 1000);
+        assert_eq!(saved.offset, 10);
     } else {
         panic!("Expected State struct to be in final state and did not find one");
     }

@@ -99,7 +99,7 @@ async fn test_simple_mysql_output() {
     )
     .await
     .expect("Error running the stream")
-    .complete()
+    .complete().await
     .expect("Error completing job");
 
     if let Some(cmd_status) = job_state.step_history.get("move to db") {

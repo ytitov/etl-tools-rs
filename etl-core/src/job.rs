@@ -34,6 +34,8 @@ pub struct JobRunner {
     job_state: JobState,
     /// has the job started yet
     is_running: bool,
+    /// has the job state been updated and not saved
+    job_state_updated: bool,
 }
 
 pub struct JobRunnerConfig {
@@ -79,6 +81,7 @@ impl JobRunner {
             config,
             data_output_handles: Vec::new(),
             job_state: JobState::new(id, name),
+            job_state_updated: false,
             is_running: false,
         };
         jr.register()
@@ -95,8 +98,10 @@ impl JobRunner {
     }
 
     async fn load_job_state(&mut self) -> Result<JobState, DataStoreError> {
-        // TODO: can optimise here by flagging if this is needed
-        self.save_job_state().await?;
+        if self.job_state_updated {
+            self.save_job_state().await?;
+            self.job_state_updated = false;
+        }
         let path = JobState::gen_name(self.job_state.id(), self.job_state.name());
         let mut job_state = match self.config.ds.load(&path).await {
             Ok(json) => match serde_json::from_value(json) {
@@ -175,12 +180,12 @@ impl JobRunner {
         };
     }
 
-    pub fn set_state<K: Into<String>, V: Serialize>(mut self, key: K, val: &V) -> Self {
+    pub fn set_state<K: Into<String>, V: Serialize>(&mut self, key: K, val: &V) {
         if let Ok(_) = self.job_state.set(key.into(), val) {
+            self.job_state_updated = true;
         } else {
             println!("JobRunner::set_state: error saving state");
         }
-        self
     }
 
     pub fn get_state_or_default<V: DeserializeOwned + Serialize + Default>(
@@ -191,8 +196,9 @@ impl JobRunner {
             Ok(Some(val)) => Ok(val),
             Ok(None) => {
                 self.job_state.set::<String, V>(key.into(), &V::default())?;
+                self.job_state_updated = true;
                 Ok(V::default())
-            },
+            }
             Err(e) => panic!("Fatal error JobRunner::get_state for {} error: {}", key, e),
         }
     }
@@ -521,16 +527,19 @@ impl JobRunner {
     pub async fn run_cmd(mut self, job_cmd: Box<dyn JobCommand>) -> Result<Self, JobRunnerError> {
         self.job_state = self.load_job_state().await?;
         let name = job_cmd.name();
-        if let Err(_) = self.job_state.start_new_cmd(&name, &self.config) {
-            return Ok(self);
-        }
         if let Some(StepCommandStatus::Complete { .. }) = self.job_state.get_command(&name) {
+            println!("{}: JobCommand ({}) already ran", self.name(), job_cmd.name());
             self.log_info(
                 self.job_state.name(),
                 format!("{} command previously ran, skipping", &name),
             );
         } else {
-            match job_cmd.run(&self).await {
+            //println!("{:?}", &self.job_state);
+            //panic!("apparently it doesn't think it is done");
+            if let Err(_) = self.job_state.start_new_cmd(&name, &self.config) {
+                return Ok(self);
+            }
+            match job_cmd.run(&mut self).await {
                 Ok(()) => {
                     self.job_state.cmd_ok(name, &self.config)?;
                 }
