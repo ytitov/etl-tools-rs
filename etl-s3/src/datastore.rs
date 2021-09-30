@@ -14,6 +14,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::task::JoinHandle;
 
+pub mod bytes_source;
 // TODO: convert to use read_content: ReadContentOptions
 pub struct S3DataSource {
     pub read_content: ReadContentOptions,

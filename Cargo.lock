@@ -396,7 +396,7 @@ dependencies = [
 
 [[package]]
 name = "etl-core"
-version = "0.1.9-a"
+version = "0.1.10-a"
 dependencies = [
  "anyhow",
  "async-trait",

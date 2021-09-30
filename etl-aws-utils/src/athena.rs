@@ -85,9 +85,9 @@ impl AthenaQueryJobCommand {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct AthenaResult {
-    result: String,
+    pub result: String,
 }
 
 #[async_trait]
@@ -117,8 +117,15 @@ impl<'a> JobCommand for AthenaQueryJobCommand {
             } = &self.config;
             let r = result.unwrap();
             loop {
-                if etl_s3::is_result_on_s3(s3_credentials, s3_bucket, s3_prefix, &r, ".csv").await? {
-                    println!("result is on s3");
+                if etl_s3::is_result_on_s3(s3_credentials, s3_bucket, s3_prefix, &r, ".csv").await?
+                {
+                    //println!("result is on s3, adding csv extension");
+                    jr.set_state(
+                        self.name(),
+                        &AthenaResult {
+                            result: format!("{}.csv", &r),
+                        },
+                    );
                     break;
                 } else {
                     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
@@ -128,7 +135,7 @@ impl<'a> JobCommand for AthenaQueryJobCommand {
         Ok(())
     }
     fn name(&self) -> String {
-        format!("AthenaQuery-{}", &self.id)
+        format!("{}", &self.id)
     }
 }
 

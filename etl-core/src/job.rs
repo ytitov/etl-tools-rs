@@ -203,10 +203,10 @@ impl JobRunner {
         }
     }
 
-    pub fn get_state<V: DeserializeOwned + Default>(&self, key: &str) -> anyhow::Result<Option<V>> {
+    pub fn get_state<V: DeserializeOwned + Default>(&self, key: &str) -> anyhow::Result<V> {
         match self.job_state.get(key) {
-            Ok(Some(val)) => Ok(Some(val)),
-            Ok(None) => Ok(None),
+            Ok(Some(val)) => Ok(val),
+            Ok(None) => Err(anyhow::anyhow!("get_state requested a non-existant value")),
             Err(e) => panic!("Fatal error JobRunner::get_state for {} error: {}", key, e),
         }
     }
