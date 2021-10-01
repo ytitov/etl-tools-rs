@@ -386,6 +386,17 @@ impl JobRunner {
             input_ds: ds,
         })
     }
+    pub async fn run_stream_handler_fn<I>(
+        mut self,
+        ds: Box<dyn DataSource<I>>,
+        create_sh: CreateStreamHandlerFn<'_, I>,
+    ) -> Result<Self, JobRunnerError>
+    where
+        I: DeserializeOwned + Serialize + Debug + Send + Sync + 'static,
+    {
+        let sh = create_sh(&mut self).await?;
+        Ok(self.run_stream_handler::<I>(ds, sh).await?)
+    }
 
     /// uses the StreamHandler trait to do the final custom transform.
     /// This method gives a lot of flexibility in what you can execute

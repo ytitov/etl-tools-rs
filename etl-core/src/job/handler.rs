@@ -1,4 +1,9 @@
 use super::*;
+use futures_core::future::BoxFuture;
+
+pub type BoxedCreateStreamHandlerResult<T> = anyhow::Result<Box<dyn StreamHandler<T>>>;
+pub type CreateStreamHandlerFn<'a, R> =
+    Box<dyn Fn(&'_ mut JobRunner) -> BoxFuture<'a, BoxedCreateStreamHandlerResult<R>> + 'static + Send + Sync>;
 
 #[async_trait]
 /// Meant to be used for a variety situations like calling external apis, or

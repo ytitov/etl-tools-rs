@@ -21,6 +21,13 @@ pub struct AthenaConfig {
     pub region: Region,
 }
 
+impl AthenaConfig {
+    pub fn append_s3_prefix<S: Into<String>>(mut self, s: S) -> Self {
+        self.s3_prefix.push_str(&s.into());
+        self
+    }
+}
+
 impl Default for AthenaConfig {
     fn default() -> Self {
         AthenaConfig {
@@ -99,38 +106,48 @@ impl<'a> JobCommand for AthenaQueryJobCommand {
             //jr.set_state(self.name(), &AthenaResult { idx, result });
         }
         if result.is_some() {
+            let s3_file_full_path = format!("{}{}", self.config.s3_prefix, result.clone().unwrap());
             jr.set_state(
                 self.name(),
                 &AthenaResult {
-                    result: result.clone().unwrap(),
+                    result: s3_file_full_path.clone(),
                 },
             );
-        }
-        if self.is_select_query && result.is_some() {
-            let AthenaConfig {
-                s3_credentials,
-                s3_bucket,
-                s3_prefix,
-                athena_catalog_name: _,
-                athena_db_name: _,
-                region: _,
-            } = &self.config;
-            let r = result.unwrap();
-            loop {
-                if etl_s3::is_result_on_s3(s3_credentials, s3_bucket, s3_prefix, &r, ".csv").await?
-                {
-                    //println!("result is on s3, adding csv extension");
-                    jr.set_state(
-                        self.name(),
-                        &AthenaResult {
-                            result: format!("{}.csv", &r),
-                        },
-                    );
-                    break;
-                } else {
-                    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+            if self.is_select_query && result.is_some() {
+                let AthenaConfig {
+                    s3_credentials,
+                    s3_bucket,
+                    s3_prefix: _,
+                    athena_catalog_name: _,
+                    athena_db_name: _,
+                    region: _,
+                } = &self.config;
+                loop {
+                    if etl_s3::is_result_on_s3(
+                        s3_credentials,
+                        s3_bucket,
+                        "",
+                        &s3_file_full_path,
+                        ".csv",
+                    )
+                    .await?
+                    {
+                        jr.set_state(
+                            self.name(),
+                            &AthenaResult {
+                                result: format!("{}.csv", &s3_file_full_path),
+                            },
+                        );
+                        break;
+                    } else {
+                        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+                    }
                 }
             }
+        } else {
+            return Err(anyhow::anyhow!(
+                "Did not get file, which is needed to get results of the query"
+            ));
         }
         Ok(())
     }

@@ -115,7 +115,8 @@ impl<T: DeserializeOwned + Debug + 'static + Send + Sync> DecodeStream<T> for Cs
                                 }
                                 Some(Err(e)) => {
                                     println!("An error happened in CsvDecoder: {}", e);
-                                    break;
+                                    // TODO: this error does not seem to stop the pipeline
+                                    return Err(e);
                                 }
                                 None => {
                                     break;

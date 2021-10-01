@@ -14,6 +14,7 @@ use tokio::task::JoinHandle;
 
 #[derive(Default)]
 pub struct MySqlDataOutput {
+    // TODO: scaling may never need to happen
     pub on_put_num_rows_max: usize,
     pub on_put_num_rows: usize,
     pub table_name: String,
@@ -49,7 +50,7 @@ impl Default for MySqlDataOutputPool {
 #[async_trait]
 impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for MySqlDataOutput {
     async fn start_stream(&mut self, jm: JobManagerChannel) -> anyhow::Result<DataOutputTask<T>> {
-        let (tx, mut rx): (Sender<DataOutputMessage<T>>, _) = channel(self.on_put_num_rows_max * 2);
+        let (tx, mut rx): (Sender<DataOutputMessage<T>>, _) = channel(self.on_put_num_rows * 2);
 
         let table_name = self.table_name.clone();
         let on_put_num_rows_orig = *&self.on_put_num_rows;
@@ -76,8 +77,8 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                         // 3 hours timeout
                         //.connect_timeout(std::time::Duration::from_secs(60))
                         //.min_connections(1)
-                        .idle_timeout(Some(std::time::Duration::from_secs(60 * 10)))
-                        .max_lifetime(Some(std::time::Duration::from_secs(60 * 60 * 2)))
+                        //.idle_timeout(Some(std::time::Duration::from_secs(60 * 10)))
+                        //.max_lifetime(Some(std::time::Duration::from_secs(60 * 60 * 2)))
                         .after_connect(|_conn| {
                             Box::pin(async move {
                                 println!("MySql connection established");
@@ -268,6 +269,12 @@ pub async fn exec_rows_mysql(
                 count_ok += value_rows_buf.len(); //println!(" ** OK ** ");
             }
             Err(sqlx::Error::Io(e)) => {
+                // TODO: need to figure out a way to handle these errors
+                // do we just stop on the first error or allow several errors to accumulate via the
+                // job manager, just like in data sources. menono, though writing is probably a bit
+                // more important.  right now, for example getting error that table does not exist
+                // but the JobRunner thinks records have been inserted (they're under threshold of
+                // the batch size)
                 println!(
                     "MYSQL IO `{}` ERROR: {}.  Did not insert {} records",
                     table_name,

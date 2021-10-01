@@ -285,6 +285,9 @@ impl JobState {
         };
     }
 
+    //TODO: streamline start_* and make it use an enum.  There are issues with steps numbering
+    //and it looks like it is only incrementing when steps run, but not when they do not run which 
+    //will mess up the counter if some run and some don't (when resuming)
     pub fn start_new_cmd<N: Into<String>>(
         &mut self,
         name: N,
