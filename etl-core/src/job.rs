@@ -395,6 +395,7 @@ impl JobRunner {
     where
         I: DeserializeOwned + Serialize + Debug + Send + Sync + 'static,
     {
+        //TODO: this shouldn't run the create_sh if the state is already complete
         let sh = create_sh(&mut self).await?;
         Ok(self.run_stream_handler::<I>(ds, sh).await?)
     }
