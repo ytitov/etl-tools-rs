@@ -64,17 +64,17 @@ impl Default for JobRunnerConfig {
 impl JobRunner {
     /// `id` is an enumerated name like an extract id
     /// `name` is the name of the actual job, like 'extract-patient-data'
-    pub fn new<A, B>(
+    pub async fn create<A, B>(
         id: A,
         name: B,
         job_manager_channel: JobManagerChannel,
         config: JobRunnerConfig,
-    ) -> Self
+    ) -> anyhow::Result<Self>
     where
         A: Into<String>,
         B: Into<String>,
     {
-        let jr = JobRunner {
+        let mut jr = JobRunner {
             job_manager_channel,
             num_process_item_errors: 0,
             num_processed_items: 0,
@@ -84,9 +84,10 @@ impl JobRunner {
             job_state_updated: false,
             is_running: false,
         };
+        jr.job_state = jr.load_job_state().await?;
         jr.register()
             .expect("There was an error registering the job");
-        jr
+        Ok(jr)
     }
 
     pub fn name(&self) -> &'_ str {

@@ -1,5 +1,6 @@
 use etl_core::datastore::*;
 use etl_core::preamble::*;
+use etl_core::job::stream::*;
 use mock::*;
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +13,7 @@ async fn run_two_jobs_fail_one() {
     .expect("Could not initialize job_manager");
     let (jm_handle, jm_channel) = job_manager.start();
 
-    let jr_ok = create_jr(jm_channel.clone(), 100);
+    let jr_ok = create_jr(jm_channel.clone(), 100).await;
     let jr_ok_job_state = jr_ok
         .run_stream::<TestSourceData>(
             "transformed-ds-1a",
@@ -25,7 +26,7 @@ async fn run_two_jobs_fail_one() {
         .await
         .expect("Should not have failed");
 
-    let jr_not_ok = create_jr(jm_channel.clone(), 1);
+    let jr_not_ok = create_jr(jm_channel.clone(), 1).await;
     let jr_not_ok_err = jr_not_ok
         .run_stream::<TestSourceData>(
             "transformed-ds-1b",
@@ -61,8 +62,8 @@ async fn run_two_jobs_fail_one() {
     jm_handle.await.expect("Fatal: error awaiting on jm handle");
 }
 
-fn create_jr(jm_channel: JobManagerChannel, max_errors: usize) -> JobRunner {
-    let jr = JobRunner::new(
+async fn create_jr(jm_channel: JobManagerChannel, max_errors: usize) -> JobRunner {
+    JobRunner::create(
         "test_simple_pipeline_id",
         format!("test_simple_pipeline_{}", max_errors),
         jm_channel.clone(),
@@ -70,8 +71,7 @@ fn create_jr(jm_channel: JobManagerChannel, max_errors: usize) -> JobRunner {
             max_errors,
             ..Default::default()
         },
-    );
-    jr
+    ).await.expect("Error creating JobRunner")
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

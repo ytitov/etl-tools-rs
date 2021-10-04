@@ -46,6 +46,12 @@ async fn test_state_existing() {
     let mut job_state = JobState::new("test_simple_state", "test_simple_state");
     let job_state_file_name = JobState::gen_name("test_simple_state", "test_simple_state");
     job_state.set("offset", &State { offset: 10 }).expect("Could not set value");
+    let saved = 
+        job_state.get::<State>("offset")
+        .expect("Error with get_state")
+        .expect("Should not get a NONE");
+    assert_eq!(saved.offset, 10);
+    println!("CREATED FAKE STATE: {:?}", &job_state);
     hs_files.insert(
         String::from(&job_state_file_name),
         serde_json::to_string(&job_state).expect("Fatal error serializing"),
@@ -57,7 +63,7 @@ async fn test_state_existing() {
     })
     .expect("Could not initialize job_manager");
     let (jm_handle, jm_channel) = job_manager.start();
-    let mut jr = JobRunner::new(
+    let mut jr = JobRunner::create(
         "test_simple_state",
         "test_simple_state",
         jm_channel.clone(),
@@ -68,7 +74,7 @@ async fn test_state_existing() {
             }),
             ..Default::default()
         },
-    );
+    ).await.expect("Failure creating JobRunner");
     match jr.get_state_or_default::<TestState>("test-state") {
        Ok(_) => {},
        Err(e) => {

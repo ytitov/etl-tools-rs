@@ -5,6 +5,7 @@ use etl_core::job::state::*;
 use etl_core::job::*;
 use etl_core::job_manager::*;
 use etl_core::preamble::*;
+use etl_core::job::stream::*;
 use fs::LocalFs;
 use serde::{Deserialize, Serialize};
 use command::*;
@@ -24,14 +25,14 @@ async fn test_basic_fs_json_decoder() {
     })
     .expect("Could not initialize job_manager");
     let (jm_handle, jm_channel) = job_manager.start();
-    let jr = JobRunner::new(
+    let jr = JobRunner::create(
         "decoder_fs",
         "decoder_fs_test",
         jm_channel.clone(),
         JobRunnerConfig {
             ..Default::default()
         },
-    );
+    ).await.expect("Error creating JobRunner");
     let job_state = jr
         .run_stream::<TestCsv>(
             "basic json fs",
@@ -86,14 +87,14 @@ async fn test_basic_fs_csv_decoder() {
     })
     .expect("Could not initialize job_manager");
     let (jm_handle, jm_channel) = job_manager.start();
-    let jr = JobRunner::new(
+    let jr = JobRunner::create(
         "decoder_fs",
         "decoder_fs_test",
         jm_channel.clone(),
         JobRunnerConfig {
             ..Default::default()
         },
-    );
+    ).await.expect("Error creating JobRunner");
     use fs::LocalFs;
     let job_state = jr
         .run_stream::<TestCsv>(

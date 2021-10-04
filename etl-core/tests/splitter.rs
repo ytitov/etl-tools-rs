@@ -32,7 +32,7 @@ async fn test_splitter() {
     let ds2 = datasources.remove(0);
     let jr1_jm_channel = jm_channel.clone();
     tokio::spawn(async move {
-        let jr1 = JobRunner::new(
+        let jr1 = JobRunner::create(
             "jr1_id",
             "Copy1",
             jr1_jm_channel,
@@ -40,7 +40,9 @@ async fn test_splitter() {
                 max_errors: 2, // do a hard fail at error 2
                 ..Default::default()
             },
-        );
+        )
+        .await
+        .expect("Error creating JobRunner");
         let _ = jr1
             .run_stream::<TestSourceData>(
                 "stream-jr1-ds",
@@ -60,7 +62,7 @@ async fn test_splitter() {
 
     let jr2_jm_channel = jm_channel.clone();
     tokio::spawn(async move {
-        JobRunner::new(
+        JobRunner::create(
             "jr2_id",
             "Copy2",
             jr2_jm_channel,
@@ -69,6 +71,8 @@ async fn test_splitter() {
                 ..Default::default()
             },
         )
+        .await
+        .expect("Error creating JobRunner")
         .run_stream::<TestSourceData>(
             "stream-jr2-ds",
             ds2,
@@ -85,7 +89,7 @@ async fn test_splitter() {
         .expect("error completeing");
     });
     match s_handle.await {
-        Ok(_) => {},//panic!("s_handle should return an error"),
+        Ok(_) => {} //panic!("s_handle should return an error"),
         Err(_) => {}
     };
     jm_handle.await.expect("error waiting on handle");

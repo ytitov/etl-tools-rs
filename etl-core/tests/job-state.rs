@@ -37,14 +37,14 @@ async fn test_state() {
     })
     .expect("Could not initialize job_manager");
     let (jm_handle, jm_channel) = job_manager.start();
-    let jr = JobRunner::new(
+    let jr = JobRunner::create(
         "test_simple_state",
         "test_simple_state",
         jm_channel.clone(),
         JobRunnerConfig {
             ..Default::default()
         },
-    );
+    ).await.expect("Error creating JobRunner");
 
     let mut jr = jr
         .run_stream::<TestCsv>(
@@ -80,8 +80,7 @@ async fn test_state() {
     jr.set_state("offset", &State { offset: 3 });
     let saved = jr
         .get_state::<State>("offset")
-        .expect("Error with get_state")
-        .expect("Unwrapped on a NONE");
+        .expect("Error with get_state");
     assert_eq!(saved.offset, 3);
     let job_state = jr.complete().await.expect("Fail completing");
     if let Ok(Some(saved)) = job_state.get::<State>("offset") {
@@ -117,7 +116,7 @@ async fn test_state_existing() {
     })
     .expect("Could not initialize job_manager");
     let (jm_handle, jm_channel) = job_manager.start();
-    let jr = JobRunner::new(
+    let jr = JobRunner::create(
         "test_simple_state",
         "test_simple_state",
         jm_channel.clone(),
@@ -128,7 +127,7 @@ async fn test_state_existing() {
             }),
             ..Default::default()
         },
-    );
+    ).await.expect("Error creating JobRunner");
     let mut jr = jr.run_cmd(SimpleCommand::new("dummy command", || {
         Box::pin(async {Ok(())})
     })).await.expect("Issues running command");

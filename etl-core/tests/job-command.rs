@@ -13,7 +13,7 @@ async fn test_job_command_with_error() {
     .expect("Could not initialize job_manager");
     let (jm_handle, jm_channel) = job_manager.start();
 
-    let jr = JobRunner::new(
+    let jr = JobRunner::create(
         "test",
         "test_bad_command",
         jm_channel.clone(),
@@ -21,7 +21,7 @@ async fn test_job_command_with_error() {
             stop_on_error: false,
             ..Default::default()
         },
-    );
+    ).await.expect("Error creating JobRunner");
     let jr = jr
         .run_cmd(SimpleCommand::new("do_stuff_and_not_fail_1", || {
             Box::pin(async move { Ok(()) })
@@ -76,7 +76,7 @@ async fn test_job_command_with_error_2() {
     .expect("Could not initialize job_manager");
     let (jm_handle, jm_channel) = job_manager.start();
 
-    let jr = JobRunner::new(
+    let jr = JobRunner::create(
         "test",
         "test_bad_command",
         jm_channel.clone(),
@@ -84,7 +84,7 @@ async fn test_job_command_with_error_2() {
             stop_on_error: true,
             ..Default::default()
         },
-    );
+    ).await.expect("Error creating JobRunner");
     let jr = jr
         .run_cmd(SimpleCommand::new("do_stuff_and_not_fail_1", || {
             Box::pin(async move { Ok(()) })

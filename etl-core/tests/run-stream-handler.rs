@@ -5,6 +5,7 @@ use etl_core::datastore::*;
 use etl_core::job::*;
 use etl_core::job_manager::*;
 use etl_core::preamble::*;
+use etl_core::job::stream::*;
 use mock::mock_csv::*;
 use mock::MockJsonDataOutput;
 use serde::{Deserialize, Serialize};
@@ -25,14 +26,14 @@ async fn basic_stream_handler_all_errors() {
             .await
             .expect("Could not create mock json data output"),
     };
-    let jr = JobRunner::new(
+    let jr = JobRunner::create(
         "test",
         "custom_job_state",
         jm_channel,
         JobRunnerConfig {
             ..Default::default()
         },
-    );
+    ).await.expect("Error creating JobRunner");
 
     let job_state = jr
         .run_stream_handler(

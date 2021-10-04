@@ -1,10 +1,10 @@
 use super::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
-use std::fmt::Debug;
 
 pub mod mock_csv;
 
@@ -25,7 +25,6 @@ impl Default for MockJsonDataOutput {
 
 #[async_trait]
 impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockJsonDataOutput {
-
     async fn start_stream(&mut self, _: JobManagerChannel) -> anyhow::Result<DataOutputTask<T>> {
         use tokio::sync::mpsc::channel;
         let (tx, mut rx): (Sender<DataOutputMessage<T>>, _) = channel(1);
@@ -85,7 +84,6 @@ impl Default for MockJsonDataSource {
 impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource<T>
     for MockJsonDataSource
 {
-
     fn name(&self) -> String {
         format!("MockJsonDataSource")
     }
@@ -135,14 +133,21 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource
 impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStore<T>
     for MockJsonDataSource
 {
-    // TODO: add ability to look in files and return them (store as vec of strings)
     async fn load(&self, path: &str) -> Result<T, DataStoreError> {
+        //println!("MockJsonDataSource::load({}) current files: {:?}", path, &self.files);
         match self.files.lock() {
             Ok(files) => {
                 let files_hs = files.borrow();
                 if let Some(content) = files_hs.get(path) {
                     match serde_json::from_str::<T>(content) {
-                        Ok(result) => Ok(result),
+                        Ok(result) => {
+                            println!(
+                                "MockJsonDataOutput::load: {} ===>\n{}",
+                                path,
+                                serde_json::to_string_pretty(&result).unwrap()
+                            );
+                            Ok(result)
+                        }
                         Err(er) => {
                             return Err(DataStoreError::Deserialize {
                                 attempted_string: content.to_owned(),
@@ -173,7 +178,7 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
                     Ok(files) => {
                         files.borrow_mut().insert(path.to_string(), content);
                         for (_, f) in files.borrow().iter() {
-                            println!("FILE: {} ===>\n{}", path, f);
+                            println!("MockJsonDataOutput::write: {} ===>\n{}", path, f);
                         }
                     }
                     Err(er) => {

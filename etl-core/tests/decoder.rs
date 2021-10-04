@@ -3,6 +3,7 @@ use etl_core::datastore::*;
 use etl_core::job::*;
 use etl_core::job::state::*;
 use etl_core::job_manager::*;
+use etl_core::job::stream::*;
 use etl_core::preamble::*;
 use serde::{Deserialize, Serialize};
 
@@ -22,14 +23,14 @@ async fn test_basic_csv_decoder() {
     })
     .expect("Could not initialize job_manager");
     let (jm_handle, jm_channel) = job_manager.start();
-    let jr = JobRunner::new(
+    let jr = JobRunner::create(
         "test_simple_pipeline_id",
         "test_simple_pipeline",
         jm_channel.clone(),
         JobRunnerConfig {
             ..Default::default()
         },
-    );
+    ).await.expect("Error creating JobRunner");
     jr.run_stream::<TestCsv>(
         "basic csv",
         CsvDecoder::new(
@@ -74,14 +75,14 @@ async fn test_basic_json_decoder() {
     })
     .expect("Could not initialize job_manager");
     let (jm_handle, jm_channel) = job_manager.start();
-    let jr = JobRunner::new(
+    let jr = JobRunner::create(
         "test_simple_pipeline_id",
         "test_simple_pipeline",
         jm_channel.clone(),
         JobRunnerConfig {
             ..Default::default()
         },
-    );
+    ).await.expect("Error creating JobRunner");
     let job_state = jr.run_stream::<TestCsv>(
         "basic json",
         JsonDecoder::new(

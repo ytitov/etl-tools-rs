@@ -1,5 +1,6 @@
 use etl_core::datastore::*;
 use etl_core::job::*;
+use etl_core::job::stream::*;
 use etl_core::job_manager::*;
 use etl_core::preamble::*;
 use mock::*;
@@ -13,14 +14,14 @@ async fn test_simple_pipeline() {
     })
     .expect("Could not initialize job_manager");
     let (jm_handle, jm_channel) = job_manager.start();
-    let jr = JobRunner::new(
+    let jr = JobRunner::create(
         "test_simple_pipeline_id",
         "test_simple_pipeline",
         jm_channel.clone(),
         JobRunnerConfig {
             ..Default::default()
         },
-    );
+    ).await.expect("Error creating JobRunner");
     // transform mock data source using TestTransformer and
     // create a new data source
     let transformed_ds = jr
@@ -74,7 +75,7 @@ async fn test_simple_pipeline_max_error_with_failure() {
     })
     .expect("Could not initialize job_manager");
     let (jm_handle, jm_channel) = job_manager.start();
-    let jr = JobRunner::new(
+    let jr = JobRunner::create(
         "test_simple_pipeline_id",
         "test_simple_pipeline",
         jm_channel.clone(),
@@ -82,7 +83,8 @@ async fn test_simple_pipeline_max_error_with_failure() {
             max_errors: 2, // do a hard fail at error 2
             ..Default::default()
         },
-    );
+    ).await.expect("Error creating JobRunner");
+
     // transform mock data source using TestTransformer and
     // create a new data source
     let transformed_ds = jr
