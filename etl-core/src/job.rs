@@ -304,6 +304,7 @@ impl JobRunner {
             return Ok(self);
         }
 
+        use stream::StepStreamStatus;
         if let Some(StepStreamStatus::Complete { .. }) = self.job_state.get_stream(&name) {
             self.log_info(
                 self.job_state.name(),
@@ -326,12 +327,12 @@ impl JobRunner {
                         content: input_item,
                     })) => {
                         lines_scanned += 1;
-                        self.job_state.streams.incr_num_ok(stream_name, &source)?;
+                        self.job_state.stream_incr_count_ok(stream_name, &source)?;
                         output_tx.send(DataOutputMessage::new(input_item)).await?;
                     }
                     Some(Err(val)) => {
                         lines_scanned += 1;
-                        self.job_state.streams.incr_error(stream_name)?;
+                        self.job_state.stream_incr_count_err(stream_name)?;
                         self.log_err(&input_name, Some(&info), val.to_string());
                         self.num_process_item_errors += 1;
                     }
@@ -417,19 +418,6 @@ impl JobRunner {
         if let Err(_) = self.job_state.start_new_stream(stream_name, &self.config) {
             return Ok(self);
         }
-        match self.job_state.streams.is_complete(stream_name) {
-            Ok(true) => {
-                self.log_info(self.job_state.name(), "Job already completed, skipping");
-                return Ok(self);
-            }
-            Ok(false) => {
-                //self.log_info(&self.job_state.name, "Job is in error state, restarting");
-                //return Err(anyhow::anyhow!("{}", JobRunnerError::LoadedStateWithError));
-                self.job_state.streams.in_progress(stream_name)?;
-            }
-            _ => (),
-        };
-
         let jr_action = job_handler.init(&self).await?;
         let index_start = match &jr_action {
             JobRunnerAction::Start => 0,
@@ -468,7 +456,7 @@ impl JobRunner {
                         {
                             Ok(()) => {
                                 self.num_processed_items += 1;
-                                self.job_state.streams.incr_num_ok(stream_name, &source)?;
+                                self.job_state.stream_incr_count_ok(stream_name, &source)?;
                             }
                             Err(er) => {
                                 self.log_err(
@@ -479,7 +467,7 @@ impl JobRunner {
                                     ))),
                                     er.to_string(),
                                 );
-                                self.job_state.streams.incr_error(stream_name)?;
+                                self.job_state.stream_incr_count_err(stream_name)?;
                                 self.num_process_item_errors += 1;
                             }
                         }
@@ -495,7 +483,7 @@ impl JobRunner {
                         ))),
                         er.to_string(),
                     );
-                    self.job_state.streams.incr_error(stream_name)?;
+                    self.job_state.stream_incr_count_err(stream_name)?;
                     self.num_process_item_errors += 1;
                 }
                 None => {
@@ -519,9 +507,11 @@ impl JobRunner {
             };
         }
         // TODO: num_processed_lines should be local, remove self.num_processed_items
+        /*
         self.job_state
             .streams
             .set_total_lines(stream_name, self.num_processed_items)?;
+        */
         self.job_state.stream_ok(stream_name, &self.config)?;
         job_handler.shutdown(&mut self).await?;
 

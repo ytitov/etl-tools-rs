@@ -107,3 +107,13 @@ pub enum StepCommandStatus {
         datetime: DateTime<Utc>,
     },
 }
+
+impl StepCommandStatus {
+    pub fn started_on(&self) -> DateTime<Utc> {
+        match self {
+            StepCommandStatus::InProgress { ref started, .. } => started.clone(),
+            StepCommandStatus::Complete { ref started, .. } => started.clone(),
+            StepCommandStatus::Error { ref started, .. } => started.clone(),
+        }
+    }
+}
