@@ -67,7 +67,7 @@ async fn test_basic_fs_json_decoder() {
             ..
         } = cmd_status
         {
-            assert_eq!(0, *step_index);
+            assert_eq!(1, *step_index);
             assert_eq!(9, *total_lines_scanned);
             assert_eq!(1, *num_errors);
         } else {
@@ -128,7 +128,7 @@ async fn test_basic_fs_csv_decoder() {
             ..
         } = cmd_status
         {
-            assert_eq!(0, *step_index);
+            assert_eq!(1, *step_index);
             assert_eq!(14, *total_lines_scanned);
             assert_eq!(0, *num_errors);
         } else {

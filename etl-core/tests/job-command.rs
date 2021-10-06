@@ -55,7 +55,7 @@ async fn test_job_command_with_error() {
         } = cmd_status
         {
             // expect to be an error
-            assert_eq!(1, *step_index);
+            assert_eq!(2, *step_index);
         } else {
             assert!(false);
         }
@@ -116,7 +116,7 @@ async fn test_job_command_with_error_2() {
             ..
         } = cmd_status
         {
-            assert_eq!(0, *step_index);
+            assert_eq!(1, *step_index);
         } else {
             assert!(false);
         }
@@ -134,7 +134,7 @@ async fn test_job_command_with_error_2() {
         {
             // expect to be an error
             assert!(true);
-            assert_eq!(1, *step_index);
+            assert_eq!(2, *step_index);
         } else {
             assert!(false);
         }

@@ -39,6 +39,7 @@ pub struct JobState {
     pub settings: HashMap<String, JsonValue>,
     name: String,
     id: String,
+    #[serde(skip_serializing, default)]
     cur_step_index: usize,
     run_status: RunStatus,
     pub step_history: HashMap<String, JobStepDetails>,
@@ -58,23 +59,47 @@ impl JobState {
         }
     }
 
-    pub fn get_command(&self, cmd_name: &str) -> Option<&'_ StepCommandStatus> {
+    pub fn get_cur_step_index(&self) -> usize {
+        self.cur_step_index
+    }
+
+    pub fn set_cur_step_index(&mut self, idx: usize) {
+        self.cur_step_index = idx;
+    }
+
+    pub fn get_command(&self, cmd_name: &str) -> Option<(usize, &'_ StepCommandStatus)> {
         match self.step_history.get(cmd_name) {
             Some(JobStepDetails {
+                step_index,
                 step: JobStepStatus::Command(cmd),
                 ..
-            }) => Some(cmd),
+            }) => {
+                if *step_index == self.cur_step_index {
+                    Some((*step_index, cmd))
+                } else {
+                    // in this case another command/stream may have been added, therefore
+                    // invalidating the rest of the steps
+                    None
+                }
+            }
             Some(_) => panic!("Unexpectedly got a stream instead of a command"),
             None => None,
         }
     }
 
-    pub fn get_stream(&self, cmd_name: &str) -> Option<&'_ StepStreamStatus> {
+    pub fn get_stream(&self, cmd_name: &str) -> Option<(usize, &'_ StepStreamStatus)> {
         match self.step_history.get(cmd_name) {
             Some(JobStepDetails {
+                step_index,
                 step: JobStepStatus::Stream(s),
                 ..
-            }) => Some(s),
+            }) => {
+                if *step_index == self.cur_step_index {
+                    Some((*step_index, s))
+                } else {
+                    None
+                }
+            }
             Some(_) => panic!("Unexpectedly got a stream instead of a command"),
             None => None,
         }
@@ -112,10 +137,6 @@ impl JobState {
         &self.name
     }
 
-    pub fn reset_step_index(&mut self) {
-        self.cur_step_index = 0;
-    }
-
     fn set_fatal_error<N: Into<String>, M: Into<String>>(&mut self, name: N, message: M) {
         self.run_status = RunStatus::FatalError {
             step_index: self.cur_step_index,
@@ -124,65 +145,81 @@ impl JobState {
         };
     }
 
-    //TODO: streamline start_* and make it use an enum.  There are issues with steps numbering
-    //and it looks like it is only incrementing when steps run, but not when they do not run which
-    //will mess up the counter if some run and some don't (when resuming)
-    pub fn start_new_cmd<N: Into<String>>(
+    pub fn start_new_cmd<N: Into<String> + Clone>(
         &mut self,
         name: N,
         jrc: &JobRunnerConfig,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<(usize, &'_ StepCommandStatus)> {
+        self.cur_step_index += 1;
+        println!(" {} <----------- start new cmd", self.cur_step_index);
         let started = Utc::now();
-        match &self.run_status {
-            RunStatus::InProgress => {
-                self.add_command(name, StepCommandStatus::InProgress { started });
+        let n = name.clone();
+
+        match self.get_command(&name.clone().into()) {
+            Some((_, StepCommandStatus::Complete { .. })) => {
+                // do nothing
             }
-            RunStatus::Completed => {
-                // TODO: this should possibly panic
-            }
-            RunStatus::FatalError {
-                step_index: _,
-                step_name: _,
-                message: _,
-            } => {
-                if jrc.stop_on_error {
-                    return Err(anyhow::anyhow!(
-                        "Can't start the new job because stop_on_error flag is set to true"
-                    ));
-                } else {
+            _ => match &self.run_status {
+                RunStatus::InProgress => {
                     self.add_command(name, StepCommandStatus::InProgress { started });
                 }
-            }
-        }
-        self.cur_step_index += 1;
-        Ok(())
+                RunStatus::Completed => {
+                    panic!("Job already completed, this needs to be checked");
+                }
+                RunStatus::FatalError {
+                    step_index: _,
+                    step_name: _,
+                    message: _,
+                } => {
+                    if jrc.stop_on_error {
+                        return Err(anyhow::anyhow!(
+                            "Can't start the new job because stop_on_error flag is set to true"
+                        ));
+                    } else {
+                        self.add_command(name, StepCommandStatus::InProgress { started });
+                    }
+                }
+            },
+        };
+        Ok(self
+            .get_command(&n.into())
+            .expect("Getting command failed inside start_new_cmd"))
     }
-    pub fn start_new_stream<N: Into<String>>(
+    pub fn start_new_stream<N: Into<String> + Clone>(
         &mut self,
         name: N,
         jrc: &JobRunnerConfig,
-    ) -> anyhow::Result<()> {
-        match &self.run_status {
-            RunStatus::InProgress => {
-                self.add_stream(name, StepStreamStatus::new_in_progress());
+    ) -> anyhow::Result<(usize, &'_ StepStreamStatus)> {
+        self.cur_step_index += 1;
+        println!(" {} <----------- start new stream", self.cur_step_index);
+        let n = name.clone();
+        match self.get_stream(&name.clone().into()) {
+            Some((_, StepStreamStatus::Complete { .. })) => {
+                // do nothing
             }
-            RunStatus::Completed => {}
-            RunStatus::FatalError {
-                step_index: _,
-                step_name: _,
-                message: _,
-            } => {
-                if jrc.stop_on_error {
-                    return Err(anyhow::anyhow!(
-                        "Can't start the new job because stop_on_error flag is set to true"
-                    ));
-                } else {
+            _ => match &self.run_status {
+                RunStatus::InProgress => {
                     self.add_stream(name, StepStreamStatus::new_in_progress());
                 }
-            }
+                RunStatus::Completed => {}
+                RunStatus::FatalError {
+                    step_index: _,
+                    step_name: _,
+                    message: _,
+                } => {
+                    if jrc.stop_on_error {
+                        return Err(anyhow::anyhow!(
+                            "Can't start the new job because stop_on_error flag is set to true"
+                        ));
+                    } else {
+                        self.add_stream(name, StepStreamStatus::new_in_progress());
+                    }
+                }
+            },
         }
-        self.cur_step_index += 1;
-        Ok(())
+        Ok(self
+            .get_stream(&n.into())
+            .expect("Getting stream failed inside start_new_stream"))
     }
 
     pub fn cmd_ok<N: Into<String>>(&mut self, name: N, _: &JobRunnerConfig) -> anyhow::Result<()> {
@@ -242,14 +279,18 @@ impl JobState {
             }) => {
                 s.set_error(m, lines_scanned);
                 Ok(())
-            },
+            }
             _ => {
                 panic!("Attempted to stream_incr_count_ok on a non existant stream");
             }
         }
     }
 
-    pub fn stream_incr_count_ok<N: Into<String>>(&mut self, name: N, source: &str) -> anyhow::Result<()> {
+    pub fn stream_incr_count_ok<N: Into<String>>(
+        &mut self,
+        name: N,
+        source: &str,
+    ) -> anyhow::Result<()> {
         let name = name.into();
         match self.step_history.get_mut(&name) {
             Some(JobStepDetails {
@@ -258,7 +299,7 @@ impl JobState {
             }) => {
                 cmd.incr_line(source);
                 Ok(())
-            },
+            }
             _ => {
                 panic!("Attempted to stream_incr_count_ok on a non existant stream");
             }
@@ -274,7 +315,7 @@ impl JobState {
             }) => {
                 cmd.incr_error();
                 Ok(())
-            },
+            }
             _ => {
                 panic!("Attempted to stream_incr_count_ok on a non existant stream");
             }

@@ -60,7 +60,7 @@ async fn basic_stream_handler_all_errors() {
             ..
         } = cmd_status
         {
-            assert_eq!(0, *step_index);
+            assert_eq!(1, *step_index);
             assert_eq!(0, *total_lines_scanned);
             assert_eq!(3, *num_errors);
         } else {

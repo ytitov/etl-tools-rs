@@ -36,6 +36,8 @@ pub struct JobRunner {
     is_running: bool,
     /// has the job state been updated and not saved
     job_state_updated: bool,
+    /// the current step being run
+    cur_step_index: usize,
 }
 
 pub struct JobRunnerConfig {
@@ -83,6 +85,7 @@ impl JobRunner {
             job_state: JobState::new(id, name),
             job_state_updated: false,
             is_running: false,
+            cur_step_index: 0,
         };
         jr.job_state = jr.load_job_state().await?;
         jr.register()
@@ -104,6 +107,7 @@ impl JobRunner {
             self.job_state_updated = false;
         }
         let path = JobState::gen_name(self.job_state.id(), self.job_state.name());
+        let old_step_index = self.job_state.get_cur_step_index();
         let mut job_state = match self.config.ds.load(&path).await {
             Ok(json) => match serde_json::from_value(json) {
                 Ok(job_state) => Ok(job_state),
@@ -126,8 +130,8 @@ impl JobRunner {
         }?;
         if !self.is_running {
             self.is_running = true;
-            job_state.reset_step_index();
         }
+        job_state.set_cur_step_index(old_step_index);
         Ok(job_state)
     }
 
@@ -302,66 +306,73 @@ impl JobRunner {
         self.job_state = self.load_job_state().await?;
         let name = stream_name.to_string();
         use stream::StepStreamStatus;
-        if let Some(StepStreamStatus::Complete { .. }) = self.job_state.get_stream(&name) {
-            self.log_info(
-                self.job_state.name(),
-                format!("{} stream previously ran, skipping", &name),
-            );
-        } else {
-            if let Err(_) = self.job_state.start_new_stream(&name, &self.config) {
-                return Ok(self);
+
+        match self.job_state.start_new_stream(&name, &self.config) {
+            Ok((_, StepStreamStatus::Complete { .. })) => {
+                self.log_info(
+                    self.job_state.name(),
+                    format!("{} stream previously ran, skipping", &name),
+                );
             }
-            let input_name = input.name().to_string();
-            // no need to wait on input JoinHandle
-            let (mut input_rx, _) = input.start_stream()?;
-            let (output_tx, output_jh) = output
-                .start_stream(self.job_manager_channel.clone())
-                .await?;
-            self.save_job_state().await?;
-            let mut lines_scanned = 0_usize;
-            loop {
-                let info = JobItemInfo::new((lines_scanned, self.job_state.name()));
-                match input_rx.recv().await {
-                    Some(Ok(DataSourceMessage::Data {
-                        source,
-                        content: input_item,
-                    })) => {
-                        lines_scanned += 1;
-                        self.job_state.stream_incr_count_ok(stream_name, &source)?;
-                        output_tx.send(DataOutputMessage::new(input_item)).await?;
-                    }
-                    Some(Err(val)) => {
-                        lines_scanned += 1;
-                        self.job_state.stream_incr_count_err(stream_name)?;
-                        self.log_err(&input_name, Some(&info), val.to_string());
-                        self.num_process_item_errors += 1;
-                    }
-                    None => break,
-                };
-                match self.process_job_manager_rx() {
-                    Err(JobRunnerError::TooManyErrors) => {
-                        self.job_state.stream_not_ok(
-                            name,
-                            String::from("Reached too many errors"),
-                            lines_scanned,
-                        )?;
-                        self.save_job_state().await?;
-                        drop(input_rx);
-                        drop(output_tx);
-                        output_jh.await??;
-                        return Err(JobRunnerError::TooManyErrors);
-                    }
-                    Err(e) => {
-                        panic!("Received an unforseen error {}", e);
-                    }
-                    Ok(()) => {}
-                };
+            Err(e) => {
+                //TODO: handle stop on error here, atm can't return error because the job runner
+                //needs to be able to shutdown gracefully, but not start any new things
+                //panic!("Unhandled error from start_new_stream: {}", e);
             }
-            self.job_state.stream_ok(name, &self.config)?;
-            drop(input_rx);
-            drop(output_tx);
-            output_jh.await??;
-            self.save_job_state().await?;
+            Ok(_) => {
+                let input_name = input.name().to_string();
+                // no need to wait on input JoinHandle
+                let (mut input_rx, _) = input.start_stream()?;
+                let (output_tx, output_jh) = output
+                    .start_stream(self.job_manager_channel.clone())
+                    .await?;
+                self.save_job_state().await?;
+                let mut lines_scanned = 0_usize;
+                loop {
+                    let info = JobItemInfo::new((lines_scanned, self.job_state.name()));
+                    match input_rx.recv().await {
+                        Some(Ok(DataSourceMessage::Data {
+                            source,
+                            content: input_item,
+                        })) => {
+                            lines_scanned += 1;
+                            self.job_state.stream_incr_count_ok(stream_name, &source)?;
+                            output_tx.send(DataOutputMessage::new(input_item)).await?;
+                        }
+                        Some(Err(val)) => {
+                            lines_scanned += 1;
+                            self.job_state.stream_incr_count_err(stream_name)?;
+                            self.log_err(&input_name, Some(&info), val.to_string());
+                            self.num_process_item_errors += 1;
+                        }
+                        None => break,
+                    };
+                    match self.process_job_manager_rx() {
+                        Err(JobRunnerError::TooManyErrors) => {
+                            self.job_state.stream_not_ok(
+                                name,
+                                String::from("Reached too many errors"),
+                                lines_scanned,
+                            )?;
+                            self.save_job_state().await?;
+                            drop(input_rx);
+                            drop(output_tx);
+                            output_jh.await??;
+                            return Err(JobRunnerError::TooManyErrors);
+                        }
+                        Err(e) => {
+                            panic!("Received an unforseen error {}", e);
+                        }
+                        Ok(()) => {}
+                    };
+                }
+                self.cur_step_index += 1;
+                self.job_state.stream_ok(name, &self.config)?;
+                drop(input_rx);
+                drop(output_tx);
+                output_jh.await??;
+                self.save_job_state().await?;
+            }
         }
         Ok(self)
     }
@@ -417,122 +428,129 @@ impl JobRunner {
         let stream_name = job_handler.name();
         self.job_state = self.load_job_state().await?;
 
-        if let Some(StepStreamStatus::Complete { .. }) = self.job_state.get_stream(&stream_name) {
-            self.log_info(
-                self.job_state.name(),
-                format!("{} stream previously ran, skipping", &stream_name),
-            );
-        } else {
-            if let Err(_) = self.job_state.start_new_stream(stream_name, &self.config) {
-                return Ok(self);
+        match self.job_state.start_new_stream(stream_name, &self.config) {
+            Ok((_, StepStreamStatus::Complete { .. })) => {
+                self.log_info(
+                    self.job_state.name(),
+                    format!("{} stream previously ran, skipping", &stream_name),
+                );
             }
-            let jr_action = job_handler.init(&self).await?;
-            let index_start = match &jr_action {
-                JobRunnerAction::Start => 0,
-                JobRunnerAction::Resume { index } => *index,
-                JobRunnerAction::Skip => {
-                    //self.job_state.streams.complete(stream_name)?;
-                    self.job_state.stream_ok(stream_name, &self.config)?;
-                    self.save_job_state().await?;
-                    self.log_info(
-                        self.job_state.name(),
-                        "StreamHandler requested the job to be skipped",
-                    );
-                    return Ok(self);
-                }
-            };
+            Err(e) => {
+                //TODO: handle stop on error here, atm can't return error because the job runner
+                //needs to be able to shutdown gracefully, but not start any new things
+                //panic!("Unhandled error from start_new_stream: {}", e);
+            }
+            Ok(_) => {
+                let jr_action = job_handler.init(&self).await?;
+                let index_start = match &jr_action {
+                    JobRunnerAction::Start => 0,
+                    JobRunnerAction::Resume { index } => *index,
+                    JobRunnerAction::Skip => {
+                        //self.job_state.streams.complete(stream_name)?;
+                        self.job_state.stream_ok(stream_name, &self.config)?;
+                        self.save_job_state().await?;
+                        self.log_info(
+                            self.job_state.name(),
+                            "StreamHandler requested the job to be skipped",
+                        );
+                        return Ok(self);
+                    }
+                };
 
-            let mut received_lines = 0_usize;
+                let mut received_lines = 0_usize;
 
-            self.save_job_state().await?;
-            let mut lines_scanned = 0_usize;
-            loop {
-                match rx.recv().await {
-                    Some(Ok(DataSourceMessage::Data {
-                        source,
-                        content: line,
-                    })) => {
-                        if received_lines >= index_start {
-                            lines_scanned += 1;
-                            match job_handler
-                                .process_item(
-                                    JobItemInfo::new((
-                                        self.num_processed_items,
-                                        self.job_state.name(),
-                                    )),
-                                    line,
-                                    &self,
-                                )
-                                .await
-                            {
-                                Ok(()) => {
-                                    self.num_processed_items += 1;
-                                    self.job_state.stream_incr_count_ok(stream_name, &source)?;
-                                }
-                                Err(er) => {
-                                    self.log_err(
-                                        self.job_state.name(),
-                                        Some(&JobItemInfo::new((
+                self.save_job_state().await?;
+                let mut lines_scanned = 0_usize;
+                loop {
+                    match rx.recv().await {
+                        Some(Ok(DataSourceMessage::Data {
+                            source,
+                            content: line,
+                        })) => {
+                            if received_lines >= index_start {
+                                lines_scanned += 1;
+                                match job_handler
+                                    .process_item(
+                                        JobItemInfo::new((
                                             self.num_processed_items,
                                             self.job_state.name(),
-                                        ))),
-                                        er.to_string(),
-                                    );
-                                    self.job_state.stream_incr_count_err(stream_name)?;
-                                    self.num_process_item_errors += 1;
+                                        )),
+                                        line,
+                                        &self,
+                                    )
+                                    .await
+                                {
+                                    Ok(()) => {
+                                        self.num_processed_items += 1;
+                                        self.job_state
+                                            .stream_incr_count_ok(stream_name, &source)?;
+                                    }
+                                    Err(er) => {
+                                        self.log_err(
+                                            self.job_state.name(),
+                                            Some(&JobItemInfo::new((
+                                                self.num_processed_items,
+                                                self.job_state.name(),
+                                            ))),
+                                            er.to_string(),
+                                        );
+                                        self.job_state.stream_incr_count_err(stream_name)?;
+                                        self.num_process_item_errors += 1;
+                                    }
                                 }
                             }
+                            received_lines += 1;
                         }
-                        received_lines += 1;
-                    }
-                    Some(Err(er)) => {
-                        self.log_err(
-                            self.job_state.name(),
-                            Some(&JobItemInfo::new((
-                                self.num_processed_items,
+                        Some(Err(er)) => {
+                            self.log_err(
                                 self.job_state.name(),
-                            ))),
-                            er.to_string(),
-                        );
-                        self.job_state.stream_incr_count_err(stream_name)?;
-                        self.num_process_item_errors += 1;
-                    }
-                    None => {
-                        break;
-                    }
-                };
-                match self.process_job_manager_rx() {
-                    Err(JobRunnerError::TooManyErrors) => {
-                        self.job_state.stream_not_ok(
-                            stream_name,
-                            "JobMonitor has reached maximum errors",
-                            lines_scanned,
-                        )?;
-                        self.save_job_state().await?;
-                        return Err(JobRunnerError::TooManyErrors);
-                    }
-                    Err(er) => {
-                        panic!("Unhandled error: {}", er);
-                    }
-                    Ok(()) => {}
-                };
-            }
-            // TODO: num_processed_lines should be local, remove self.num_processed_items
-            /*
-            self.job_state
-                .streams
-                .set_total_lines(stream_name, self.num_processed_items)?;
-            */
-            self.job_state.stream_ok(stream_name, &self.config)?;
-            job_handler.shutdown(&mut self).await?;
+                                Some(&JobItemInfo::new((
+                                    self.num_processed_items,
+                                    self.job_state.name(),
+                                ))),
+                                er.to_string(),
+                            );
+                            self.job_state.stream_incr_count_err(stream_name)?;
+                            self.num_process_item_errors += 1;
+                        }
+                        None => {
+                            break;
+                        }
+                    };
+                    match self.process_job_manager_rx() {
+                        Err(JobRunnerError::TooManyErrors) => {
+                            self.job_state.stream_not_ok(
+                                stream_name,
+                                "JobMonitor has reached maximum errors",
+                                lines_scanned,
+                            )?;
+                            self.save_job_state().await?;
+                            return Err(JobRunnerError::TooManyErrors);
+                        }
+                        Err(er) => {
+                            panic!("Unhandled error: {}", er);
+                        }
+                        Ok(()) => {}
+                    };
+                }
+                // TODO: num_processed_lines should be local, remove self.num_processed_items
+                /*
+                self.job_state
+                    .streams
+                    .set_total_lines(stream_name, self.num_processed_items)?;
+                */
+                self.cur_step_index += 1;
+                self.job_state.stream_ok(stream_name, &self.config)?;
+                job_handler.shutdown(&mut self).await?;
 
-            // only wait if everything is okay
-            source_stream_jh.await??;
-            for join_handle in self.data_output_handles {
-                join_handle.await??;
+                // only wait if everything is okay
+                source_stream_jh.await??;
+                for join_handle in self.data_output_handles {
+                    join_handle.await??;
+                }
+                self.data_output_handles = Vec::new();
+                self.save_job_state().await?;
             }
-            self.data_output_handles = Vec::new();
-            self.save_job_state().await?;
         }
         Ok(self)
     }
@@ -541,37 +559,39 @@ impl JobRunner {
         self.job_state = self.load_job_state().await?;
 
         let name = job_cmd.name();
-        if let Some(StepCommandStatus::Complete { .. }) = self.job_state.get_command(&name) {
-            println!(
-                "{}: JobCommand ({}) already ran",
-                self.name(),
-                job_cmd.name()
-            );
-            self.log_info(
-                self.job_state.name(),
-                format!("{} command previously ran, skipping", &name),
-            );
-        } else {
-            //println!("{:?}", &self.job_state);
-            //panic!("apparently it doesn't think it is done");
-            if let Err(_) = self.job_state.start_new_cmd(&name, &self.config) {
-                return Ok(self);
+        match self.job_state.start_new_cmd(&name, &self.config) {
+            Ok((_, StepCommandStatus::Complete { .. })) => {
+                self.log_info(
+                    self.job_state.name(),
+                    format!("{} command previously ran, skipping", &name),
+                );
             }
-            match job_cmd.run(&mut self).await {
-                Ok(()) => {
-                    self.job_state.cmd_ok(name, &self.config)?;
-                }
-                Err(er) => {
-                    self.job_state.cmd_not_ok(&name, er.to_string())?;
-                    self.log_err(
-                        self.job_state.name(),
-                        None,
-                        format!("{} command ran into an error: {}", name, er),
-                    );
-                }
-            };
-            self.save_job_state().await?;
+            Err(e) => {
+                //TODO: handle stop on error here, atm can't return error because the job runner
+                //needs to be able to shutdown gracefully, but not start any new things
+                //panic!("Unhandled error from start_new_cmd: {}", e);
+                //return Err(JobRunnerError::GenericError { message: e.to_string() } );
+            }
+            Ok((idx, _)) => {
+                println!("run cmd INDEX {}", idx);
+                //panic!("apparently it doesn't think it is done");
+                match job_cmd.run(&mut self).await {
+                    Ok(()) => {
+                        self.job_state.cmd_ok(name, &self.config)?;
+                    }
+                    Err(er) => {
+                        self.job_state.cmd_not_ok(&name, er.to_string())?;
+                        self.log_err(
+                            self.job_state.name(),
+                            None,
+                            format!("{} command ran into an error: {}", name, er),
+                        );
+                    }
+                };
+                self.save_job_state().await?;
+            }
         }
+        self.cur_step_index += 1;
         Ok(self)
     }
 }
