@@ -149,9 +149,8 @@ impl JobState {
         &mut self,
         name: N,
         jrc: &JobRunnerConfig,
-    ) -> anyhow::Result<(usize, &'_ StepCommandStatus)> {
+    ) -> Result<(usize, &'_ StepCommandStatus), JobRunnerError> {
         self.cur_step_index += 1;
-        println!(" {} <----------- start new cmd", self.cur_step_index);
         let started = Utc::now();
         let n = name.clone();
 
@@ -172,9 +171,13 @@ impl JobState {
                     message: _,
                 } => {
                     if jrc.stop_on_error {
-                        return Err(anyhow::anyhow!(
-                            "Can't start the new job because stop_on_error flag is set to true"
-                        ));
+                        return Err(JobRunnerError::JobStepError {
+                            step_index: self.cur_step_index,
+                            name: name.clone().into(),
+                            message: String::from(
+                                "Can't start the new command because stop_on_error flag is set to true",
+                            ),
+                        });
                     } else {
                         self.add_command(name, StepCommandStatus::InProgress { started });
                     }
@@ -189,9 +192,8 @@ impl JobState {
         &mut self,
         name: N,
         jrc: &JobRunnerConfig,
-    ) -> anyhow::Result<(usize, &'_ StepStreamStatus)> {
+    ) -> Result<(usize, &'_ StepStreamStatus), JobRunnerError> {
         self.cur_step_index += 1;
-        println!(" {} <----------- start new stream", self.cur_step_index);
         let n = name.clone();
         match self.get_stream(&name.clone().into()) {
             Some((_, StepStreamStatus::Complete { .. })) => {
@@ -208,9 +210,13 @@ impl JobState {
                     message: _,
                 } => {
                     if jrc.stop_on_error {
-                        return Err(anyhow::anyhow!(
-                            "Can't start the new job because stop_on_error flag is set to true"
-                        ));
+                        return Err(JobRunnerError::JobStepError {
+                            step_index: self.cur_step_index,
+                            name: name.clone().into(),
+                            message: String::from(
+                                "Can't start the new stream because stop_on_error flag is set to true",
+                            ),
+                        });
                     } else {
                         self.add_stream(name, StepStreamStatus::new_in_progress());
                     }

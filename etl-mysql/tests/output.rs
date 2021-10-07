@@ -2,6 +2,7 @@ use command::*;
 use etl_core::datastore::enumerate::EnumerateStreamAsync;
 use etl_core::job::state::*;
 use etl_core::job::*;
+use etl_core::job::stream::*;
 use etl_core::job_manager::*;
 use etl_core::preamble::*;
 use etl_mysql::datastore::*;
@@ -15,14 +16,14 @@ async fn test_simple_mysql_output() {
     })
     .expect("Could not initialize job_manager");
     let (jm_handle, jm_channel) = job_manager.start();
-    let job_state = JobRunner::new(
+    let job_state = JobRunner::create(
         "mysql_output_id",
         "mysql_output",
         jm_channel.clone(),
         JobRunnerConfig {
             ..Default::default()
         },
-    )
+    ).await.expect("Fatal error could not create JobRunner")
     .run_cmd(SimpleCommand::new("create table Info", || {
         Box::pin(async {
             let pool = create_pool("admin", "admin", "localhost", "3306").await?;
@@ -114,7 +115,7 @@ async fn test_simple_mysql_output() {
             ..
         } = cmd_status
         {
-            assert_eq!(1, *step_index);
+            assert_eq!(2, *step_index);
             assert_eq!(100, *total_lines_scanned);
             assert_eq!(0, *num_errors);
         } else {

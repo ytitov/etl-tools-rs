@@ -160,9 +160,10 @@ impl<'a> JobCommand for AthenaQueryJobCommand {
 /// If query takes longer than 10 seconds, this will not work.  At this time this is
 /// just an example, it likely needs a timeout parameter or something along those lines.
 /// Example usage:
-/// ```
+/// ```ignore
 /// use rusoto_core::request::HttpClient;
 /// use rusoto_core::region::Region;
+/// use rusoto_athena::AthenaClient;
 /// let client = AthenaClient::new_with(
 ///     HttpClient::new().unwrap(),
 ///     profile_provider.clone(),

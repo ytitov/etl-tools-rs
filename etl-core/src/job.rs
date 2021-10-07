@@ -315,9 +315,8 @@ impl JobRunner {
                 );
             }
             Err(e) => {
-                //TODO: handle stop on error here, atm can't return error because the job runner
-                //needs to be able to shutdown gracefully, but not start any new things
-                //panic!("Unhandled error from start_new_stream: {}", e);
+                self.complete().await?;
+                return Err(e);
             }
             Ok(_) => {
                 let input_name = input.name().to_string();
@@ -436,9 +435,7 @@ impl JobRunner {
                 );
             }
             Err(e) => {
-                //TODO: handle stop on error here, atm can't return error because the job runner
-                //needs to be able to shutdown gracefully, but not start any new things
-                //panic!("Unhandled error from start_new_stream: {}", e);
+                return Err(e);
             }
             Ok(_) => {
                 let jr_action = job_handler.init(&self).await?;
@@ -567,10 +564,8 @@ impl JobRunner {
                 );
             }
             Err(e) => {
-                //TODO: handle stop on error here, atm can't return error because the job runner
-                //needs to be able to shutdown gracefully, but not start any new things
-                //panic!("Unhandled error from start_new_cmd: {}", e);
-                //return Err(JobRunnerError::GenericError { message: e.to_string() } );
+                self.complete().await?;
+                return Err(e);
             }
             Ok((idx, _)) => {
                 println!("run cmd INDEX {}", idx);
@@ -652,7 +647,7 @@ pub mod error {
         CompleteError(String),
         #[error("Step {name} at index {step_index} in the job returned: {message} ")]
         JobStepError {
-            step_index: isize,
+            step_index: usize,
             name: String,
             message: String,
         },
