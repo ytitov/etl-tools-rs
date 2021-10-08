@@ -23,21 +23,21 @@ async fn test_job_command_with_error() {
         },
     ).await.expect("Error creating JobRunner");
     let jr = jr
-        .run_cmd(SimpleCommand::new("do_stuff_and_not_fail_1", || {
+        .run_cmd(SimpleCommand::new("do_stuff_and_not_fail_1", |_| {
             Box::pin(async move { Ok(()) })
         }))
         .await
         .expect("Failed run_cmd");
 
     let jr = jr
-        .run_cmd(SimpleCommand::new("do_stuff_and_fail_2", || {
+        .run_cmd(SimpleCommand::new("do_stuff_and_fail_2", |_| {
             Box::pin(async move { Err(anyhow::anyhow!("Sorry I failed :(")) })
         }))
         .await
         .expect("Failed run_cmd");
 
     let jr = jr
-        .run_cmd(SimpleCommand::new("do_stuff_and_not_fail_3", || {
+        .run_cmd(SimpleCommand::new("do_stuff_and_not_fail_3", |_| {
             Box::pin(async move { Ok(()) })
         }))
         .await
@@ -87,21 +87,21 @@ async fn test_job_command_with_error_2() {
         },
     ).await.expect("Error creating JobRunner");
     let jr = jr
-        .run_cmd(SimpleCommand::new("do_stuff_and_not_fail_1", || {
+        .run_cmd(SimpleCommand::new("do_stuff_and_not_fail_1", |_| {
             Box::pin(async move { Ok(()) })
         }))
         .await
         .expect("Failed run_cmd");
 
     let jr = jr
-        .run_cmd(SimpleCommand::new("do_stuff_and_fail_2", || {
+        .run_cmd(SimpleCommand::new("do_stuff_and_fail_2", |_| {
             Box::pin(async move { Err(anyhow::anyhow!("Sorry I failed :(")) })
         }))
         .await
         .expect("Failed run_cmd");
 
     let jr = jr
-        .run_cmd(SimpleCommand::new("do_stuff_and_not_fail_3", || {
+        .run_cmd(SimpleCommand::new("do_stuff_and_not_fail_3", |_| {
             Box::pin(async move { Ok(()) })
         }))
         .await

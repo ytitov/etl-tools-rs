@@ -24,7 +24,7 @@ async fn test_simple_mysql_output() {
             ..Default::default()
         },
     ).await.expect("Fatal error could not create JobRunner")
-    .run_cmd(SimpleCommand::new("create table Info", || {
+    .run_cmd(SimpleCommand::new("create table Info", |_| {
         Box::pin(async {
             let pool = create_pool("admin", "admin", "localhost", "3306").await?;
             sqlx::query(CREATE_TABLE).execute(&pool).await?;

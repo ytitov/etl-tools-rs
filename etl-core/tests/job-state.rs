@@ -128,7 +128,7 @@ async fn test_state_existing() {
             ..Default::default()
         },
     ).await.expect("Error creating JobRunner");
-    let mut jr = jr.run_cmd(SimpleCommand::new("dummy command", || {
+    let mut jr = jr.run_cmd(SimpleCommand::new("dummy command", |_| {
         Box::pin(async {Ok(())})
     })).await.expect("Issues running command");
 

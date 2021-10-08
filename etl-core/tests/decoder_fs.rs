@@ -48,7 +48,7 @@ async fn test_basic_fs_json_decoder() {
         )
         .await
         .expect("Failed run_stream")
-        .run_cmd(SimpleCommand::new("does nothing", || {
+        .run_cmd(SimpleCommand::new("does nothing", |_| {
             Box::pin(async {Ok(())})
         }))
         .await.expect("Command failed")

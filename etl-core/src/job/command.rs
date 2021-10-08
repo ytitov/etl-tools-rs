@@ -14,14 +14,14 @@ pub trait JobCommand: Sync + Send {
 pub struct SimpleCommand<'a> {
     name: String,
     run_command:
-        Box<dyn Fn() -> BoxFuture<'a, anyhow::Result<()>> + 'static + Send + Sync>,
+        Box<dyn Fn(&'_ JobRunner) -> BoxFuture<'a, anyhow::Result<()>> + 'static + Send + Sync>,
 }
 
 impl<'a> SimpleCommand<'a> {
     pub fn new<S, F>(name: S, callback: F) -> Box<dyn JobCommand + 'a>
     where
         S: Into<String>,
-        F: Fn() -> BoxFuture<'a, anyhow::Result<()>> + 'static + Send + Sync,
+        F: Fn(&'_ JobRunner) -> BoxFuture<'a, anyhow::Result<()>> + 'static + Send + Sync,
     {
         Box::new(SimpleCommand {
             name: name.into(),
@@ -32,8 +32,44 @@ impl<'a> SimpleCommand<'a> {
 
 #[async_trait]
 impl<'a> JobCommand for SimpleCommand<'a> {
-    async fn run(self: Box<Self>, _: &mut JobRunner) -> anyhow::Result<()> {
-        (self.run_command)().await?;
+    async fn run(self: Box<Self>, jr: &mut JobRunner) -> anyhow::Result<()> {
+        //let js = jr.get_state();
+        (self.run_command)(jr).await?;
+        Ok(())
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+}
+
+/// for use when you want to provide some sharable resource into the command that you can't read
+/// from job state (like creds, so they don't make it into the state)
+pub struct SimpleCommandWith<'a, D: Send + Sync> {
+    name: String,
+    data: D,
+    run_command:
+        Box<dyn Fn(D, &'_ JobRunner) -> BoxFuture<'a, anyhow::Result<()>> + 'static + Send + Sync>,
+}
+
+impl<'a, D: 'a + Send + Sync> SimpleCommandWith<'a, D> {
+    pub fn new<S, F>(name: S, data: D, callback: F) -> Box<dyn JobCommand + 'a>
+    where
+        S: Into<String>,
+        F: Fn(D, &'_ JobRunner) -> BoxFuture<'a, anyhow::Result<()>> + 'static + Send + Sync,
+    {
+        Box::new(SimpleCommandWith {
+            name: name.into(),
+            data,
+            run_command: Box::new(callback),
+        })
+    }
+}
+
+#[async_trait]
+impl<'a, D: 'a + Send + Sync> JobCommand for SimpleCommandWith<'a, D> {
+    async fn run(self: Box<Self>, jr: &mut JobRunner) -> anyhow::Result<()> {
+        (self.run_command)(self.data, jr).await?;
         Ok(())
     }
 
