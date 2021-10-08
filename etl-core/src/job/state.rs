@@ -67,7 +67,7 @@ impl JobState {
         self.cur_step_index = idx;
     }
 
-    pub fn get_command(&self, cmd_name: &str) -> Option<(usize, &'_ StepCommandStatus)> {
+    pub fn get_command(&self, cmd_name: &str) -> Option<(usize, StepCommandStatus)> {
         match self.step_history.get(cmd_name) {
             Some(JobStepDetails {
                 step_index,
@@ -75,7 +75,7 @@ impl JobState {
                 ..
             }) => {
                 if *step_index == self.cur_step_index {
-                    Some((*step_index, cmd))
+                    Some((*step_index, cmd.clone()))
                 } else {
                     // in this case another command/stream may have been added, therefore
                     // invalidating the rest of the steps
@@ -87,7 +87,7 @@ impl JobState {
         }
     }
 
-    pub fn get_stream(&self, cmd_name: &str) -> Option<(usize, &'_ StepStreamStatus)> {
+    pub fn get_stream(&self, cmd_name: &str) -> Option<(usize, StepStreamStatus)> {
         match self.step_history.get(cmd_name) {
             Some(JobStepDetails {
                 step_index,
@@ -95,7 +95,7 @@ impl JobState {
                 ..
             }) => {
                 if *step_index == self.cur_step_index {
-                    Some((*step_index, s))
+                    Some((*step_index, s.clone()))
                 } else {
                     None
                 }
@@ -149,8 +149,7 @@ impl JobState {
         &mut self,
         name: N,
         jrc: &JobRunnerConfig,
-    ) -> Result<(usize, &'_ StepCommandStatus), JobRunnerError> {
-        self.cur_step_index += 1;
+    ) -> Result<(usize, StepCommandStatus), JobRunnerError> {
         let started = Utc::now();
         let n = name.clone();
 
@@ -184,16 +183,15 @@ impl JobState {
                 }
             },
         };
-        Ok(self
-            .get_command(&n.into())
-            .expect("Getting command failed inside start_new_cmd"))
+        let c = self.get_command(&n.into()).unwrap();
+        self.cur_step_index += 1;
+        Ok(c)
     }
     pub fn start_new_stream<N: Into<String> + Clone>(
         &mut self,
         name: N,
         jrc: &JobRunnerConfig,
-    ) -> Result<(usize, &'_ StepStreamStatus), JobRunnerError> {
-        self.cur_step_index += 1;
+    ) -> Result<(usize, StepStreamStatus), JobRunnerError> {
         let n = name.clone();
         match self.get_stream(&name.clone().into()) {
             Some((_, StepStreamStatus::Complete { .. })) => {
@@ -223,9 +221,11 @@ impl JobState {
                 }
             },
         }
-        Ok(self
+ let s = self
             .get_stream(&n.into())
-            .expect("Getting stream failed inside start_new_stream"))
+            .expect("Getting stream failed inside start_new_stream");
+        self.cur_step_index += 1;
+        Ok(s)
     }
 
     pub fn cmd_ok<N: Into<String>>(&mut self, name: N, _: &JobRunnerConfig) -> anyhow::Result<()> {

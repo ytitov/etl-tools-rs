@@ -13,10 +13,6 @@ pub trait StreamHandler<T>: Sync + Send
 where
     T: DeserializeOwned + Serialize + Debug + Send + Sync,
 {
-    //TODO: remove default implementation
-    fn name(&self) -> &'static str {
-        "NotNamed"
-    }
     /// Optionally let the job handler decide if it needs to be skipped or resume.
     /// By default it will always start
     async fn init(&mut self, _: &JobRunner) -> anyhow::Result<JobRunnerAction> {

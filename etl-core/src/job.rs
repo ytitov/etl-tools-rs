@@ -399,23 +399,29 @@ impl JobRunner {
     }
     pub async fn run_stream_handler_fn<I>(
         mut self,
+        name: &str,
         ds: Box<dyn DataSource<I>>,
-        create_sh: CreateStreamHandlerFn<'_, I>,
+        create_sh: CreateStreamHandlerFn<'static, I>,
     ) -> Result<Self, JobRunnerError>
     where
         I: DeserializeOwned + Serialize + Debug + Send + Sync + 'static,
     {
-        //TODO: this shouldn't run the create_sh if the state is already complete
-        let sh = create_sh(&mut self).await?;
-        Ok(self.run_stream_handler::<I>(ds, sh).await?)
+        use stream::StepStreamStatus;
+        if let Some((_i, StepStreamStatus::Complete { .. })) = self.job_state.get_stream(name) {
+            Ok(self)
+        } else {
+            let sh = create_sh(&mut self).await?;
+            Ok(self.run_stream_handler::<I, &str>(name, ds, sh).await?)
+        }
     }
 
     /// uses the StreamHandler trait to do the final custom transform.
     /// This method gives a lot of flexibility in what you can execute
     /// during the execute (like external apis).  During the init, and
     /// shutdown step give extra options.  See the relevant docs on that
-    pub async fn run_stream_handler<I>(
+    pub async fn run_stream_handler<I, S: Into<String>>(
         mut self,
+        name: S,
         ds: Box<dyn DataSource<I>>,
         mut job_handler: Box<dyn StreamHandler<I>>,
     ) -> Result<Self, JobRunnerError>
@@ -424,10 +430,10 @@ impl JobRunner {
     {
         use stream::StepStreamStatus;
         let (mut rx, source_stream_jh) = ds.start_stream()?;
-        let stream_name = job_handler.name();
+        let stream_name = name.into();
         self.job_state = self.load_job_state().await?;
 
-        match self.job_state.start_new_stream(stream_name, &self.config) {
+        match self.job_state.start_new_stream(&stream_name, &self.config) {
             Ok((_, StepStreamStatus::Complete { .. })) => {
                 self.log_info(
                     self.job_state.name(),
@@ -480,7 +486,7 @@ impl JobRunner {
                                     Ok(()) => {
                                         self.num_processed_items += 1;
                                         self.job_state
-                                            .stream_incr_count_ok(stream_name, &source)?;
+                                            .stream_incr_count_ok(&stream_name, &source)?;
                                     }
                                     Err(er) => {
                                         self.log_err(
@@ -491,7 +497,7 @@ impl JobRunner {
                                             ))),
                                             er.to_string(),
                                         );
-                                        self.job_state.stream_incr_count_err(stream_name)?;
+                                        self.job_state.stream_incr_count_err(&stream_name)?;
                                         self.num_process_item_errors += 1;
                                     }
                                 }
@@ -507,7 +513,7 @@ impl JobRunner {
                                 ))),
                                 er.to_string(),
                             );
-                            self.job_state.stream_incr_count_err(stream_name)?;
+                            self.job_state.stream_incr_count_err(&stream_name)?;
                             self.num_process_item_errors += 1;
                         }
                         None => {

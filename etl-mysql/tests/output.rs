@@ -115,7 +115,7 @@ async fn test_simple_mysql_output() {
             ..
         } = cmd_status
         {
-            assert_eq!(2, *step_index);
+            assert_eq!(1, *step_index);
             assert_eq!(100, *total_lines_scanned);
             assert_eq!(0, *num_errors);
         } else {

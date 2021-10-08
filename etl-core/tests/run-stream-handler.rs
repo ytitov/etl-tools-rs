@@ -37,6 +37,7 @@ async fn basic_stream_handler_all_errors() {
 
     let job_state = jr
         .run_stream_handler(
+            "TestJob",
             Box::new(create_csv_datasource_all_bad_lines()),
             Box::new(testjob),
         )
@@ -60,7 +61,7 @@ async fn basic_stream_handler_all_errors() {
             ..
         } = cmd_status
         {
-            assert_eq!(1, *step_index);
+            assert_eq!(0, *step_index);
             assert_eq!(0, *total_lines_scanned);
             assert_eq!(3, *num_errors);
         } else {
@@ -112,10 +113,6 @@ struct TestOutputData {
 
 #[async_trait]
 impl StreamHandler<TestSourceData> for TestJob {
-    fn name(&self) -> &'static str {
-        "TestJob"
-    }
-
     async fn init(&mut self, _: &JobRunner) -> anyhow::Result<JobRunnerAction> {
         Ok(JobRunnerAction::Start)
     }
