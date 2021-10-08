@@ -76,17 +76,14 @@ pub trait BytesSource: Sync + Send {
     fn process_job_manager_rx(&self, rx: &mut JobManagerRx) -> Result<(), DataStoreError> {
         loop {
             if let Ok(message) = rx.try_recv() {
-                //use crate::job_manager::Message::*;
-                //use crate::job_manager::NotifyBytesSource;
-                // TODO: handle this
+                use crate::job_manager::Message::*;
+                use crate::job_manager::NotifyDataSource;
                 match message {
                     // this is a global message which means need to shutdown and stop
                     // what we are doing
-                    /*
-                    ToBytesSource(NotifyBytesSource::TooManyErrors) => {
+                    ToDataSource(NotifyDataSource::TooManyErrors) => {
                         return Err(DataStoreError::TooManyErrors);
                     }
-                    */
                     _ => {}
                 }
             } else {
