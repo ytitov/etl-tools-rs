@@ -26,7 +26,9 @@ use self::error::*;
 /// multiple pipelines in parallel, use separate JobRunner for each pipeline.
 pub struct JobRunner {
     config: JobRunnerConfig,
-    job_manager_channel: JobManagerChannel,
+    //job_manager_channel: JobManagerChannel,
+    job_manager_rx: Option<JobManagerTx>,
+    job_manager_tx: Option<JobManagerTx>,
     num_process_item_errors: usize,
     num_processed_items: usize,
     /// helps to await on DataOutput instances to complete writing
@@ -78,6 +80,7 @@ impl JobRunner {
     {
         let mut jr = JobRunner {
             job_manager_channel,
+            job_manager_tx: None,
             num_process_item_errors: 0,
             num_processed_items: 0,
             config,
@@ -89,6 +92,7 @@ impl JobRunner {
         };
         jr.job_state = jr.load_job_state().await?;
         jr.register()
+            .await
             .expect("There was an error registering the job");
         Ok(jr)
     }
@@ -149,7 +153,7 @@ impl JobRunner {
         self.data_output_handles.push(d);
     }
 
-    pub fn log_info<A, B>(&self, name: A, msg: B)
+    pub async fn log_info<A, B>(&self, name: A, msg: B)
     where
         A: Into<String>,
         B: Into<String>,
@@ -157,14 +161,14 @@ impl JobRunner {
         match self
             .job_manager_channel
             .tx
-            .send(Message::log_info(name, msg.into()))
+            .send(Message::log_info(name, msg.into())).await
         {
             Ok(_) => {}
             Err(er) => println!("Could not send to job_manager {}", er),
         };
     }
 
-    pub fn log_err<A, B>(&self, name: A, item_info: Option<&JobItemInfo>, msg: B)
+    pub async fn log_err<A, B>(&self, name: A, item_info: Option<&JobItemInfo>, msg: B)
     where
         A: Into<String>,
         B: Into<String>,
@@ -178,7 +182,7 @@ impl JobRunner {
         match self
             .job_manager_channel
             .tx
-            .send(Message::log_err(name.into(), message))
+            .send(Message::log_err(name.into(), message)).await
         {
             Ok(_) => {}
             Err(er) => println!("Could not send to job_manager {}", er),
@@ -229,9 +233,9 @@ impl JobRunner {
     /// Checks if the job must exist by processing messages from JobManager and also checking
     /// whether the JobRunner has reached maximum number of errors allowed.  If it must exit, it
     /// will notify JobManager of the fact and return a JobRunnerError
-    fn process_job_manager_rx(&mut self) -> Result<(), JobRunnerError> {
+    async fn process_job_manager_rx(&mut self) -> Result<(), JobRunnerError> {
         loop {
-            if let Ok(message) = self.job_manager_channel.rx.try_recv() {
+            if let Some(message) = self.job_manager_channel.rx.recv().await {
                 use crate::job_manager::Message::*;
                 match message {
                     // message broadcasted from JobManager when there are too many errors and its
@@ -249,30 +253,39 @@ impl JobRunner {
         }
         if self.config.max_errors <= self.num_process_item_errors {
             // notify JobManager that we are exiting
-            self.un_register()?;
+            self.un_register().await?;
             return Err(JobRunnerError::TooManyErrors);
         }
         Ok(())
     }
 
     /// Notify JobManager that this job was added
-    fn register(&self) -> Result<(), JobRunnerError> {
+    async fn register(&mut self) -> Result<(), JobRunnerError> {
+        use tokio::sync::oneshot;
+        let (tx, rx) = oneshot::channel();
         match self
             .job_manager_channel
             .tx
-            .send(Message::broadcast_job_start(self.job_state.name()))
+            .send(Message::broadcast_job_start(self.job_state.name(), tx)).await
         {
             Ok(_) => Ok(()),
             Err(er) => Err(JobRunnerError::CompleteError(er.to_string())),
+        };
+        match rx.await {
+            Ok(job_manager_tx) => {
+                self.job_manager_tx = Some(job_manager_tx);
+            }
+            Err(e) => panic!(e),
         }
+        Ok(())
     }
 
     /// Notify JobManager that this job was added
-    fn un_register(&self) -> Result<(), JobRunnerError> {
+    async fn un_register(&self) -> Result<(), JobRunnerError> {
         match self
             .job_manager_channel
             .tx
-            .send(Message::broadcast_job_end(&self))
+            .send(Message::broadcast_job_end(&self)).await
         {
             Ok(_) => Ok(()),
             Err(er) => Err(JobRunnerError::CompleteError(er.to_string())),
@@ -285,7 +298,7 @@ impl JobRunner {
         match self
             .job_manager_channel
             .tx
-            .send(Message::broadcast_job_end(&self))
+            .send(Message::broadcast_job_end(&self)).await
         {
             Ok(_) => Ok(self.job_state),
             Err(er) => Err(JobRunnerError::CompleteError(er.to_string())),

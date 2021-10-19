@@ -1,28 +1,33 @@
 use crate::job::JobRunner;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{
-    broadcast,
-    broadcast::{error::RecvError, Receiver, Sender},
+    oneshot,
+    //mpsc,
+    mpsc::{Receiver, Sender},
+    //broadcast,
+    //broadcast::{error::RecvError, Receiver, Sender},
 };
 pub type JobManagerTx = Sender<Message>;
 pub type JobManagerRx = Receiver<Message>;
 use crate::utils::log::{log_err, log_info, LogMessage};
 use crate::utils::*;
+use std::collections::HashMap;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::task::JoinHandle;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum NotifyJobRunner {
+    JobCanRun { to_job_manager_tx: JobManagerTx },
     TooManyErrors,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum NotifyJobManager {
     LogInfo { sender: String, message: String },
     LogError { sender: String, message: String },
     TaskStarted { sender: String },
     TaskFinished { sender: String },
-    JobStarted { sender: String },
+    JobStarted { sender: String, reply_tx: oneshot::Sender<JobManagerTx> },
     JobFinished { sender: SenderDetails },
     ShutdownJobManager,
 }
@@ -47,7 +52,7 @@ pub enum NotifyDataSource {
     TooManyErrors,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Message {
     ToJobManager(NotifyJobManager),
     ToJobRunner(NotifyJobRunner),
@@ -77,8 +82,8 @@ impl Default for JobManagerConfig {
 }
 
 pub struct JobManager {
-    tx: Sender<Message>,
-    rx: Receiver<Message>,
+    to_job_runner_tx: HashMap<String, Sender<Message>>,
+    from_job_runner_channel: Option<(Sender<Message>, Receiver<Message>)>,
     num_log_errors: usize,
     logger_tx: UnboundedSender<LogMessage>,
     num_tasks_started: usize,
@@ -88,11 +93,8 @@ pub struct JobManager {
 }
 
 pub struct JobManagerChannel {
-    //tx: Sender<Message>,
-    //rx: Receiver<Message>,
+    //pub tx: JobManagerTx,
     pub tx: JobManagerTx,
-    pub rx: JobManagerRx,
-    //join_handle: Option<JoinHandle<()>>,
 }
 
 /*
@@ -112,22 +114,21 @@ impl Clone for JobManagerChannel {
     fn clone(&self) -> Self {
         JobManagerChannel {
             tx: self.tx.clone(),
-            rx: self.tx.subscribe(),
-            //join_handle: None,
         }
     }
 }
 
 impl JobManagerChannel {
     pub fn shutdown_job_manager(self) -> anyhow::Result<()> {
-        self.tx.send(Message::shutdown_job_manager())?;
-        Ok(())
+        panic!("shutdown_job_manager is unimplemented");
+        //self.tx.send(Message::shutdown_job_manager())?;
+        //Ok(())
     }
 }
 
 impl JobManager {
     pub fn new(config: JobManagerConfig) -> anyhow::Result<Self> {
-        let (tx, rx) = broadcast::channel(16);
+        //let (tx, rx) = broadcast::channel(16);
         let JobManagerConfig {
             ref log_path,
             ref log_name_prefix,
@@ -141,8 +142,8 @@ impl JobManager {
             None => tx_to_stdout_output()?,
         };
         Ok(JobManager {
-            tx,
-            rx,
+            to_job_runner_tx: HashMap::new(),
+            from_job_runner_channel: None,
             num_log_errors: 0,
             logger_tx,
             num_tasks_started: 0,
@@ -152,120 +153,121 @@ impl JobManager {
         })
     }
 
-    pub fn get_rx(&self) -> JobManagerRx {
-        self.tx.subscribe()
-    }
-
-    pub fn get_tx(&self) -> JobManagerTx {
-        self.tx.clone()
-    }
-
-    pub fn start(mut self) -> (JoinHandle<()>, JobManagerChannel) {
-        let ret_tx = self.get_tx();
-        let ret_rx = self.get_rx();
+    pub fn start(mut self) -> JoinHandle<()> {
         let jh = tokio::spawn(async move {
             loop {
-                match self.rx.recv().await {
-                    Ok(Message::ToJobManager(m)) => {
-                        use NotifyJobManager::*;
-                        match m {
-                            LogInfo { sender, message } => {
-                                log_info(&self.logger_tx, format!("{}: {} ", sender, message));
-                            }
-                            LogError { sender, message } => {
-                                log_err(&self.logger_tx, format!("{}: {} ", sender, message));
-                                self.num_log_errors += 1;
-
-                                if self.num_log_errors >= self.config.max_errors {
-                                    log_err(
-                                        &self.logger_tx,
-                                        "Reached too many global errors, shutting down",
-                                    );
-                                    self.tx
-                                        .send(Message::ToJobRunner(NotifyJobRunner::TooManyErrors))
-                                        .expect("Fatal");
+                if let Some((_, from_jobs_rx)) = &self.from_job_runner_channel {
+                    match from_jobs_rx.recv().await {
+                        Some(Message::ToJobManager(m)) => {
+                            use NotifyJobManager::*;
+                            match m {
+                                LogInfo { sender, message } => {
+                                    log_info(&self.logger_tx, format!("{}: {} ", sender, message));
                                 }
-                            }
-                            TaskStarted { sender } => {
-                                self.num_tasks_started += 1;
-                                let s = format!(
-                                    "Started {} tasks: {}/{}",
-                                    sender, self.num_tasks_finished, self.num_tasks_started
-                                );
+                                LogError { sender, message } => {
+                                    log_err(&self.logger_tx, format!("{}: {} ", sender, message));
+                                    self.num_log_errors += 1;
 
-                                self.tx
-                                    .send(Message::ToJob(NotifyJob::Scale {
-                                        started: self.num_tasks_started,
-                                        finished: self.num_tasks_finished,
-                                        running: self.num_tasks_started - self.num_tasks_finished,
-                                    }))
-                                    .expect("Fatal");
-                                log_info(&self.logger_tx, s);
-                            }
-                            TaskFinished { sender } => {
-                                self.num_tasks_finished += 1;
-                                self.tx
-                                    .send(Message::ToJob(NotifyJob::Scale {
-                                        started: self.num_tasks_started,
-                                        finished: self.num_tasks_finished,
-                                        running: self.num_tasks_started - self.num_tasks_finished,
-                                    }))
-                                    .expect("Fatal");
-                                let s = format!(
-                                    "Finished {} tasks: {}/{}",
-                                    sender, self.num_tasks_finished, self.num_tasks_started
-                                );
-                                log_info(&self.logger_tx, s);
-                            }
-                            // needed so the job manager can finish writing the log
-                            ShutdownJobManager => {
-                                break;
-                            }
-                            JobStarted { .. } => {
-                                self.num_jobs_running += 1;
-                            }
-                            JobFinished { .. } => {
-                                self.num_jobs_running -= 1;
-                                if self.num_jobs_running == 0 {
-                                    log_info(
-                                        &self.logger_tx,
-                                        "JobManager: no more running jobs, shutting down",
+                                    if self.num_log_errors >= self.config.max_errors {
+                                        log_err(
+                                            &self.logger_tx,
+                                            "Reached too many global errors, shutting down",
+                                        );
+                                        /*
+                                        self.tx
+                                            .send(Message::ToJobRunner(
+                                                NotifyJobRunner::TooManyErrors,
+                                            ))
+                                            .expect("Fatal");
+                                        */
+                                    }
+                                }
+                                TaskStarted { sender } => {
+                                    self.num_tasks_started += 1;
+                                    let s = format!(
+                                        "Started {} tasks: {}/{}",
+                                        sender, self.num_tasks_finished, self.num_tasks_started
                                     );
-                                    // TODO: this method still leaves some messages
-                                    // in the queue
+
+                                    /*
+                                    self.tx
+                                        .send(Message::ToJob(NotifyJob::Scale {
+                                            started: self.num_tasks_started,
+                                            finished: self.num_tasks_finished,
+                                            running: self.num_tasks_started
+                                                - self.num_tasks_finished,
+                                        }))
+                                        .expect("Fatal");
+                                    */
+                                    log_info(&self.logger_tx, s);
+                                }
+                                TaskFinished { sender } => {
+                                    self.num_tasks_finished += 1;
+                                    /*
+                                    self.tx
+                                        .send(Message::ToJob(NotifyJob::Scale {
+                                            started: self.num_tasks_started,
+                                            finished: self.num_tasks_finished,
+                                            running: self.num_tasks_started
+                                                - self.num_tasks_finished,
+                                        }))
+                                        .expect("Fatal");
+                                    */
+                                    let s = format!(
+                                        "Finished {} tasks: {}/{}",
+                                        sender, self.num_tasks_finished, self.num_tasks_started
+                                    );
+                                    log_info(&self.logger_tx, s);
+                                }
+                                // needed so the job manager can finish writing the log
+                                ShutdownJobManager => {
                                     break;
+                                }
+                                JobStarted { sender, .. } => {
+                                    //self.from_job_runner_rx.insert(sender.name, rx);
+                                    if let Some((tx, rx)) = &self.from_job_runner_channel {
+                                        //let (rx, tx) = mpsc::channel(1);
+                                    }
+                                    self.num_jobs_running += 1;
+                                }
+                                JobFinished { .. } => {
+                                    self.num_jobs_running -= 1;
+                                    if self.num_jobs_running == 0 {
+                                        log_info(
+                                            &self.logger_tx,
+                                            "JobManager: no more running jobs, shutting down",
+                                        );
+                                        // TODO: this method still leaves some messages
+                                        // in the queue
+                                        break;
+                                    }
                                 }
                             }
                         }
-                    }
-                    // ignore these here, as they are meant for Jobs, just log them
-                    Ok(Message::ToJob(m)) => {
-                        log_info(&self.logger_tx, format!("ToJob: {:?}", &m));
-                    }
-                    Ok(Message::ToJobRunner(m)) => {
-                        log_info(&self.logger_tx, &format!("ToJobRunner: {:?}", m));
-                    }
-                    Ok(Message::ToDataSource(m)) => {
-                        log_info(&self.logger_tx, &format!("ToDataSource: {:?}", m));
-                    }
-                    Err(RecvError::Lagged(num)) => {
-                        println!("JobManager RecvError::Lagged by {} messages", num);
-                    }
-                    Err(RecvError::Closed) => {
-                        println!("JobManager RecvError::Closed");
-                        break;
+                        // ignore these here, as they are meant for Jobs, just log them
+                        Some(Message::ToJob(m)) => {
+                            log_info(&self.logger_tx, format!("ToJob: {:?}", &m));
+                        }
+                        Some(Message::ToJobRunner(m)) => {
+                            log_info(&self.logger_tx, &format!("ToJobRunner: {:?}", m));
+                        }
+                        Some(Message::ToDataSource(m)) => {
+                            log_info(&self.logger_tx, &format!("ToDataSource: {:?}", m));
+                        }
+                        /*
+                        Err(RecvError::Lagged(num)) => {
+                            println!("JobManager RecvError::Lagged by {} messages", num);
+                        }
+                        Err(RecvError::Closed) => {
+                            println!("JobManager RecvError::Closed");
+                            break;
+                        }
+                        */
                     }
                 }
             }
         });
-        (
-            jh,
-            JobManagerChannel {
-                //join_handle: Some(jh),
-                tx: ret_tx,
-                rx: ret_rx,
-            },
-        )
+        jh
     }
 }
 
@@ -310,12 +312,12 @@ impl Message {
         })
     }
 
-    pub fn broadcast_job_start<A>(sender: A) -> Self
+    pub fn broadcast_job_start<A>(sender: A, reply_tx: oneshot::Sender<JobManagerTx>) -> Self
     where
         A: Into<String>,
     {
         Message::ToJobManager(NotifyJobManager::JobStarted {
-            sender: sender.into(),
+            sender: sender.into(), reply_tx
         })
     }
 
