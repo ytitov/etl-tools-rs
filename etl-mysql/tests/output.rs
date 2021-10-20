@@ -15,11 +15,11 @@ async fn test_simple_mysql_output() {
         ..Default::default()
     })
     .expect("Could not initialize job_manager");
-    let (jm_handle, jm_channel) = job_manager.start();
+    let jm_handle = job_manager.start();
     let job_state = JobRunner::create(
         "mysql_output_id",
         "mysql_output",
-        jm_channel.clone(),
+        &jm_handle,
         JobRunnerConfig {
             ..Default::default()
         },
@@ -126,6 +126,7 @@ async fn test_simple_mysql_output() {
     }
 
     jm_handle
+        .shutdown()
         .await
         .expect("Error awaiting on job manager handle");
 }

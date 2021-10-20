@@ -49,14 +49,12 @@ impl Default for MySqlDataOutputPool {
 
 #[async_trait]
 impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for MySqlDataOutput {
-    async fn start_stream(&mut self, jm: JobManagerChannel) -> anyhow::Result<DataOutputTask<T>> {
+    async fn start_stream(&mut self) -> anyhow::Result<DataOutputTask<T>> {
         let (tx, mut rx): (Sender<DataOutputMessage<T>>, _) = channel(self.on_put_num_rows * 2);
 
         let table_name = self.table_name.clone();
         let on_put_num_rows_orig = *&self.on_put_num_rows;
         let on_put_num_rows_max = *&self.on_put_num_rows_max;
-        let job_manager_tx = jm.tx;
-        job_manager_tx.send(Message::broadcast_task_start(&table_name))?;
         let db_name = self.db_name.clone();
         let pool_config = self.pool.clone();
         let join_handle: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
@@ -106,7 +104,7 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
             let mut source_finished_sending = false;
             loop {
                 if num_bytes >= 4_000_000 {
-                    job_manager_tx.send(Message::log_err(&table_name, "Packet exceeded 4mb consider reducing max commit size or setting the server max_allowed_packet"))?;
+                    println!(" for table {} Packet exceeded 4mb consider reducing max commit size or setting the server max_allowed_packet", &table_name);
                 }
                 // 1. loop until we have enough rows
                 loop {
@@ -150,19 +148,18 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                             total_inserted += r.inserted;
                             if time_started.elapsed().as_secs() >= 60 {
                                 time_started = std::time::Instant::now();
-                                job_manager_tx.send(Message::log_info(
-                                    "mysql-datastore",
-                                    format!(
-                                        "{} exec_rows_mysql took: {} ms",
-                                        &table_name,
-                                        r.duration.as_millis()
-                                    ),
-                                ))?;
+                                println!(
+                                    "{} exec_rows_mysql took: {} ms",
+                                    &table_name,
+                                    r.duration.as_millis()
+                                );
                             }
                         }
                         Err(e) => {
+                            //TODO: this should reply a message with an error
                             let m = format!("Error inserting rows into {}: {} ", &table_name, e);
-                            job_manager_tx.send(Message::log_err("mysql-datastore", m))?;
+                            println!("{}", m);
+                            //job_manager_tx.send(Message::log_err("mysql-datastore", m))?;
                         }
                     };
                     value_rows.clear();
@@ -178,10 +175,9 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                 &table_name,
                 value_rows.len()
             );
-            job_manager_tx.send(Message::log_info("mysql-datastore", msg))?;
+            println!("{}", msg);
+            //job_manager_tx.send(Message::log_info("mysql-datastore", msg))?;
             drop(pool);
-            job_manager_tx.send(Message::broadcast_task_end(&table_name))?;
-            drop(job_manager_tx);
             println!("{} inserted {} entries", table_name, total_inserted);
             Ok(())
         });
