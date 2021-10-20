@@ -331,7 +331,6 @@ impl Default for S3DataOutput {
 impl S3DataOutput {
     async fn start_stream_output_csv<T>(
         &mut self,
-        jm: JobManagerChannel,
         csv_options: CsvWriteOptions,
     ) -> anyhow::Result<DataOutputTask<T>>
     where
@@ -352,7 +351,6 @@ impl S3DataOutput {
         let s3_key = self.s3_key.clone();
         let region = self.region.clone();
         let credentials = self.credentials.clone();
-        let job_manager_tx = jm.tx;
         let jh: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
             let mut num_lines_sent = 0_usize;
             let (s3_tx, s3_rx) = channel(1);
@@ -400,10 +398,13 @@ impl S3DataOutput {
                                         }
                                     }
                                     Err(e) => {
+                                        println!("se error: {}", e);
+                                        /*
                                         job_manager_tx.send(Message::log_err(
                                             "S3DataOutput",
                                             e.to_string(),
                                         ))?;
+                                        */
                                         return Err(anyhow::anyhow!("{}", e));
                                     }
                                 }
@@ -425,7 +426,6 @@ impl S3DataOutput {
     }
     async fn start_stream_output_json<T>(
         &mut self,
-        jm: JobManagerChannel,
     ) -> anyhow::Result<DataOutputTask<T>>
     where
         T: Serialize + Debug + 'static + Sync + Send,
@@ -435,7 +435,6 @@ impl S3DataOutput {
         let s3_key = self.s3_key.clone();
         let region = self.region.clone();
         let credentials = self.credentials.clone();
-        let job_manager_tx = jm.tx;
         let jh: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
             let (s3_tx, s3_rx) = channel(1);
             let p = ProfileProvider::with_default_configuration(credentials);
@@ -452,10 +451,13 @@ impl S3DataOutput {
                                         s3_tx.send(line).await?;
                                     }
                                     Err(e) => {
+                                        println!("S3DataOutput error: {}", e);
+                                        /*
                                         job_manager_tx.send(Message::log_err(
                                             "S3DataOutput",
                                             e.to_string(),
                                         ))?;
+                                        */
                                         return Err(anyhow::anyhow!("{}", e));
                                     }
                                 }
@@ -479,10 +481,10 @@ impl S3DataOutput {
 
 #[async_trait]
 impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for S3DataOutput {
-    async fn start_stream(&mut self, jm: JobManagerChannel) -> anyhow::Result<DataOutputTask<T>> {
+    async fn start_stream(&mut self) -> anyhow::Result<DataOutputTask<T>> {
         match self.write_content.clone() {
-            WriteContentOptions::Json => self.start_stream_output_json::<T>(jm).await,
-            WriteContentOptions::Csv(opts) => self.start_stream_output_csv::<T>(jm, opts).await,
+            WriteContentOptions::Json => self.start_stream_output_json::<T>().await,
+            WriteContentOptions::Csv(opts) => self.start_stream_output_csv::<T>(opts).await,
             WriteContentOptions::Text => {
                 unimplemented!()
             }
