@@ -63,13 +63,14 @@ pub trait SimpleStore<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send
     }
 }
 
-use crate::job_manager::JobManagerRx;
+//use crate::job_manager::JobManagerRx;
 
 pub trait BytesSource: Sync + Send {
     fn name(&self) -> String;
 
     fn start_stream(self: Box<Self>) -> Result<BytesSourceTask, DataStoreError>;
 
+    /*
     /// TODO: this is not integrated yet because this doesn't get the JobManagerChannel because I'm
     /// not completely convinced this is necessary.  After all, JobRunner can close the rx end of
     /// the channel provided by the data source
@@ -93,6 +94,7 @@ pub trait BytesSource: Sync + Send {
         }
         Ok(())
     }
+    */
     /*
     fn boxed(self: Box<Self>) -> Box<dyn BytesSource<T> + Send + Sync> {
         Box::new(self)

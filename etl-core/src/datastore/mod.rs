@@ -7,6 +7,7 @@ use serde::Serialize;
 use std::fmt::Debug;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinHandle;
+use crate::job_manager::JobManagerTx;
 
 /// Local file system data stores
 pub mod fs;
@@ -84,13 +85,14 @@ pub trait SimpleStore<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send
     }
 }
 
-use crate::job_manager::JobManagerRx;
+//use crate::job_manager::JobManagerRx;
 
 pub trait DataSource<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send {
     fn name(&self) -> String;
 
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError>;
 
+    /*
     /// TODO: this is not integrated yet because this doesn't get the JobManagerChannel because I'm
     /// not completely convinced this is necessary.  After all, JobRunner can close the rx end of
     /// the channel provided by the data source
@@ -117,6 +119,7 @@ pub trait DataSource<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send 
         }
         Ok(())
     }
+    */
     /*
     fn boxed(self: Box<Self>) -> Box<dyn DataSource<T> + Send + Sync> {
         Box::new(self)
@@ -148,7 +151,7 @@ where
 pub trait DataOutput<T: Serialize + Debug + 'static + Sync + Send>: Sync + Send {
     async fn start_stream(
         &mut self,
-        _: JobManagerChannel,
+        _: JobManagerTx,
     ) -> anyhow::Result<DataOutputTask<T>> {
         unimplemented!();
     }

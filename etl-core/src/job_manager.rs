@@ -27,7 +27,7 @@ pub enum NotifyJobManager {
     LogError { sender: String, message: String },
     TaskStarted { sender: String },
     TaskFinished { sender: String },
-    JobStarted { sender: String, reply_tx: oneshot::Sender<JobManagerTx> },
+    JobStarted { sender: String },
     JobFinished { sender: SenderDetails },
     ShutdownJobManager,
 }
@@ -93,7 +93,7 @@ pub struct JobManager {
 }
 
 pub struct JobManagerChannel {
-    //pub tx: JobManagerTx,
+    pub rx: JobManagerRx,
     pub tx: JobManagerTx,
 }
 
@@ -110,6 +110,7 @@ impl JobManagerChannel {
 }
 */
 
+/*
 impl Clone for JobManagerChannel {
     fn clone(&self) -> Self {
         JobManagerChannel {
@@ -117,6 +118,7 @@ impl Clone for JobManagerChannel {
         }
     }
 }
+*/
 
 impl JobManagerChannel {
     pub fn shutdown_job_manager(self) -> anyhow::Result<()> {
@@ -156,7 +158,7 @@ impl JobManager {
     pub fn start(mut self) -> JoinHandle<()> {
         let jh = tokio::spawn(async move {
             loop {
-                if let Some((_, from_jobs_rx)) = &self.from_job_runner_channel {
+                if let Some((_, from_jobs_rx)) = &mut self.from_job_runner_channel {
                     match from_jobs_rx.recv().await {
                         Some(Message::ToJobManager(m)) => {
                             use NotifyJobManager::*;
@@ -244,6 +246,10 @@ impl JobManager {
                                 }
                             }
                         }
+                        None => {
+                            println!("JobManager exiting got a none");
+                            break;
+                        }
                         // ignore these here, as they are meant for Jobs, just log them
                         Some(Message::ToJob(m)) => {
                             log_info(&self.logger_tx, format!("ToJob: {:?}", &m));
@@ -312,12 +318,12 @@ impl Message {
         })
     }
 
-    pub fn broadcast_job_start<A>(sender: A, reply_tx: oneshot::Sender<JobManagerTx>) -> Self
+    pub fn broadcast_job_start<A>(sender: A) -> Self
     where
         A: Into<String>,
     {
         Message::ToJobManager(NotifyJobManager::JobStarted {
-            sender: sender.into(), reply_tx
+            sender: sender.into()
         })
     }
 

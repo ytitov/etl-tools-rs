@@ -26,9 +26,7 @@ use self::error::*;
 /// multiple pipelines in parallel, use separate JobRunner for each pipeline.
 pub struct JobRunner {
     config: JobRunnerConfig,
-    //job_manager_channel: JobManagerChannel,
-    job_manager_rx: Option<JobManagerTx>,
-    job_manager_tx: Option<JobManagerTx>,
+    job_manager_channel: JobManagerChannel,
     num_process_item_errors: usize,
     num_processed_items: usize,
     /// helps to await on DataOutput instances to complete writing
@@ -80,7 +78,6 @@ impl JobRunner {
     {
         let mut jr = JobRunner {
             job_manager_channel,
-            job_manager_tx: None,
             num_process_item_errors: 0,
             num_processed_items: 0,
             config,
@@ -91,8 +88,7 @@ impl JobRunner {
             cur_step_index: 0,
         };
         jr.job_state = jr.load_job_state().await?;
-        jr.register()
-            .await
+        jr.register().await
             .expect("There was an error registering the job");
         Ok(jr)
     }
@@ -260,24 +256,15 @@ impl JobRunner {
     }
 
     /// Notify JobManager that this job was added
-    async fn register(&mut self) -> Result<(), JobRunnerError> {
-        use tokio::sync::oneshot;
-        let (tx, rx) = oneshot::channel();
+    async fn register(&self) -> Result<(), JobRunnerError> {
         match self
             .job_manager_channel
             .tx
-            .send(Message::broadcast_job_start(self.job_state.name(), tx)).await
+            .send(Message::broadcast_job_start(self.job_state.name())).await
         {
             Ok(_) => Ok(()),
             Err(er) => Err(JobRunnerError::CompleteError(er.to_string())),
-        };
-        match rx.await {
-            Ok(job_manager_tx) => {
-                self.job_manager_tx = Some(job_manager_tx);
-            }
-            Err(e) => panic!(e),
         }
-        Ok(())
     }
 
     /// Notify JobManager that this job was added
@@ -336,7 +323,7 @@ impl JobRunner {
                 // no need to wait on input JoinHandle
                 let (mut input_rx, _) = input.start_stream()?;
                 let (output_tx, output_jh) = output
-                    .start_stream(self.job_manager_channel.clone())
+                    .start_stream(self.job_manager_channel.tx.clone())
                     .await?;
                 self.save_job_state().await?;
                 let mut lines_scanned = 0_usize;
@@ -359,7 +346,7 @@ impl JobRunner {
                         }
                         None => break,
                     };
-                    match self.process_job_manager_rx() {
+                    match self.process_job_manager_rx().await {
                         Err(JobRunnerError::TooManyErrors) => {
                             self.job_state.stream_not_ok(
                                 name,
@@ -533,7 +520,7 @@ impl JobRunner {
                             break;
                         }
                     };
-                    match self.process_job_manager_rx() {
+                    match self.process_job_manager_rx().await {
                         Err(JobRunnerError::TooManyErrors) => {
                             self.job_state.stream_not_ok(
                                 stream_name,
