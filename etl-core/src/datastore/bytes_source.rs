@@ -143,7 +143,7 @@ pub trait BytesOutput: Sync + Send {
             Ok(Ok(())) => Ok(()),
             Ok(Err(e)) => {
                 let msg = format!("Waiting for task to finish resulted in an error: {}", e);
-                jr.log_err("JobManager", None, msg);
+                jr.log_err("JobManager", None, msg).await;
                 Ok(())
             }
             Err(e) => Err(anyhow::anyhow!(

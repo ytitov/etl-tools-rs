@@ -62,11 +62,11 @@ async fn test_state_existing() {
         ..Default::default()
     })
     .expect("Could not initialize job_manager");
-    let (jm_handle, jm_channel) = job_manager.start();
+    let jm_handle = job_manager.start();
     let mut jr = JobRunner::create(
         "test_simple_state",
         "test_simple_state",
-        jm_channel.clone(),
+        &jm_handle,
         JobRunnerConfig {
             ds: Box::new(MockJsonDataSource {
                 lines: Vec::new(),
@@ -100,5 +100,5 @@ async fn test_state_existing() {
         Some(_) => {}
         None => panic!("Expected to get back the state 'test-state' and did not get it"),
     };
-    jm_handle.await.expect("failure waiting for jm");
+    jm_handle.shutdown().await.expect("failure waiting for jm");
 }

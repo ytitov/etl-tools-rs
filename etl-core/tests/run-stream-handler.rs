@@ -19,17 +19,17 @@ async fn basic_stream_handler_all_errors() {
         ..Default::default()
     })
     .expect("Could not initialize job_manager");
-    let (jm_handle, jm_channel) = job_manager.start();
+    let jm_handle = job_manager.start();
     let testjob = TestJob {
         output: MockJsonDataOutput::default()
-            .start_stream(jm_channel.clone())
+            .start_stream()
             .await
             .expect("Could not create mock json data output"),
     };
     let jr = JobRunner::create(
         "test",
         "custom_job_state",
-        jm_channel,
+        &jm_handle,
         JobRunnerConfig {
             ..Default::default()
         },
@@ -46,7 +46,7 @@ async fn basic_stream_handler_all_errors() {
         .complete()
         .await
         .expect("Job completed with an error");
-    jm_handle
+    jm_handle.shutdown()
         .await
         .expect("Fatal error awaiting on JobManager handle");
     if let Some(cmd_status) = job_state.step_history.get("TestJob") {

@@ -114,7 +114,7 @@ pub struct JobManagerChannel {
 }
 
 pub struct JobManagerHandle {
-    join_handle: JoinHandle<()>,
+    join_handle: JoinHandle<anyhow::Result<()>>,
     job_manager_tx: JobManagerTx,
 }
 
@@ -126,11 +126,9 @@ impl JobManagerHandle {
             oneshot::Sender<JobManagerRx>,
             oneshot::Receiver<JobManagerRx>,
         ) = oneshot::channel();
-        println!("connect called on JobManagerHandle");
         self.job_manager_tx
             .send(Message::broadcast_job_start(name, oneshot_tx))
             .await?;
-        println!("waiting for job_manager_rx");
         let job_manager_rx = oneshot_rx.await?;
         Ok(JobManagerChannel {
             tx: self.job_manager_tx.clone(),
@@ -150,37 +148,13 @@ impl JobManagerHandle {
                 println!("There was an error during shutdown of JobManager: {}", e);
             }
         };
-        self.join_handle.await?;
+        self.join_handle.await??;
         Ok(())
     }
 }
-
-/*
-impl JobManagerChannel {
-    pub async fn shutdown(self) -> anyhow::Result<()> {
-        self.tx.send(Message::shutdown_job_manager())?;
-        match self.join_handle {
-            Some(jh) => jh.await?,
-            _ => println!("Channel already shutdown"),
-        }
-        Ok(())
-    }
-}
-*/
-
-/*
-impl Clone for JobManagerChannel {
-    fn clone(&self) -> Self {
-        JobManagerChannel {
-            tx: self.tx.clone(),
-        }
-    }
-}
-*/
 
 impl JobManager {
     pub fn new(config: JobManagerConfig) -> anyhow::Result<Self> {
-        //let (tx, rx) = broadcast::channel(16);
         let JobManagerConfig {
             ref log_path,
             ref log_name_prefix,
@@ -209,7 +183,7 @@ impl JobManager {
     pub fn start(mut self) -> JobManagerHandle {
         let (job_manager_tx, job_manager_rx) = mpsc::channel(16);
         self.from_job_runner_channel = Some(job_manager_rx);
-        let jh = tokio::spawn(async move {
+        let jh: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
             loop {
                 if let Some(from_jobs_rx) = &mut self.from_job_runner_channel {
                     match from_jobs_rx.recv().await {
@@ -280,7 +254,9 @@ impl JobManager {
                                 }
                                 JobStarted { sender, reply_rx } => {
                                     let (tx, rx): (JobManagerTx, JobManagerRx) = mpsc::channel(1);
-                                    reply_rx.send(rx);
+                                    reply_rx
+                                        .send(rx)
+                                        .expect("Fatal error replying with a JobManagerRx to a job, this should never happen");
                                     self.to_job_runner_tx.insert(sender, tx);
                                     self.num_jobs_running += 1;
                                 }
@@ -311,22 +287,15 @@ impl JobManager {
                         }
                         Some(Message::ToDataSource(m)) => {
                             log_info(&self.logger_tx, &format!("ToDataSource: {:?}", m));
-                        } /*
-                          Err(RecvError::Lagged(num)) => {
-                              println!("JobManager RecvError::Lagged by {} messages", num);
-                          }
-                          Err(RecvError::Closed) => {
-                              println!("JobManager RecvError::Closed");
-                              break;
-                          }
-                          */
+                        }
                     }
                 } else {
                     use std::time::Duration;
-                    println!("waiting for jobs to start");
+                    println!("WARNING: JobManager is waiting for jobs to start, will not exit if none start");
                     tokio::time::sleep(Duration::from_millis(500)).await;
                 }
             }
+            Ok(())
         });
         JobManagerHandle {
             join_handle: jh,

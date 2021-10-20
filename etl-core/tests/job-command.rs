@@ -11,12 +11,12 @@ async fn test_job_command_with_error() {
         ..Default::default()
     })
     .expect("Could not initialize job_manager");
-    let (jm_handle, jm_channel) = job_manager.start();
+    let jm_handle = job_manager.start();
 
     let jr = JobRunner::create(
         "test",
         "test_bad_command",
-        jm_channel.clone(),
+        &jm_handle,
         JobRunnerConfig {
             stop_on_error: false,
             ..Default::default()
@@ -43,7 +43,7 @@ async fn test_job_command_with_error() {
         .await
         .expect("Failed run_cmd");
     let job_state = jr.complete().await.expect("Error completing job");
-    jm_handle.await.expect("Failed waiting on handle");
+    jm_handle.shutdown().await.expect("Failed waiting on handle");
     use command::*;
     use state::*;
     // Make sure that the second command resulted in an error and verify the step index
@@ -75,12 +75,12 @@ async fn test_job_command_with_error_2() {
         ..Default::default()
     })
     .expect("Could not initialize job_manager");
-    let (jm_handle, jm_channel) = job_manager.start();
+    let jm_handle = job_manager.start();
 
     let jr = JobRunner::create(
         "test",
         "test_bad_command",
-        jm_channel.clone(),
+        &jm_handle,
         JobRunnerConfig {
             stop_on_error: true,
             ..Default::default()
@@ -110,5 +110,5 @@ async fn test_job_command_with_error_2() {
     } else {
         panic!("Should have gotten a JobRunnerError::JobStepError due to stop_on_error: true option");
     }
-    jm_handle.await.expect("Failed waiting on handle");
+    jm_handle.shutdown().await.expect("Failed waiting on handle");
 }

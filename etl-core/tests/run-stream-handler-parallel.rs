@@ -11,9 +11,12 @@ async fn run_two_jobs_fail_one() {
         ..Default::default()
     })
     .expect("Could not initialize job_manager");
-    let (jm_handle, jm_channel) = job_manager.start();
+    let jm_handle = job_manager.start();
 
-    let jr_ok = create_jr(jm_channel.clone(), 100).await;
+    // very important to initialize jobs before calling complete
+    // otherwise the JobManager will exit before the second job can start
+    let jr_ok = create_jr(&jm_handle, 100).await;
+    let jr_not_ok = create_jr(&jm_handle, 1).await;
     let jr_ok_job_state = jr_ok
         .run_stream::<TestSourceData>(
             "transformed-ds-1a",
@@ -26,7 +29,6 @@ async fn run_two_jobs_fail_one() {
         .await
         .expect("Should not have failed");
 
-    let jr_not_ok = create_jr(jm_channel.clone(), 1).await;
     let jr_not_ok_err = jr_not_ok
         .run_stream::<TestSourceData>(
             "transformed-ds-1b",
@@ -59,14 +61,14 @@ async fn run_two_jobs_fail_one() {
     } else {
         panic!("Expected a step with name transformed-ds-1");
     }
-    jm_handle.await.expect("Fatal: error awaiting on jm handle");
+    jm_handle.shutdown().await.expect("Fatal: error awaiting on jm handle");
 }
 
-async fn create_jr(jm_channel: JobManagerChannel, max_errors: usize) -> JobRunner {
+async fn create_jr(jm_handle: &JobManagerHandle, max_errors: usize) -> JobRunner {
     JobRunner::create(
         "test_simple_pipeline_id",
         format!("test_simple_pipeline_{}", max_errors),
-        jm_channel.clone(),
+        &jm_handle,
         JobRunnerConfig {
             max_errors,
             ..Default::default()

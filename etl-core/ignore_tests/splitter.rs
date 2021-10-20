@@ -23,76 +23,70 @@ async fn test_splitter() {
         ..Default::default()
     })
     .expect("Could not initialize job_manager");
-    let (jm_handle, jm_channel) = job_manager.start();
+    let jm_handle = job_manager.start();
     let (s_handle, mut datasources) =
         split_datasources::<TestSourceData>(Box::new(create_mock_data_source_many_errors()), 2)
             .await;
 
     let ds1 = datasources.remove(0);
     let ds2 = datasources.remove(0);
-    let jr1_jm_channel = jm_channel.clone();
-    tokio::spawn(async move {
-        let jr1 = JobRunner::create(
-            "jr1_id",
-            "Copy1",
-            jr1_jm_channel,
-            JobRunnerConfig {
-                max_errors: 2, // do a hard fail at error 2
-                ..Default::default()
-            },
-        )
-        .await
-        .expect("Error creating JobRunner");
-        let _ = jr1
-            .run_stream::<TestSourceData>(
-                "stream-jr1-ds",
-                ds1,
-                Box::new(MockJsonDataOutput {
-                    name: String::from("fast-ds"),
-                    sleep_duration: Duration::from_secs(1),
-                    ..Default::default()
-                }),
-            )
-            .await
-            .unwrap_err();
-        //.expect("error processing stream 1")
-        //.complete()
-        //.expect("error completeing");
-    });
-
-    let jr2_jm_channel = jm_channel.clone();
-    tokio::spawn(async move {
-        JobRunner::create(
-            "jr2_id",
-            "Copy2",
-            jr2_jm_channel,
-            JobRunnerConfig {
-                //max_errors: 2, // do a hard fail at error 2
-                ..Default::default()
-            },
-        )
-        .await
-        .expect("Error creating JobRunner")
+    let jr1 = JobRunner::create(
+        "jr1_id",
+        "Copy1",
+        &jm_handle,
+        JobRunnerConfig {
+            max_errors: 2, // do a hard fail at error 2
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("Error creating JobRunner");
+    let _ = jr1
         .run_stream::<TestSourceData>(
-            "stream-jr2-ds",
-            ds2,
+            "stream-jr1-ds",
+            ds1,
             Box::new(MockJsonDataOutput {
-                name: String::from("slow-ds"),
-                sleep_duration: Duration::from_secs(2),
+                name: String::from("fast-ds"),
+                sleep_duration: Duration::from_secs(1),
                 ..Default::default()
             }),
         )
         .await
-        .expect("error processing stream 2")
-        .complete()
-        .await
-        .expect("error completeing");
-    });
+        .unwrap_err();
+    //.expect("error processing stream 1")
+    //.complete()
+    //.expect("error completeing");
+
+    JobRunner::create(
+        "jr2_id",
+        "Copy2",
+        &jm_handle,
+        JobRunnerConfig {
+            //max_errors: 2, // do a hard fail at error 2
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("Error creating JobRunner")
+    .run_stream::<TestSourceData>(
+        "stream-jr2-ds",
+        ds2,
+        Box::new(MockJsonDataOutput {
+            name: String::from("slow-ds"),
+            sleep_duration: Duration::from_secs(2),
+            ..Default::default()
+        }),
+    )
+    .await
+    .expect("error processing stream 2")
+    .complete()
+    .await
+    .expect("error completeing");
     match s_handle.await {
         Ok(_) => {} //panic!("s_handle should return an error"),
         Err(_) => {}
     };
-    jm_handle.await.expect("error waiting on handle");
+    jm_handle.shutdown().await.expect("error waiting on handle");
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

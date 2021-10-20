@@ -7,7 +7,6 @@ use serde::Serialize;
 use std::fmt::Debug;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinHandle;
-use crate::job_manager::JobManagerTx;
 
 /// Local file system data stores
 pub mod fs;
@@ -151,7 +150,6 @@ where
 pub trait DataOutput<T: Serialize + Debug + 'static + Sync + Send>: Sync + Send {
     async fn start_stream(
         &mut self,
-        _: JobManagerTx,
     ) -> anyhow::Result<DataOutputTask<T>> {
         unimplemented!();
     }
@@ -172,7 +170,7 @@ pub trait DataOutput<T: Serialize + Debug + 'static + Sync + Send>: Sync + Send 
             Ok(Err(e)) => {
                 let msg =
                     format!("Waiting for task to finish resulted in an error: {}", e);
-                jr.log_err("JobManager", None, msg);
+                jr.log_err("JobManager", None, msg).await;
                 Ok(())
             }
             Err(e) => Err(anyhow::anyhow!(
@@ -203,7 +201,7 @@ where
         Ok(Ok(())) => Ok(()),
         Ok(Err(e)) => {
             let msg = format!("Waiting for task to finish resulted in an error: {}", e);
-            jr.log_err("JobManager", None, msg);
+            jr.log_err("JobManager", None, msg).await;
             Ok(())
         }
         Err(e) => Err(anyhow::anyhow!(

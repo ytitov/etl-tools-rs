@@ -36,11 +36,11 @@ async fn test_state() {
         ..Default::default()
     })
     .expect("Could not initialize job_manager");
-    let (jm_handle, jm_channel) = job_manager.start();
+    let jm_handle = job_manager.start();
     let jr = JobRunner::create(
         "test_simple_state",
         "test_simple_state",
-        jm_channel.clone(),
+        &jm_handle,
         JobRunnerConfig {
             ..Default::default()
         },
@@ -88,7 +88,7 @@ async fn test_state() {
     } else {
         panic!("Expected State struct to be in final state and did not find one");
     }
-    jm_handle.await.expect("failure waiting for jm");
+    jm_handle.shutdown().await.expect("failure waiting for jm");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -115,11 +115,11 @@ async fn test_state_existing() {
         ..Default::default()
     })
     .expect("Could not initialize job_manager");
-    let (jm_handle, jm_channel) = job_manager.start();
+    let jm_handle = job_manager.start();
     let jr = JobRunner::create(
         "test_simple_state",
         "test_simple_state",
-        jm_channel.clone(),
+        &jm_handle,
         JobRunnerConfig {
             ds: Box::new(MockJsonDataSource {
                 lines: Vec::new(),
@@ -142,5 +142,5 @@ async fn test_state_existing() {
     } else {
         panic!("Expected State struct to be in final state and did not find one");
     }
-    jm_handle.await.expect("failure waiting for jm");
+    jm_handle.shutdown().await.expect("failure waiting for jm");
 }

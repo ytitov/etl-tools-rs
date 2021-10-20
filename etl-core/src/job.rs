@@ -320,7 +320,7 @@ impl JobRunner {
                 // no need to wait on input JoinHandle
                 let (mut input_rx, _) = input.start_stream()?;
                 let (output_tx, output_jh) = output
-                    .start_stream(self.job_manager_channel.tx.clone())
+                    .start_stream()
                     .await?;
                 self.save_job_state().await?;
                 let mut lines_scanned = 0_usize;

@@ -25,7 +25,7 @@ impl Default for MockJsonDataOutput {
 
 #[async_trait]
 impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockJsonDataOutput {
-    async fn start_stream(&mut self, _: JobManagerTx) -> anyhow::Result<DataOutputTask<T>> {
+    async fn start_stream(&mut self) -> anyhow::Result<DataOutputTask<T>> {
         use tokio::sync::mpsc::channel;
         let (tx, mut rx): (Sender<DataOutputMessage<T>>, _) = channel(1);
         let sleep_duration = self.sleep_duration;
