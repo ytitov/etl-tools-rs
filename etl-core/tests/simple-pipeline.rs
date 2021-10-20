@@ -13,11 +13,11 @@ async fn test_simple_pipeline() {
         ..Default::default()
     })
     .expect("Could not initialize job_manager");
-    let (jm_handle, jm_channel) = job_manager.start();
+    let jm_handle = job_manager.start();
     let jr = JobRunner::create(
         "test_simple_pipeline_id",
         "test_simple_pipeline",
-        jm_channel.clone(),
+        &jm_handle,
         JobRunnerConfig {
             ..Default::default()
         },
@@ -41,9 +41,6 @@ async fn test_simple_pipeline() {
         .expect("Error running run_data_output");
     let job_state = jr.complete().await.expect("Error completing job");
     use state::*;
-    jm_handle
-        .await
-        .expect("Error awaiting on job manager handle");
     if let Some(cmd_status) = job_state.step_history.get("transformed-ds-1") {
         if let JobStepDetails {
             step:
@@ -65,6 +62,7 @@ async fn test_simple_pipeline() {
     } else {
         panic!("Expected a step with name transformed-ds-1");
     }
+    jm_handle.shutdown().await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -74,11 +72,11 @@ async fn test_simple_pipeline_max_error_with_failure() {
         ..Default::default()
     })
     .expect("Could not initialize job_manager");
-    let (jm_handle, jm_channel) = job_manager.start();
+    let jm_handle = job_manager.start();
     let jr = JobRunner::create(
         "test_simple_pipeline_id",
         "test_simple_pipeline",
-        jm_channel.clone(),
+        &jm_handle,
         JobRunnerConfig {
             max_errors: 2, // do a hard fail at error 2
             ..Default::default()
@@ -104,9 +102,7 @@ async fn test_simple_pipeline_max_error_with_failure() {
     assert_eq!(JobRunnerError::TooManyErrors, jr);
     //let job_result = jr.complete().expect("Error completing job");
     //use state::*;
-    jm_handle
-        .await
-        .expect("Error awaiting on job manager handle");
+    jm_handle.shutdown().await.unwrap();
 }
 
 pub struct TestTransformer;

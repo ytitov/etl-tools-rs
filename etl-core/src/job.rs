@@ -69,15 +69,16 @@ impl JobRunner {
     pub async fn create<A, B>(
         id: A,
         name: B,
-        job_manager_channel: JobManagerChannel,
+        job_manager_handle: &JobManagerHandle,
         config: JobRunnerConfig,
     ) -> anyhow::Result<Self>
     where
         A: Into<String>,
         B: Into<String>,
     {
+        let name = name.into();
         let mut jr = JobRunner {
-            job_manager_channel,
+            job_manager_channel: job_manager_handle.connect(name.clone()).await?,
             num_process_item_errors: 0,
             num_processed_items: 0,
             config,
@@ -88,8 +89,10 @@ impl JobRunner {
             cur_step_index: 0,
         };
         jr.job_state = jr.load_job_state().await?;
+        /*
         jr.register().await
             .expect("There was an error registering the job");
+        */
         Ok(jr)
     }
 
@@ -116,7 +119,8 @@ impl JobRunner {
                         "JobRunner",
                         None,
                         format!("Fix or remove the file: {}", &path),
-                    );
+                    )
+                    .await;
                     Err(DataStoreError::Deserialize {
                         attempted_string: self.job_state.name().to_owned(),
                         message: e.to_string(),
@@ -157,7 +161,8 @@ impl JobRunner {
         match self
             .job_manager_channel
             .tx
-            .send(Message::log_info(name, msg.into())).await
+            .send(Message::log_info(name, msg.into()))
+            .await
         {
             Ok(_) => {}
             Err(er) => println!("Could not send to job_manager {}", er),
@@ -178,7 +183,8 @@ impl JobRunner {
         match self
             .job_manager_channel
             .tx
-            .send(Message::log_err(name.into(), message)).await
+            .send(Message::log_err(name.into(), message))
+            .await
         {
             Ok(_) => {}
             Err(er) => println!("Could not send to job_manager {}", er),
@@ -216,35 +222,35 @@ impl JobRunner {
         }
     }
 
-    fn _log_if_err<T>(&self, name: &str, item_info: Result<(), T>)
-    where
-        T: std::fmt::Display,
-    {
-        if let Err(e) = item_info {
-            let message = format!("{}", e);
-            self.log_err(name, None, message);
-        }
-    }
-
     /// Checks if the job must exist by processing messages from JobManager and also checking
     /// whether the JobRunner has reached maximum number of errors allowed.  If it must exit, it
     /// will notify JobManager of the fact and return a JobRunnerError
     async fn process_job_manager_rx(&mut self) -> Result<(), JobRunnerError> {
+        use tokio::sync::mpsc::error::TryRecvError;
         loop {
-            if let Some(message) = self.job_manager_channel.rx.recv().await {
-                use crate::job_manager::Message::*;
-                match message {
-                    // message broadcasted from JobManager when there are too many errors and its
-                    // better to stop the job completely.  max errors are defined in the
-                    // configuration file
-                    ToJobRunner(NotifyJobRunner::TooManyErrors) => {
-                        return Err(JobRunnerError::TooManyErrors);
+            match self.job_manager_channel.rx.try_recv() {
+                Ok(message) => {
+                    use crate::job_manager::Message::*;
+                    match message {
+                        // message broadcasted from JobManager when there are too many errors and its
+                        // better to stop the job completely.  max errors are defined in the
+                        // configuration file
+                        ToJobRunner(NotifyJobRunner::TooManyErrors) => {
+                            return Err(JobRunnerError::TooManyErrors);
+                        }
+                        _ => {}
                     }
-                    _ => {}
                 }
-            } else {
-                // end of available messages
-                break;
+                Err(TryRecvError::Disconnected) => {
+                    return Err(JobRunnerError::GenericError {
+                        message: String::from(
+                            "Channel from the JobManager was unexpectedly closed",
+                        ),
+                    });
+                }
+                Err(TryRecvError::Empty) => {
+                    break;
+                }
             }
         }
         if self.config.max_errors <= self.num_process_item_errors {
@@ -256,23 +262,12 @@ impl JobRunner {
     }
 
     /// Notify JobManager that this job was added
-    async fn register(&self) -> Result<(), JobRunnerError> {
-        match self
-            .job_manager_channel
-            .tx
-            .send(Message::broadcast_job_start(self.job_state.name())).await
-        {
-            Ok(_) => Ok(()),
-            Err(er) => Err(JobRunnerError::CompleteError(er.to_string())),
-        }
-    }
-
-    /// Notify JobManager that this job was added
     async fn un_register(&self) -> Result<(), JobRunnerError> {
         match self
             .job_manager_channel
             .tx
-            .send(Message::broadcast_job_end(&self)).await
+            .send(Message::broadcast_job_end(&self))
+            .await
         {
             Ok(_) => Ok(()),
             Err(er) => Err(JobRunnerError::CompleteError(er.to_string())),
@@ -285,7 +280,8 @@ impl JobRunner {
         match self
             .job_manager_channel
             .tx
-            .send(Message::broadcast_job_end(&self)).await
+            .send(Message::broadcast_job_end(&self))
+            .await
         {
             Ok(_) => Ok(self.job_state),
             Err(er) => Err(JobRunnerError::CompleteError(er.to_string())),
@@ -312,7 +308,8 @@ impl JobRunner {
                 self.log_info(
                     self.job_state.name(),
                     format!("{} stream previously ran, skipping", &name),
-                );
+                )
+                .await;
             }
             Err(e) => {
                 self.complete().await?;
@@ -341,7 +338,8 @@ impl JobRunner {
                         Some(Err(val)) => {
                             lines_scanned += 1;
                             self.job_state.stream_incr_count_err(stream_name)?;
-                            self.log_err(&input_name, Some(&info), val.to_string());
+                            self.log_err(&input_name, Some(&info), val.to_string())
+                                .await;
                             self.num_process_item_errors += 1;
                         }
                         None => break,
@@ -438,7 +436,8 @@ impl JobRunner {
                 self.log_info(
                     self.job_state.name(),
                     format!("{} stream previously ran, skipping", &stream_name),
-                );
+                )
+                .await;
             }
             Err(e) => {
                 return Err(e);
@@ -455,7 +454,8 @@ impl JobRunner {
                         self.log_info(
                             self.job_state.name(),
                             "StreamHandler requested the job to be skipped",
-                        );
+                        )
+                        .await;
                         return Ok(self);
                     }
                 };
@@ -496,7 +496,8 @@ impl JobRunner {
                                                 self.job_state.name(),
                                             ))),
                                             er.to_string(),
-                                        );
+                                        )
+                                        .await;
                                         self.job_state.stream_incr_count_err(&stream_name)?;
                                         self.num_process_item_errors += 1;
                                     }
@@ -512,7 +513,8 @@ impl JobRunner {
                                     self.job_state.name(),
                                 ))),
                                 er.to_string(),
-                            );
+                            )
+                            .await;
                             self.job_state.stream_incr_count_err(&stream_name)?;
                             self.num_process_item_errors += 1;
                         }
@@ -567,15 +569,14 @@ impl JobRunner {
                 self.log_info(
                     self.job_state.name(),
                     format!("{} command previously ran, skipping", &name),
-                );
+                )
+                .await;
             }
             Err(e) => {
                 self.complete().await?;
                 return Err(e);
             }
-            Ok((idx, _)) => {
-                println!("run cmd INDEX {}", idx);
-                //panic!("apparently it doesn't think it is done");
+            Ok((_, _)) => {
                 match job_cmd.run(&mut self).await {
                     Ok(()) => {
                         self.job_state.cmd_ok(name, &self.config)?;
@@ -586,7 +587,8 @@ impl JobRunner {
                             self.job_state.name(),
                             None,
                             format!("{} command ran into an error: {}", name, er),
-                        );
+                        )
+                        .await;
                     }
                 };
                 self.save_job_state().await?;

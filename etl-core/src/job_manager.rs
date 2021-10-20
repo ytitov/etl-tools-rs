@@ -1,11 +1,11 @@
 use crate::job::JobRunner;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{
-    oneshot,
-    //mpsc,
+    mpsc,
     mpsc::{Receiver, Sender},
     //broadcast,
     //broadcast::{error::RecvError, Receiver, Sender},
+    oneshot,
 };
 pub type JobManagerTx = Sender<Message>;
 pub type JobManagerRx = Receiver<Message>;
@@ -23,12 +23,27 @@ pub enum NotifyJobRunner {
 
 #[derive(Debug)]
 pub enum NotifyJobManager {
-    LogInfo { sender: String, message: String },
-    LogError { sender: String, message: String },
-    TaskStarted { sender: String },
-    TaskFinished { sender: String },
-    JobStarted { sender: String },
-    JobFinished { sender: SenderDetails },
+    LogInfo {
+        sender: String,
+        message: String,
+    },
+    LogError {
+        sender: String,
+        message: String,
+    },
+    TaskStarted {
+        sender: String,
+    },
+    TaskFinished {
+        sender: String,
+    },
+    JobStarted {
+        sender: String,
+        reply_rx: oneshot::Sender<JobManagerRx>,
+    },
+    JobFinished {
+        sender: SenderDetails,
+    },
     ShutdownJobManager,
 }
 
@@ -83,7 +98,7 @@ impl Default for JobManagerConfig {
 
 pub struct JobManager {
     to_job_runner_tx: HashMap<String, Sender<Message>>,
-    from_job_runner_channel: Option<(Sender<Message>, Receiver<Message>)>,
+    from_job_runner_channel: Option<Receiver<Message>>,
     num_log_errors: usize,
     logger_tx: UnboundedSender<LogMessage>,
     num_tasks_started: usize,
@@ -95,6 +110,48 @@ pub struct JobManager {
 pub struct JobManagerChannel {
     pub rx: JobManagerRx,
     pub tx: JobManagerTx,
+}
+
+pub struct JobManagerHandle {
+    join_handle: JoinHandle<()>,
+    job_manager_tx: JobManagerTx,
+}
+
+impl JobManagerHandle {
+    pub async fn connect<N: Into<String>>(&self, name: N) -> anyhow::Result<JobManagerChannel> {
+        // this will recieve the reciever from the JobManager so the JobRunner can send
+        // messages
+        let (oneshot_tx, oneshot_rx): (
+            oneshot::Sender<JobManagerRx>,
+            oneshot::Receiver<JobManagerRx>,
+        ) = oneshot::channel();
+        println!("connect called on JobManagerHandle");
+        self.job_manager_tx
+            .send(Message::broadcast_job_start(name, oneshot_tx))
+            .await?;
+        println!("waiting for job_manager_rx");
+        let job_manager_rx = oneshot_rx.await?;
+        Ok(JobManagerChannel {
+            tx: self.job_manager_tx.clone(),
+            rx: job_manager_rx,
+        })
+    }
+
+    pub async fn shutdown(self) -> anyhow::Result<()> {
+        println!("Shutting down JobManager");
+        match self
+            .job_manager_tx
+            .send(Message::ToJobManager(NotifyJobManager::ShutdownJobManager))
+            .await
+        {
+            Ok(_) => {}
+            Err(e) => {
+                println!("There was an error during shutdown of JobManager: {}", e);
+            }
+        };
+        self.join_handle.await?;
+        Ok(())
+    }
 }
 
 /*
@@ -119,14 +176,6 @@ impl Clone for JobManagerChannel {
     }
 }
 */
-
-impl JobManagerChannel {
-    pub fn shutdown_job_manager(self) -> anyhow::Result<()> {
-        panic!("shutdown_job_manager is unimplemented");
-        //self.tx.send(Message::shutdown_job_manager())?;
-        //Ok(())
-    }
-}
 
 impl JobManager {
     pub fn new(config: JobManagerConfig) -> anyhow::Result<Self> {
@@ -155,10 +204,13 @@ impl JobManager {
         })
     }
 
-    pub fn start(mut self) -> JoinHandle<()> {
+    //pub fn start(mut self) -> JoinHandle<()> {
+    pub fn start(mut self) -> JobManagerHandle {
+        let (job_manager_tx, job_manager_rx) = mpsc::channel(16);
+        self.from_job_runner_channel = Some(job_manager_rx);
         let jh = tokio::spawn(async move {
             loop {
-                if let Some((_, from_jobs_rx)) = &mut self.from_job_runner_channel {
+                if let Some(from_jobs_rx) = &mut self.from_job_runner_channel {
                     match from_jobs_rx.recv().await {
                         Some(Message::ToJobManager(m)) => {
                             use NotifyJobManager::*;
@@ -175,13 +227,13 @@ impl JobManager {
                                             &self.logger_tx,
                                             "Reached too many global errors, shutting down",
                                         );
-                                        /*
-                                        self.tx
-                                            .send(Message::ToJobRunner(
+                                        for (_, tx) in &self.to_job_runner_tx {
+                                            tx.send(Message::ToJobRunner(
                                                 NotifyJobRunner::TooManyErrors,
                                             ))
-                                            .expect("Fatal");
-                                        */
+                                            .await
+                                            .expect("Could not notify job_runner_tx");
+                                        }
                                     }
                                 }
                                 TaskStarted { sender } => {
@@ -225,11 +277,10 @@ impl JobManager {
                                 ShutdownJobManager => {
                                     break;
                                 }
-                                JobStarted { sender, .. } => {
-                                    //self.from_job_runner_rx.insert(sender.name, rx);
-                                    if let Some((tx, rx)) = &self.from_job_runner_channel {
-                                        //let (rx, tx) = mpsc::channel(1);
-                                    }
+                                JobStarted { sender, reply_rx } => {
+                                    let (tx, rx): (JobManagerTx, JobManagerRx) = mpsc::channel(1);
+                                    reply_rx.send(rx);
+                                    self.to_job_runner_tx.insert(sender, tx);
                                     self.num_jobs_running += 1;
                                 }
                                 JobFinished { .. } => {
@@ -259,21 +310,27 @@ impl JobManager {
                         }
                         Some(Message::ToDataSource(m)) => {
                             log_info(&self.logger_tx, &format!("ToDataSource: {:?}", m));
-                        }
-                        /*
-                        Err(RecvError::Lagged(num)) => {
-                            println!("JobManager RecvError::Lagged by {} messages", num);
-                        }
-                        Err(RecvError::Closed) => {
-                            println!("JobManager RecvError::Closed");
-                            break;
-                        }
-                        */
+                        } /*
+                          Err(RecvError::Lagged(num)) => {
+                              println!("JobManager RecvError::Lagged by {} messages", num);
+                          }
+                          Err(RecvError::Closed) => {
+                              println!("JobManager RecvError::Closed");
+                              break;
+                          }
+                          */
                     }
+                } else {
+                    use std::time::Duration;
+                    println!("waiting for jobs to start");
+                    tokio::time::sleep(Duration::from_millis(500)).await;
                 }
             }
         });
-        jh
+        JobManagerHandle {
+            join_handle: jh,
+            job_manager_tx,
+        }
     }
 }
 
@@ -318,12 +375,13 @@ impl Message {
         })
     }
 
-    pub fn broadcast_job_start<A>(sender: A) -> Self
+    pub fn broadcast_job_start<A>(sender: A, reply_rx: oneshot::Sender<JobManagerRx>) -> Self
     where
         A: Into<String>,
     {
         Message::ToJobManager(NotifyJobManager::JobStarted {
-            sender: sender.into()
+            sender: sender.into(),
+            reply_rx,
         })
     }
 
@@ -334,9 +392,5 @@ impl Message {
                 name: String::from(job.name()),
             },
         })
-    }
-
-    pub fn shutdown_job_manager() -> Self {
-        Message::ToJobManager(NotifyJobManager::ShutdownJobManager)
     }
 }
