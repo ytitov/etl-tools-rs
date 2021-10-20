@@ -97,6 +97,7 @@ impl Default for JobManagerConfig {
 }
 
 pub struct JobManager {
+    /// senders to job runners identified by their name
     to_job_runner_tx: HashMap<String, Sender<Message>>,
     from_job_runner_channel: Option<Receiver<Message>>,
     num_log_errors: usize,
