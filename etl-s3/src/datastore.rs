@@ -9,9 +9,10 @@ use rusoto_s3::*;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 //use std::sync::{Arc, Mutex};
+use etl_core::job_manager::JobManagerTx;
 use std::fmt::Debug;
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::sync::mpsc::{channel, Receiver};
 use tokio::task::JoinHandle;
 
 pub mod bytes_source;
@@ -332,6 +333,7 @@ impl S3DataOutput {
     async fn start_stream_output_csv<T>(
         &mut self,
         csv_options: CsvWriteOptions,
+        jm_tx: JobManagerTx,
     ) -> anyhow::Result<DataOutputTask<T>>
     where
         T: Serialize + Debug + 'static + Sync + Send,
@@ -346,12 +348,12 @@ impl S3DataOutput {
             escape,
             double_quote,
         } = csv_options;
-        let (tx, mut rx): (Sender<DataOutputMessage<T>>, _) = channel(1);
+        let (tx, mut rx): (DataOutputTx<T>, _) = channel(1);
         let s3_bucket = self.s3_bucket.clone();
         let s3_key = self.s3_key.clone();
         let region = self.region.clone();
         let credentials = self.credentials.clone();
-        let jh: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
+        let jh: JoinHandle<anyhow::Result<DataOutputStats>> = tokio::spawn(async move {
             let mut num_lines_sent = 0_usize;
             let (s3_tx, s3_rx) = channel(1);
             let p = ProfileProvider::with_default_configuration(credentials);
@@ -391,20 +393,18 @@ impl S3DataOutput {
                                                     num_lines_sent += 1;
                                                 }
                                                 Err(er) => {
-                                                    // TODO: send a warning to JobManager
-                                                    println!("WARNING: create_s3_csv_writer skipping bad str due to: {}", er);
+                                                    let m = format!("WARNING: create_s3_csv_writer skipping bad str due to: {}", er);
+                                                    jm_tx
+                                                        .send(Message::log_err("S3DataOutput", m))
+                                                        .await?;
                                                 }
                                             }
                                         }
                                     }
                                     Err(e) => {
-                                        println!("se error: {}", e);
-                                        /*
-                                        job_manager_tx.send(Message::log_err(
-                                            "S3DataOutput",
-                                            e.to_string(),
-                                        ))?;
-                                        */
+                                        jm_tx
+                                            .send(Message::log_err("S3DataOutput", e.to_string()))
+                                            .await?;
                                         return Err(anyhow::anyhow!("{}", e));
                                     }
                                 }
@@ -420,25 +420,29 @@ impl S3DataOutput {
             }
             drop(s3_tx);
             s3_jh.await??;
-            Ok(())
+            Ok(DataOutputStats {
+                lines_written: num_lines_sent
+            })
         });
         Ok((tx, jh))
     }
     async fn start_stream_output_json<T>(
         &mut self,
+        jm_tx: JobManagerTx,
     ) -> anyhow::Result<DataOutputTask<T>>
     where
         T: Serialize + Debug + 'static + Sync + Send,
     {
-        let (tx, mut rx): (Sender<DataOutputMessage<T>>, _) = channel(1);
+        let (tx, mut rx): (DataOutputTx<T>, _) = channel(1);
         let s3_bucket = self.s3_bucket.clone();
         let s3_key = self.s3_key.clone();
         let region = self.region.clone();
         let credentials = self.credentials.clone();
-        let jh: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
+        let jh: JoinHandle<anyhow::Result<DataOutputStats>> = tokio::spawn(async move {
             let (s3_tx, s3_rx) = channel(1);
             let p = ProfileProvider::with_default_configuration(credentials);
             let s3_jh = s3_write_bytes_multipart(p, &s3_bucket, &s3_key, s3_rx, region).await?;
+            let mut lines_written = 0;
             loop {
                 match rx.recv().await {
                     Some(m) => {
@@ -449,16 +453,13 @@ impl S3DataOutput {
                                     Ok(mut line) => {
                                         line.push_str("\n");
                                         s3_tx.send(line).await?;
+                                        lines_written += 1;
                                     }
                                     Err(e) => {
                                         println!("S3DataOutput error: {}", e);
-                                        /*
-                                        job_manager_tx.send(Message::log_err(
-                                            "S3DataOutput",
-                                            e.to_string(),
-                                        ))?;
-                                        */
-                                        return Err(anyhow::anyhow!("{}", e));
+                                        jm_tx
+                                            .send(Message::log_err("S3DataOutput", e.to_string()))
+                                            .await?;
                                     }
                                 }
                             }
@@ -473,7 +474,7 @@ impl S3DataOutput {
             }
             drop(s3_tx);
             s3_jh.await??;
-            Ok(())
+            Ok(DataOutputStats { lines_written })
         });
         Ok((tx, jh))
     }
@@ -481,10 +482,10 @@ impl S3DataOutput {
 
 #[async_trait]
 impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for S3DataOutput {
-    async fn start_stream(&mut self) -> anyhow::Result<DataOutputTask<T>> {
+    async fn start_stream(&mut self, jm_tx: JobManagerTx) -> anyhow::Result<DataOutputTask<T>> {
         match self.write_content.clone() {
-            WriteContentOptions::Json => self.start_stream_output_json::<T>().await,
-            WriteContentOptions::Csv(opts) => self.start_stream_output_csv::<T>(opts).await,
+            WriteContentOptions::Json => self.start_stream_output_json::<T>(jm_tx).await,
+            WriteContentOptions::Csv(opts) => self.start_stream_output_csv::<T>(opts, jm_tx).await,
             WriteContentOptions::Text => {
                 unimplemented!()
             }

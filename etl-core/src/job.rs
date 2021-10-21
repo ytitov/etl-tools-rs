@@ -67,8 +67,8 @@ impl JobRunner {
     /// `id` is an enumerated name like an extract id
     /// `name` is the name of the actual job, like 'extract-patient-data'
     pub async fn create<A, B>(
-        id: A,
-        name: B,
+        id: A, // what the job is always called
+        name: B, // instance id of the job
         job_manager_handle: &JobManagerHandle,
         config: JobRunnerConfig,
     ) -> anyhow::Result<Self>
@@ -77,8 +77,9 @@ impl JobRunner {
         B: Into<String>,
     {
         let name = name.into();
+        let id = id.into();
         let mut jr = JobRunner {
-            job_manager_channel: job_manager_handle.connect(name.clone()).await?,
+            job_manager_channel: job_manager_handle.connect(id.clone()).await?,
             num_process_item_errors: 0,
             num_processed_items: 0,
             config,
@@ -94,6 +95,10 @@ impl JobRunner {
             .expect("There was an error registering the job");
         */
         Ok(jr)
+    }
+
+    pub fn get_job_manager_sender(&self) -> JobManagerTx {
+        self.job_manager_channel.tx.clone()
     }
 
     pub fn name(&self) -> &'_ str {
@@ -320,7 +325,7 @@ impl JobRunner {
                 // no need to wait on input JoinHandle
                 let (mut input_rx, _) = input.start_stream()?;
                 let (output_tx, output_jh) = output
-                    .start_stream()
+                    .start_stream(self.job_manager_channel.tx.clone())
                     .await?;
                 self.save_job_state().await?;
                 let mut lines_scanned = 0_usize;
@@ -358,7 +363,17 @@ impl JobRunner {
                             return Err(JobRunnerError::TooManyErrors);
                         }
                         Err(e) => {
-                            panic!("Received an unforseen error {}", e);
+                            //panic!("Received an unforseen error {}", e);
+                            self.job_state.stream_not_ok(
+                                name,
+                                format!("While processing job manager messages ran into {}", &e),
+                                lines_scanned,
+                            )?;
+                            self.save_job_state().await?;
+                            drop(input_rx);
+                            drop(output_tx);
+                            output_jh.await??;
+                            return Err(JobRunnerError::GenericError { message: e.to_string() });
                         }
                         Ok(()) => {}
                     };
@@ -653,13 +668,13 @@ pub mod error {
         LoadedStateWithError,
         #[error("Job completed with an error: `{0}`")]
         CompleteError(String),
-        #[error("Step {name} at index {step_index} in the job returned: {message} ")]
+        #[error("Step {name} at index {step_index} in the job returned: {message}")]
         JobStepError {
             step_index: usize,
             name: String,
             message: String,
         },
-        #[error("Encounter a fatal error: {message} ")]
+        #[error("GenericError: {message}")]
         GenericError { message: String },
     }
 

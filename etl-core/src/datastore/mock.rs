@@ -25,13 +25,14 @@ impl Default for MockJsonDataOutput {
 
 #[async_trait]
 impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockJsonDataOutput {
-    async fn start_stream(&mut self) -> anyhow::Result<DataOutputTask<T>> {
+    async fn start_stream(&mut self, jm_tx: JobManagerTx) -> anyhow::Result<DataOutputTask<T>> {
         use tokio::sync::mpsc::channel;
-        let (tx, mut rx): (Sender<DataOutputMessage<T>>, _) = channel(1);
+        let (tx, mut rx): (DataOutputTx<T>, _) = channel(1);
         let sleep_duration = self.sleep_duration;
         let name = self.name.clone();
-        let jh: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
+        let jh: JoinHandle<anyhow::Result<DataOutputStats>> = tokio::spawn(async move {
             let name = name;
+            let mut lines_written = 0;
             loop {
                 tokio::time::sleep(sleep_duration).await;
                 match rx.recv().await {
@@ -42,9 +43,11 @@ impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockJsonDat
                                 match serde_json::to_string(&data) {
                                     Ok(line) => {
                                         println!("{} received: {}", &name, line);
+                                        lines_written += 1;
                                     }
                                     Err(e) => {
-                                        println!("{} ERROR {}", &name, e);
+                                        let m = format!("{} ERROR {}", &name, e);
+                                        jm_tx.send(Message::log_err(&name, m)).await?;
                                     }
                                 }
                             }
@@ -57,7 +60,9 @@ impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockJsonDat
                     None => break,
                 };
             }
-            Ok(())
+            Ok(DataOutputStats {
+                lines_written
+            })
         });
         Ok((tx, jh))
     }

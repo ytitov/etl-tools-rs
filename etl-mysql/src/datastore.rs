@@ -1,4 +1,5 @@
 use etl_core::datastore::*;
+use etl_core::job_manager::JobManagerTx;
 use etl_core::preamble::*;
 use etl_core::utils;
 use serde::de;
@@ -9,12 +10,13 @@ pub use sqlx::mysql::MySqlPoolOptions;
 pub use sqlx::MySqlPool;
 use std::fmt::Debug;
 use std::time::{Duration, Instant};
-use tokio::sync::mpsc::{channel, Sender};
+use tokio::sync::mpsc::channel;
 use tokio::task::JoinHandle;
 
 #[derive(Default)]
 pub struct MySqlDataOutput {
     // TODO: scaling may never need to happen
+    // remove it
     pub on_put_num_rows_max: usize,
     pub on_put_num_rows: usize,
     pub table_name: String,
@@ -49,15 +51,15 @@ impl Default for MySqlDataOutputPool {
 
 #[async_trait]
 impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for MySqlDataOutput {
-    async fn start_stream(&mut self) -> anyhow::Result<DataOutputTask<T>> {
-        let (tx, mut rx): (Sender<DataOutputMessage<T>>, _) = channel(self.on_put_num_rows * 2);
+    async fn start_stream(&mut self, mut jm_tx: JobManagerTx) -> anyhow::Result<DataOutputTask<T>> {
+        let (tx, mut rx): (DataOutputTx<T>, _) = channel(self.on_put_num_rows * 2);
 
         let table_name = self.table_name.clone();
         let on_put_num_rows_orig = *&self.on_put_num_rows;
         let on_put_num_rows_max = *&self.on_put_num_rows_max;
         let db_name = self.db_name.clone();
         let pool_config = self.pool.clone();
-        let join_handle: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
+        let join_handle: JoinHandle<anyhow::Result<DataOutputStats>> = tokio::spawn(async move {
             let mut time_started = std::time::Instant::now();
             let mut value_rows: Vec<String> = Vec::with_capacity(on_put_num_rows_max);
             let pool = match pool_config {
@@ -123,13 +125,13 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                                     value_rows.push(v);
                                 }
                             }
+                            Some(DataOutputMessage::NoMoreData) => {
+                                break;
+                            }
                             None => {
                                 source_finished_sending = true;
                                 // get out because source is done
                                 break;
-                            }
-                            _ => {
-                                // TODO: implement scaling here
                             }
                         }
                     } else {
@@ -141,25 +143,49 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                 if (value_rows.len() >= on_put_num_rows || source_finished_sending)
                     && value_rows.len() > 0
                 {
-                    match exec_rows_mysql(&pool, &db_name, &table_name, &columns, &value_rows, 0)
+                    match exec_rows_mysql(&mut jm_tx, &pool, &db_name, &table_name, &columns, &value_rows, 0)
                         .await
                     {
                         Ok(r) => {
                             total_inserted += r.inserted;
                             if time_started.elapsed().as_secs() >= 60 {
                                 time_started = std::time::Instant::now();
-                                println!(
-                                    "{} exec_rows_mysql took: {} ms",
+                                let m = format!(
+                                    "{} exec_rows_mysql inserted {} and took: {} ms",
                                     &table_name,
+                                    &total_inserted,
                                     r.duration.as_millis()
                                 );
+                                jm_tx.send(Message::log_info("mysql-datastore", m)).await?;
                             }
                         }
                         Err(e) => {
-                            //TODO: this should reply a message with an error
-                            let m = format!("Error inserting rows into {}: {} ", &table_name, e);
-                            println!("{}", m);
-                            //job_manager_tx.send(Message::log_err("mysql-datastore", m))?;
+                            let m = format!(
+                                "Error inserting rows into {}: {} will try to insert one by one",
+                                &table_name, e
+                            );
+                            jm_tx.send(Message::log_err("mysql-datastore", m)).await?;
+                            match exec_rows_mysql(
+                                &mut jm_tx,
+                                &pool,
+                                &db_name,
+                                &table_name,
+                                &columns,
+                                &value_rows,
+                                1,
+                            )
+                            .await
+                            {
+                                Ok(_) => {
+                                }
+                                Err(er) => {
+                                    let m = format!(
+                                        "Error inserting rows into {}: {} ",
+                                        &table_name, er
+                                    );
+                                    jm_tx.send(Message::log_err("mysql-datastore", m)).await?;
+                                }
+                            }
                         }
                     };
                     value_rows.clear();
@@ -175,11 +201,15 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                 &table_name,
                 value_rows.len()
             );
-            println!("{}", msg);
-            //job_manager_tx.send(Message::log_info("mysql-datastore", msg))?;
+            jm_tx
+                .send(Message::log_info("mysql-datastore", msg))
+                .await?;
             drop(pool);
-            println!("{} inserted {} entries", table_name, total_inserted);
-            Ok(())
+            let m = format!("{} inserted {} entries", table_name, total_inserted);
+            jm_tx.send(Message::log_info("mysql-datastore", m)).await?;
+            Ok(DataOutputStats {
+                lines_written: total_inserted
+            })
         });
         Ok((tx, join_handle))
     }
@@ -198,6 +228,7 @@ pub struct ExecRowsOutput {
 }
 
 pub async fn exec_rows_mysql(
+    jm_tx: &mut JobManagerTx,
     pool: &sqlx::MySqlPool,
     db_name: &str,
     table_name: &str,
@@ -227,7 +258,7 @@ pub async fn exec_rows_mysql(
                         .collect::<Vec<String>>()
                         .join(",")
                 );
-                println!("QUERY: {}", &query);
+                //println!("QUERY: {}", &query);
                 match sqlx::query(&query).execute(pool).await {
                     Ok(_) => {
                         count_ok += value_rows_buf.len(); //println!(" ** OK ** ");
@@ -236,7 +267,9 @@ pub async fn exec_rows_mysql(
                         println!("Error::Io {}", e);
                     }
                     Err(e) => {
-                        println!("MYSQL `{}` ERROR: {}", table_name, e);
+                        let m = format!("MYSQL `{}` ERROR: {}", table_name, e);
+                        println!("QUERY: {}", &query);
+                        let _ = jm_tx.send(Message::log_info("mysql-datastore", m)).await;
                     }
                 }
                 value_rows_buf.clear();

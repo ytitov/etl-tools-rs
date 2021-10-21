@@ -98,7 +98,9 @@ impl Default for JobManagerConfig {
 
 pub struct JobManager {
     /// senders to job runners identified by their name
+    /// currently only get the TooManyErrors message to let them know they need to terminate
     to_job_runner_tx: HashMap<String, Sender<Message>>,
+    /// receives messages from JobRunner and also DataOutput's
     from_job_runner_channel: Option<Receiver<Message>>,
     num_log_errors: usize,
     logger_tx: UnboundedSender<LogMessage>,
@@ -119,6 +121,10 @@ pub struct JobManagerHandle {
 }
 
 impl JobManagerHandle {
+    pub fn get_jm_tx(&self) -> JobManagerTx {
+        self.job_manager_tx.clone()
+    }
+
     pub async fn connect<N: Into<String>>(&self, name: N) -> anyhow::Result<JobManagerChannel> {
         // this will recieve the reciever from the JobManager so the JobRunner can send
         // messages
@@ -253,6 +259,10 @@ impl JobManager {
                                     break;
                                 }
                                 JobStarted { sender, reply_rx } => {
+                                    log_info(
+                                        &self.logger_tx,
+                                        format!("JobManager: starting {}", &sender),
+                                    );
                                     let (tx, rx): (JobManagerTx, JobManagerRx) = mpsc::channel(1);
                                     reply_rx
                                         .send(rx)
@@ -260,8 +270,12 @@ impl JobManager {
                                     self.to_job_runner_tx.insert(sender, tx);
                                     self.num_jobs_running += 1;
                                 }
-                                JobFinished { .. } => {
+                                JobFinished { sender } => {
                                     self.num_jobs_running -= 1;
+                                    log_info(
+                                        &self.logger_tx,
+                                        format!("JobManager: finished {}", &sender.name),
+                                    );
                                     if self.num_jobs_running == 0 {
                                         log_info(
                                             &self.logger_tx,

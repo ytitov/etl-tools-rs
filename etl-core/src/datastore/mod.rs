@@ -1,4 +1,5 @@
 use self::error::*;
+use crate::job_manager::JobManagerTx;
 use crate::preamble::*;
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
@@ -8,34 +9,36 @@ use std::fmt::Debug;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinHandle;
 
+pub mod bytes_source;
+/// creates generated data sources
+pub mod enumerate;
 /// Local file system data stores
 pub mod fs;
 pub mod job_runner;
 /// various data stores used for testing
 pub mod mock;
-/// creates generated data sources
-pub mod enumerate;
-pub mod bytes_source;
 
 //pub type DataOutputItemResult = Result<String, Box<dyn std::error::Error + Send>>;
 
 pub type DataOutputItemResult<T> = Result<T, DataStoreError>;
 
 pub type DataSourceRx<T> = Receiver<Result<DataSourceMessage<T>, DataStoreError>>;
-pub type DataSourceTx<T> = Sender<DataOutputMessage<T>>;
 pub type DataSourceTask<T> = (
     DataSourceRx<T>,
     JoinHandle<Result<DataSourceStats, DataStoreError>>,
 );
+pub type DataOutputTx<T> = Sender<DataOutputMessage<T>>;
+pub type DataOutputTask<T> = (DataOutputTx<T>, JoinHandle<anyhow::Result<DataOutputStats>>);
 
-pub type DataOutputJoinHandle = JoinHandle<anyhow::Result<()>>;
+pub type DataOutputJoinHandle = JoinHandle<anyhow::Result<DataOutputStats>>;
 
 pub struct DataSourceStats {
     pub lines_scanned: usize,
 }
 
-pub type DataOutputTask<T> =
-    (Sender<DataOutputMessage<T>>, JoinHandle<anyhow::Result<()>>);
+pub struct DataOutputStats {
+    pub lines_written: usize,
+}
 
 #[derive(Debug)]
 pub enum DataSourceMessage<T: Send> {
@@ -148,9 +151,7 @@ where
 
 #[async_trait]
 pub trait DataOutput<T: Serialize + Debug + 'static + Sync + Send>: Sync + Send {
-    async fn start_stream(
-        &mut self,
-    ) -> anyhow::Result<DataOutputTask<T>> {
+    async fn start_stream(&mut self, _: JobManagerTx) -> anyhow::Result<DataOutputTask<T>> {
         unimplemented!();
     }
 
@@ -162,16 +163,15 @@ pub trait DataOutput<T: Serialize + Debug + 'static + Sync + Send>: Sync + Send 
         self: Box<Self>,
         dot: DataOutputTask<T>,
         jr: &JobRunner,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<DataOutputStats> {
         let (c, jh) = dot;
         drop(c);
         match jh.await {
-            Ok(Ok(())) => Ok(()),
+            Ok(Ok(stats)) => Ok(stats),
             Ok(Err(e)) => {
-                let msg =
-                    format!("Waiting for task to finish resulted in an error: {}", e);
-                jr.log_err("JobManager", None, msg).await;
-                Ok(())
+                let msg = format!("Waiting for task to finish resulted in an error: {}", e);
+                jr.log_err("JobManager", None, msg.clone()).await;
+                Err(anyhow::anyhow!(msg))
             }
             Err(e) => Err(anyhow::anyhow!(
                 "FATAL waiting on JoinHandle for DbOutputTask due to: {}",
@@ -192,17 +192,17 @@ pub trait DataOutput<T: Serialize + Debug + 'static + Sync + Send>: Sync + Send 
 pub async fn data_output_shutdown<T>(
     jr: &JobRunner,
     (c, jh): DataOutputTask<T>,
-) -> anyhow::Result<()>
+) -> anyhow::Result<DataOutputStats>
 where
     T: Serialize + Debug + Send + Sync,
 {
     drop(c);
     match jh.await {
-        Ok(Ok(())) => Ok(()),
+        Ok(Ok(stats)) => Ok(stats),
         Ok(Err(e)) => {
             let msg = format!("Waiting for task to finish resulted in an error: {}", e);
-            jr.log_err("JobManager", None, msg).await;
-            Ok(())
+            jr.log_err("JobManager", None, msg.clone()).await;
+            Err(anyhow::anyhow!(msg))
         }
         Err(e) => Err(anyhow::anyhow!(
             "FATAL waiting on JoinHandle for DbOutputTask due to: {}",
@@ -240,9 +240,7 @@ pub mod error {
         StreamingLines { key: String, error: String },
         #[error("Key or path `{key:?}` was not found.  Reason: `{error:?}`")]
         NotExist { key: String, error: String },
-        #[error(
-            "Error returned from transform_item `{job_name:?}`.  Reason: `{error:?}`"
-        )]
+        #[error("Error returned from transform_item `{job_name:?}`.  Reason: `{error:?}`")]
         TransformerError { job_name: String, error: String },
         #[error("JoinError: `{0}`")]
         //JoinError(#[from] tokio::task::JoinError),

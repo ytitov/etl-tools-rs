@@ -22,7 +22,7 @@ async fn basic_stream_handler_all_errors() {
     let jm_handle = job_manager.start();
     let testjob = TestJob {
         output: MockJsonDataOutput::default()
-            .start_stream()
+            .start_stream(jm_handle.get_jm_tx())
             .await
             .expect("Could not create mock json data output"),
     };

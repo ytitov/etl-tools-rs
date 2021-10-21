@@ -34,7 +34,7 @@ impl BytesSource for S3Storage {
         let jh = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             for s3_key in files {
-                println!("s3_key {}", &s3_key);
+                //println!("s3_key {}", &s3_key);
                 let request = GetObjectRequest {
                     bucket: s3_bucket.clone(),
                     key: s3_key.to_owned(),
