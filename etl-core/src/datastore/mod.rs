@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::de::Deserializer;
 use serde::Serialize;
+use serde::Deserialize;
 use std::fmt::Debug;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinHandle;
@@ -36,7 +37,9 @@ pub struct DataSourceStats {
     pub lines_scanned: usize,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DataOutputStats {
+    pub name: String,
     pub lines_written: usize,
 }
 

@@ -61,6 +61,7 @@ impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockJsonDat
                 };
             }
             Ok(DataOutputStats {
+                name,
                 lines_written
             })
         });

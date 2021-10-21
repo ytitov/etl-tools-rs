@@ -382,7 +382,7 @@ impl JobRunner {
                 drop(input_rx);
                 drop(output_tx);
                 let output_stats = output_jh.await??;
-                self.job_state.stream_ok(name, &self.config, output_stats)?;
+                self.job_state.stream_ok(name, &self.config, vec![output_stats])?;
                 self.save_job_state().await?;
             }
         }
@@ -467,7 +467,7 @@ impl JobRunner {
                         self.job_state.stream_ok(
                             stream_name,
                             &self.config,
-                            DataOutputStats { lines_written: 0 },
+                            Vec::new(),
                         )?;
                         self.save_job_state().await?;
                         self.log_info(
@@ -568,12 +568,12 @@ impl JobRunner {
 
                 // only wait if everything is okay
                 source_stream_jh.await??;
-                let mut lines_written = 0;
+                let mut output_stats = Vec::new();
                 for join_handle in self.data_output_handles {
-                    let output_stats = join_handle.await??;
-                    lines_written += output_stats.lines_written;
+                    let s = join_handle.await??;
+                    output_stats.push(s);
                 }
-                self.job_state.stream_ok(stream_name, &self.config, DataOutputStats { lines_written })?;
+                self.job_state.stream_ok(stream_name, &self.config, output_stats)?;
                 self.data_output_handles = Vec::new();
                 self.save_job_state().await?;
             }

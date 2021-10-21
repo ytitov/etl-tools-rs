@@ -421,6 +421,7 @@ impl S3DataOutput {
             drop(s3_tx);
             s3_jh.await??;
             Ok(DataOutputStats {
+                name: format!("s3://{}/{}", s3_bucket, s3_key),
                 lines_written: num_lines_sent
             })
         });
@@ -474,7 +475,7 @@ impl S3DataOutput {
             }
             drop(s3_tx);
             s3_jh.await??;
-            Ok(DataOutputStats { lines_written })
+            Ok(DataOutputStats { name: format!("s3://{}/{}", s3_bucket, s3_key), lines_written })
         });
         Ok((tx, jh))
     }

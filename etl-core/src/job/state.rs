@@ -42,6 +42,13 @@ pub struct JobState {
     #[serde(skip_serializing, default)]
     cur_step_index: usize,
     run_status: RunStatus,
+    // TODO: if a job runner is issued multiple steps with the same name, it will still run then
+    // because it expects them to be possibly there already (because JobState) gets loaded from a
+    // file if it exists.  As a side effect if a programmer makes a mistake and that command is
+    // already in there, it will overwrite previously ran command by the same name.  Not sure yet
+    // how to fix this issue because ideally I want it to panic.  This means we need to have a
+    // runtime tracker of what ran so far and not have it be serialized when the file is ran or
+    // deserialized when things are written
     pub step_history: HashMap<String, JobStepDetails>,
 }
 
@@ -253,7 +260,7 @@ impl JobState {
         &mut self,
         name: N,
         _: &JobRunnerConfig,
-        stats: DataOutputStats,
+        stats: Vec<DataOutputStats>,
     ) -> anyhow::Result<()> {
         let n = name.into();
         match self.step_history.get_mut(&n) {

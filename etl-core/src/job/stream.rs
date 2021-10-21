@@ -11,23 +11,23 @@ pub enum StepStreamStatus {
         started: DateTime<Utc>,
         finished: DateTime<Utc>,
         total_lines_scanned: usize,
-        #[serde(default)]
-        total_lines_written: usize,
         num_errors: usize,
-        files: HashMap<String, FileStatus>,
+        inputs: HashMap<String, FileStatus>,
+        #[serde(default)]
+        outputs: Vec<DataOutputStats>,
     },
     InProgress {
         started: DateTime<Utc>,
         total_lines_scanned: usize,
         num_errors: usize,
-        files: HashMap<String, FileStatus>,
+        inputs: HashMap<String, FileStatus>,
     },
     Error {
         message: String,
         datetime: DateTime<Utc>,
         num_errors: usize,
         last_index: usize,
-        files: HashMap<String, FileStatus>,
+        inputs: HashMap<String, FileStatus>,
     },
 }
 
@@ -46,7 +46,7 @@ impl StepStreamStatus {
             started: Utc::now(),
             total_lines_scanned: 0,
             num_errors: 0,
-            files: HashMap::new(),
+            inputs: HashMap::new(),
         }
     }
 
@@ -54,12 +54,12 @@ impl StepStreamStatus {
         *self = StepStreamStatus::new_in_progress();
     }
 
-    pub fn complete(&mut self, stats: DataOutputStats) {
+    pub fn complete(&mut self, stats: Vec<DataOutputStats>) {
         match self {
             StepStreamStatus::InProgress {
                 ref started,
                 ref total_lines_scanned,
-                ref files,
+                ref inputs,
                 ref num_errors,
                 ..
             } => {
@@ -67,9 +67,9 @@ impl StepStreamStatus {
                     started: started.to_owned(),
                     finished: Utc::now(),
                     total_lines_scanned: *total_lines_scanned,
-                    total_lines_written: stats.lines_written,
                     num_errors: *num_errors,
-                    files: files.clone(),
+                    inputs: inputs.clone(),
+                    outputs: stats,
                 }
             }
             _ => panic!("Can't set lines scanned on this StepStreamStatus."),
@@ -83,7 +83,7 @@ impl StepStreamStatus {
                     started: Utc::now(),
                     total_lines_scanned: count,
                     num_errors: 0,
-                    files: HashMap::new(),
+                    inputs: HashMap::new(),
                 };
             }
             StepStreamStatus::InProgress {
@@ -103,7 +103,7 @@ impl StepStreamStatus {
                     started: Utc::now(),
                     total_lines_scanned: count,
                     num_errors: 0,
-                    files: HashMap::new(),
+                    inputs: HashMap::new(),
                 };
             }
         };
@@ -126,8 +126,8 @@ impl StepStreamStatus {
     pub fn incr_line(&mut self, f_name: &str) {
         match self {
             StepStreamStatus::New => {
-                let mut files = HashMap::new();
-                files.insert(
+                let mut inputs = HashMap::new();
+                inputs.insert(
                     f_name.to_owned(),
                     FileStatus::Info {
                         started: Utc::now(),
@@ -138,33 +138,33 @@ impl StepStreamStatus {
                     started: Utc::now(),
                     total_lines_scanned: 1,
                     num_errors: 0,
-                    files,
+                    inputs,
                 };
             }
             StepStreamStatus::InProgress {
                 ref mut total_lines_scanned,
-                ref mut files,
+                ref mut inputs,
                 ..
             } => {
                 *total_lines_scanned += 1;
-                FileStatus::incr_file_line(files, f_name);
+                FileStatus::incr_file_line(inputs, f_name);
             }
             StepStreamStatus::Complete {
                 ref mut total_lines_scanned,
-                ref mut files,
+                ref mut inputs,
                 ..
             } => {
                 *total_lines_scanned += 1;
-                FileStatus::incr_file_line(files, f_name);
+                FileStatus::incr_file_line(inputs, f_name);
             }
             StepStreamStatus::Error { .. } => {
-                let mut files: HashMap<String, FileStatus> = HashMap::new();
-                FileStatus::incr_file_line(&mut files, f_name);
+                let mut inputs: HashMap<String, FileStatus> = HashMap::new();
+                FileStatus::incr_file_line(&mut inputs, f_name);
                 *self = StepStreamStatus::InProgress {
                     started: Utc::now(),
                     total_lines_scanned: 1,
                     num_errors: 0,
-                    files,
+                    inputs,
                 };
             }
         };
@@ -173,12 +173,12 @@ impl StepStreamStatus {
     pub fn incr_error(&mut self) {
         match self {
             StepStreamStatus::New => {
-                let files = HashMap::new();
+                let inputs = HashMap::new();
                 *self = StepStreamStatus::InProgress {
                     started: Utc::now(),
                     total_lines_scanned: 0,
                     num_errors: 1,
-                    files,
+                    inputs,
                 };
             }
             StepStreamStatus::InProgress {
@@ -192,12 +192,12 @@ impl StepStreamStatus {
                 *num_errors += 1;
             }
             StepStreamStatus::Error { .. } => {
-                let files: HashMap<String, FileStatus> = HashMap::new();
+                let inputs: HashMap<String, FileStatus> = HashMap::new();
                 *self = StepStreamStatus::InProgress {
                     started: Utc::now(),
                     total_lines_scanned: 0,
                     num_errors: 1,
-                    files,
+                    inputs,
                 };
             }
         };
@@ -211,11 +211,11 @@ impl StepStreamStatus {
                     datetime: Utc::now(),
                     last_index,
                     num_errors: 1,
-                    files: HashMap::new(),
+                    inputs: HashMap::new(),
                 };
             }
             StepStreamStatus::InProgress {
-                ref files,
+                ref inputs,
                 ref num_errors,
                 ..
             } => {
@@ -224,11 +224,11 @@ impl StepStreamStatus {
                     datetime: Utc::now(),
                     last_index,
                     num_errors: *num_errors,
-                    files: files.clone(),
+                    inputs: inputs.clone(),
                 };
             }
             StepStreamStatus::Complete {
-                ref files,
+                ref inputs,
                 ref num_errors,
                 ..
             } => {
@@ -237,11 +237,11 @@ impl StepStreamStatus {
                     datetime: Utc::now(),
                     last_index,
                     num_errors: *num_errors,
-                    files: files.clone(),
+                    inputs: inputs.clone(),
                 };
             }
             StepStreamStatus::Error {
-                ref files,
+                ref inputs,
                 ref num_errors,
                 ..
             } => {
@@ -250,7 +250,7 @@ impl StepStreamStatus {
                     datetime: Utc::now(),
                     last_index,
                     num_errors: *num_errors,
-                    files: files.clone(),
+                    inputs: inputs.clone(),
                 };
             }
         }
@@ -289,10 +289,10 @@ impl FileStatus {
         };
     }
 
-    pub fn incr_file_line(files: &mut HashMap<String, FileStatus>, f_name: &str) {
-        match files.get_mut(f_name) {
+    pub fn incr_file_line(inputs: &mut HashMap<String, FileStatus>, f_name: &str) {
+        match inputs.get_mut(f_name) {
             None => {
-                files.insert(
+                inputs.insert(
                     f_name.to_owned(),
                     FileStatus::Info {
                         started: Utc::now(),
