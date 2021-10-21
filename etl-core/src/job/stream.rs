@@ -11,6 +11,8 @@ pub enum StepStreamStatus {
         started: DateTime<Utc>,
         finished: DateTime<Utc>,
         total_lines_scanned: usize,
+        #[serde(default)]
+        total_lines_written: usize,
         num_errors: usize,
         files: HashMap<String, FileStatus>,
     },
@@ -52,7 +54,7 @@ impl StepStreamStatus {
         *self = StepStreamStatus::new_in_progress();
     }
 
-    pub fn complete(&mut self) {
+    pub fn complete(&mut self, stats: DataOutputStats) {
         match self {
             StepStreamStatus::InProgress {
                 ref started,
@@ -65,6 +67,7 @@ impl StepStreamStatus {
                     started: started.to_owned(),
                     finished: Utc::now(),
                     total_lines_scanned: *total_lines_scanned,
+                    total_lines_written: stats.lines_written,
                     num_errors: *num_errors,
                     files: files.clone(),
                 }

@@ -67,7 +67,7 @@ impl JobRunner {
     /// `id` is an enumerated name like an extract id
     /// `name` is the name of the actual job, like 'extract-patient-data'
     pub async fn create<A, B>(
-        id: A, // what the job is always called
+        id: A,   // what the job is always called
         name: B, // instance id of the job
         job_manager_handle: &JobManagerHandle,
         config: JobRunnerConfig,
@@ -246,12 +246,9 @@ impl JobRunner {
                         _ => {}
                     }
                 }
+                // even though we're disconnected, allow the job to finish
                 Err(TryRecvError::Disconnected) => {
-                    return Err(JobRunnerError::GenericError {
-                        message: String::from(
-                            "Channel from the JobManager was unexpectedly closed",
-                        ),
-                    });
+                    break;
                 }
                 Err(TryRecvError::Empty) => {
                     break;
@@ -359,7 +356,8 @@ impl JobRunner {
                             self.save_job_state().await?;
                             drop(input_rx);
                             drop(output_tx);
-                            output_jh.await??;
+                            // not using the number in error yet..
+                            let _ = output_jh.await??;
                             return Err(JobRunnerError::TooManyErrors);
                         }
                         Err(e) => {
@@ -373,16 +371,18 @@ impl JobRunner {
                             drop(input_rx);
                             drop(output_tx);
                             output_jh.await??;
-                            return Err(JobRunnerError::GenericError { message: e.to_string() });
+                            return Err(JobRunnerError::GenericError {
+                                message: e.to_string(),
+                            });
                         }
                         Ok(()) => {}
                     };
                 }
                 self.cur_step_index += 1;
-                self.job_state.stream_ok(name, &self.config)?;
                 drop(input_rx);
                 drop(output_tx);
-                output_jh.await??;
+                let output_stats = output_jh.await??;
+                self.job_state.stream_ok(name, &self.config, output_stats)?;
                 self.save_job_state().await?;
             }
         }
@@ -464,7 +464,11 @@ impl JobRunner {
                     JobRunnerAction::Resume { index } => *index,
                     JobRunnerAction::Skip => {
                         //self.job_state.streams.complete(stream_name)?;
-                        self.job_state.stream_ok(stream_name, &self.config)?;
+                        self.job_state.stream_ok(
+                            stream_name,
+                            &self.config,
+                            DataOutputStats { lines_written: 0 },
+                        )?;
                         self.save_job_state().await?;
                         self.log_info(
                             self.job_state.name(),
@@ -560,14 +564,16 @@ impl JobRunner {
                     .set_total_lines(stream_name, self.num_processed_items)?;
                 */
                 self.cur_step_index += 1;
-                self.job_state.stream_ok(stream_name, &self.config)?;
                 job_handler.shutdown(&mut self).await?;
 
                 // only wait if everything is okay
                 source_stream_jh.await??;
+                let mut lines_written = 0;
                 for join_handle in self.data_output_handles {
-                    join_handle.await??;
+                    let output_stats = join_handle.await??;
+                    lines_written += output_stats.lines_written;
                 }
+                self.job_state.stream_ok(stream_name, &self.config, DataOutputStats { lines_written })?;
                 self.data_output_handles = Vec::new();
                 self.save_job_state().await?;
             }

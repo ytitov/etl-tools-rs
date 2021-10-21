@@ -38,7 +38,7 @@ pub enum NotifyJobManager {
         sender: String,
     },
     JobStarted {
-        sender: String,
+        sender_name: String,
         reply_rx: oneshot::Sender<JobManagerRx>,
     },
     JobFinished {
@@ -115,8 +115,14 @@ pub struct JobManagerChannel {
     pub tx: JobManagerTx,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+/// the resulting stats about the job
+pub struct JobManagerOutput {
+    pub num_errors: usize,
+}
+
 pub struct JobManagerHandle {
-    join_handle: JoinHandle<anyhow::Result<()>>,
+    join_handle: JoinHandle<anyhow::Result<JobManagerOutput>>,
     job_manager_tx: JobManagerTx,
 }
 
@@ -189,7 +195,7 @@ impl JobManager {
     pub fn start(mut self) -> JobManagerHandle {
         let (job_manager_tx, job_manager_rx) = mpsc::channel(16);
         self.from_job_runner_channel = Some(job_manager_rx);
-        let jh: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
+        let jh: JoinHandle<anyhow::Result<JobManagerOutput>> = tokio::spawn(async move {
             loop {
                 if let Some(from_jobs_rx) = &mut self.from_job_runner_channel {
                     match from_jobs_rx.recv().await {
@@ -258,16 +264,16 @@ impl JobManager {
                                 ShutdownJobManager => {
                                     break;
                                 }
-                                JobStarted { sender, reply_rx } => {
+                                JobStarted { sender_name, reply_rx } => {
                                     log_info(
                                         &self.logger_tx,
-                                        format!("JobManager: starting {}", &sender),
+                                        format!("JobManager: starting {}", &sender_name),
                                     );
                                     let (tx, rx): (JobManagerTx, JobManagerRx) = mpsc::channel(1);
                                     reply_rx
                                         .send(rx)
                                         .expect("Fatal error replying with a JobManagerRx to a job, this should never happen");
-                                    self.to_job_runner_tx.insert(sender, tx);
+                                    self.to_job_runner_tx.insert(sender_name, tx);
                                     self.num_jobs_running += 1;
                                 }
                                 JobFinished { sender } => {
@@ -276,6 +282,7 @@ impl JobManager {
                                         &self.logger_tx,
                                         format!("JobManager: finished {}", &sender.name),
                                     );
+                                    let _ = self.to_job_runner_tx.remove(&sender.name);
                                     if self.num_jobs_running == 0 {
                                         log_info(
                                             &self.logger_tx,
@@ -309,7 +316,9 @@ impl JobManager {
                     tokio::time::sleep(Duration::from_millis(500)).await;
                 }
             }
-            Ok(())
+            let o = JobManagerOutput { num_errors: self.num_log_errors };
+            log_info(&self.logger_tx, &format!("JobManager: {:?}", &o));
+            Ok(o)
         });
         JobManagerHandle {
             join_handle: jh,
@@ -364,7 +373,7 @@ impl Message {
         A: Into<String>,
     {
         Message::ToJobManager(NotifyJobManager::JobStarted {
-            sender: sender.into(),
+            sender_name: sender.into(),
             reply_rx,
         })
     }

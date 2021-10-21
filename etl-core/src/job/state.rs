@@ -253,6 +253,7 @@ impl JobState {
         &mut self,
         name: N,
         _: &JobRunnerConfig,
+        stats: DataOutputStats,
     ) -> anyhow::Result<()> {
         let n = name.into();
         match self.step_history.get_mut(&n) {
@@ -261,7 +262,7 @@ impl JobState {
                 step_index: _,
                 step: JobStepStatus::Stream(ref mut st),
             }) => {
-                st.complete();
+                st.complete(stats);
             }
             Some(_) => panic!("Unexpectedly got a stream instead of a command"),
             None => {
