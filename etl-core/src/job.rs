@@ -1,5 +1,4 @@
 use super::datastore::error::*;
-use super::datastore::job_runner::*;
 use super::datastore::*;
 use crate::job_manager::*;
 use async_trait::async_trait;
@@ -389,27 +388,6 @@ impl JobRunner {
         Ok(self)
     }
 
-    /// Allows processing data using the TransformHandler trait to process and
-    /// filter a stream, and output that as a new DataSource which can
-    /// then be forwarded to a DataOutput, or continue as input for
-    /// more transformations
-    // TODO: this should be taken out and put into Transformer.  Doesn't make sense
-    // semantically to be done by the JobRunner
-    pub fn as_datasource<I, O>(
-        &self,
-        ds: Box<dyn DataSource<I>>,
-        transformer: Box<dyn TransformHandler<I, O>>,
-    ) -> anyhow::Result<JRDataSource<I, O>>
-    where
-        I: DeserializeOwned + Debug + Send + Sync,
-        O: Serialize + Debug + Send + Sync,
-    {
-        Ok(JRDataSource {
-            job_name: self.job_state.name().to_owned(),
-            transformer,
-            input_ds: ds,
-        })
-    }
     pub async fn run_stream_handler_fn<I>(
         mut self,
         name: &str,
@@ -581,6 +559,8 @@ impl JobRunner {
         Ok(self)
     }
 
+    //TODO: it appears that after you press control-c to terminate program while it is running
+    //the next time around it will think it already ran.. need to investigate
     pub async fn run_cmd(mut self, job_cmd: Box<dyn JobCommand>) -> Result<Self, JobRunnerError> {
         self.job_state = self.load_job_state().await?;
 
@@ -594,6 +574,7 @@ impl JobRunner {
                 .await;
             }
             Err(e) => {
+                // complete job which closes some things off
                 self.complete().await?;
                 return Err(e);
             }

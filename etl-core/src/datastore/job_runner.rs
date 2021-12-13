@@ -2,10 +2,32 @@ use super::*;
 use crate::job::*;
 use tokio::task::JoinHandle;
 
+/// Allows processing data using the TransformHandler trait to process and
+/// filter a stream, and output that as a new DataSource which can
+/// then be forwarded to a DataOutput, or continue as input for
+/// more transformations
 pub struct JRDataSource<I, O: Serialize + Debug + Send + Sync + 'static> {
     pub input_ds: Box<dyn DataSource<I>>, // recv message
     pub transformer: Box<dyn TransformHandler<I, O>>,
     pub job_name: String,
+}
+
+impl<I, O> JRDataSource<I, O>
+where
+    I: DeserializeOwned + Debug + Send + Sync,
+    O: Serialize + Debug + Send + Sync,
+{
+    pub fn new(
+        name: &str,
+        ds: Box<dyn DataSource<I>>,
+        transformer: Box<dyn TransformHandler<I, O>>,
+    ) -> Self {
+        JRDataSource {
+            job_name: name.to_string(),
+            transformer,
+            input_ds: ds,
+        }
+    }
 }
 
 impl<

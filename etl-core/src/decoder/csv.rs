@@ -51,13 +51,16 @@ impl<T: DeserializeOwned + Debug + 'static + Send + Sync> DecodeStream<T> for Cs
                         loop {
                             match source_rx.recv().await {
                                 Some(Ok(BytesSourceMessage::Data { source, content })) => {
-                                    if lines_scanned == 0 {
+                                    if has_headers == true && lines_scanned == 0 {
                                         headers_str =
                                             std::string::String::from_utf8_lossy(&*content)
                                                 .to_string();
                                     } else {
                                         let line = std::string::String::from_utf8_lossy(&*content);
-                                        let data = format!("{}\n{}", headers_str, line);
+                                        let data = match has_headers {
+                                            true => format!("{}\n{}", headers_str, line),
+                                            false => line.to_string(),
+                                        };
                                         let rdr = ReaderBuilder::new()
                                             .delimiter(delimiter)
                                             .has_headers(has_headers)

@@ -11,6 +11,7 @@ pub struct Transformer<I, O> {
     pub map: fn(I) -> DataOutputItemResult<O>,
 }
 
+
 impl<
         I: DeserializeOwned + Debug + Send + Sync + 'static,
         O: DeserializeOwned + Debug + Send + Sync + 'static,
