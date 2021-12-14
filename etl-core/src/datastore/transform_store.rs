@@ -6,13 +6,13 @@ use tokio::task::JoinHandle;
 /// filter a stream, and output that as a new DataSource which can
 /// then be forwarded to a DataOutput, or continue as input for
 /// more transformations
-pub struct JRDataSource<I, O: Serialize + Debug + Send + Sync + 'static> {
+pub struct TransformDataSource<I, O: Serialize + Debug + Send + Sync + 'static> {
     pub input_ds: Box<dyn DataSource<I>>, // recv message
     pub transformer: Box<dyn TransformHandler<I, O>>,
     pub job_name: String,
 }
 
-impl<I, O> JRDataSource<I, O>
+impl<I, O> TransformDataSource<I, O>
 where
     I: DeserializeOwned + Debug + Send + Sync,
     O: Serialize + Debug + Send + Sync,
@@ -22,7 +22,7 @@ where
         ds: Box<dyn DataSource<I>>,
         transformer: Box<dyn TransformHandler<I, O>>,
     ) -> Self {
-        JRDataSource {
+        TransformDataSource {
             job_name: name.to_string(),
             transformer,
             input_ds: ds,
@@ -33,10 +33,10 @@ where
 impl<
         I: Serialize + DeserializeOwned + Debug + Send + Sync + 'static,
         O: Serialize + DeserializeOwned + Debug + Send + Sync + 'static,
-    > DataSource<O> for JRDataSource<I, O>
+    > DataSource<O> for TransformDataSource<I, O>
 {
     fn name(&self) -> String {
-        format!("JobRunner-{}", &self.job_name)
+        format!("TransformDataSource-{}", &self.job_name)
     }
 
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<O>, DataStoreError> {
@@ -44,7 +44,7 @@ impl<
         let (mut source_rx, source_stream_jh) = self.input_ds.start_stream()?;
         let (tx, rx) = channel(1);
         let transformer = self.transformer;
-        let job_name = format!("JRDataSource job name: {}", &self.job_name);
+        let job_name = self.job_name;
         let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             loop {
@@ -60,9 +60,9 @@ impl<
                             .await
                         {
                             Ok(Some(Item(item_out))) => tx
-                                .send(Ok(DataSourceMessage::new(&source, item_out)))
+                                .send(Ok(DataSourceMessage::new(&job_name, item_out)))
                                 .await
-                                .map_err(|e| DataStoreError::send_error(&job_name, "", e))?,
+                                .map_err(|e| DataStoreError::send_error(&job_name, &source, e))?,
                             Ok(Some(List(_vec))) => {
                                 panic!("Processing list not implemented")
                             }
@@ -73,7 +73,7 @@ impl<
                                     error: er.to_string(),
                                 }))
                                 .await
-                                .map_err(|e| DataStoreError::send_error(&job_name, "", e))?;
+                                .map_err(|e| DataStoreError::send_error(&job_name, &source, e))?;
                             }
                         };
                     }

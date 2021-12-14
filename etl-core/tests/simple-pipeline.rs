@@ -1,6 +1,6 @@
 use etl_core::datastore::*;
-use etl_core::job::*;
 use etl_core::job::stream::*;
+use etl_core::job::*;
 use etl_core::job_manager::*;
 use etl_core::preamble::*;
 use mock::*;
@@ -21,15 +21,16 @@ async fn test_simple_pipeline() {
         JobRunnerConfig {
             ..Default::default()
         },
-    ).await.expect("Error creating JobRunner");
+    )
+    .await
+    .expect("Error creating JobRunner");
     // transform mock data source using TestTransformer and
     // create a new data source
-    let transformed_ds = jr
-        .as_datasource(
-            Box::new(create_mock_data_source()),
-            Box::new(TestTransformer {}),
-        )
-        .expect("Error creating transformed_ds");
+    let transformed_ds = TransformDataSource::new(
+        "transformed-mock-ds",
+        Box::new(create_mock_data_source()),
+        Box::new(TestTransformer {}),
+    );
     let jr = jr
         .run_stream::<TestOutputData>(
             "transformed-ds-1",
@@ -81,16 +82,17 @@ async fn test_simple_pipeline_max_error_with_failure() {
             max_errors: 2, // do a hard fail at error 2
             ..Default::default()
         },
-    ).await.expect("Error creating JobRunner");
+    )
+    .await
+    .expect("Error creating JobRunner");
 
     // transform mock data source using TestTransformer and
     // create a new data source
-    let transformed_ds = jr
-        .as_datasource(
-            Box::new(create_mock_data_source_many_errors()),
-            Box::new(TestTransformer {}),
-        )
-        .expect("Error creating transformed_ds");
+    let transformed_ds = TransformDataSource::new(
+        "jr-ds",
+        Box::new(create_mock_data_source_many_errors()),
+        Box::new(TestTransformer {}),
+    );
     let jr = jr
         .run_stream(
             "transformed-ds-1",

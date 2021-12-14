@@ -15,7 +15,7 @@ pub mod bytes_source;
 pub mod enumerate;
 /// Local file system data stores
 pub mod fs;
-pub mod job_runner;
+pub mod transform_store;
 /// various data stores used for testing
 pub mod mock;
 

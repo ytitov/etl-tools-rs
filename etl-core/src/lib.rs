@@ -2,7 +2,7 @@ pub mod datastore;
 pub mod decoder;
 pub mod utils;
 pub mod preamble {
-    pub use crate::datastore::job_runner::JRDataSource;
+    pub use crate::datastore::transform_store::TransformDataSource;
     pub use crate::job::error::*;
     pub use crate::job::{handler::*, JobRunner, JobRunnerConfig};
     pub use crate::job_manager::{
