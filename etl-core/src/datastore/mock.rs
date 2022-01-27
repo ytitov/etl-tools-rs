@@ -198,3 +198,29 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
         }
     }
 }
+
+use crate::queue::QueueClient;
+#[async_trait]
+impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> QueueClient<T>
+    for MockJsonDataSource
+{
+    async fn pop(&mut self) -> anyhow::Result<Option<T>> {
+        use std::cell::RefMut;
+        if let Ok(inner) = self.files.lock() {
+            match inner.try_borrow_mut() {
+                Ok::<RefMut<'_, HashMap<String, String>>,_>(mut hs) => {
+                    let maybe_key: Option<String> = hs.keys().next().cloned();
+                    if let Some(key) = maybe_key {
+                        if let Some(item) = hs.remove(&key) {
+                            return Ok(serde_json::from_str(&item)?);
+                        }
+                    }
+                }
+                Err(e) => {
+                    return Err(anyhow::anyhow!(e));
+                }
+            }
+        }
+        Ok(None)
+    }
+}
