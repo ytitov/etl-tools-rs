@@ -24,7 +24,7 @@ pub trait QueueClient<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send
     async fn start_incoming(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         panic!("not implemented");
     }
-    async fn pop(&mut self) -> anyhow::Result<Option<T>> {
+    async fn pop(&self) -> anyhow::Result<Option<T>> {
         println!("QueueClient::pop default implementation always returns None");
         Ok(None)
     }

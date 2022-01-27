@@ -204,7 +204,7 @@ use crate::queue::QueueClient;
 impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> QueueClient<T>
     for MockJsonDataSource
 {
-    async fn pop(&mut self) -> anyhow::Result<Option<T>> {
+    async fn pop(&self) -> anyhow::Result<Option<T>> {
         use std::cell::RefMut;
         if let Ok(inner) = self.files.lock() {
             match inner.try_borrow_mut() {
