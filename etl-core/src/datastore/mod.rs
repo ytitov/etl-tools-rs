@@ -91,6 +91,17 @@ pub trait SimpleStore<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send
 }
 
 //use crate::job_manager::JobManagerRx;
+pub struct DynDataSource<T> {
+    pub ds: Box<dyn DataSource<T>>,
+}
+
+impl<T: DeserializeOwned + Debug + Send + 'static> DynDataSource<T> {
+    pub fn new<C: DataSource<T> + 'static>(t: C) -> Self {
+        DynDataSource {
+            ds: Box::new(t)
+        }
+    }
+}
 
 pub trait DataSource<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send {
     fn name(&self) -> String;

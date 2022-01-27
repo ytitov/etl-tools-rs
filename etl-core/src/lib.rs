@@ -1,6 +1,7 @@
 pub mod datastore;
 pub mod decoder;
 pub mod utils;
+pub mod queue;
 pub mod preamble {
     pub use crate::datastore::transform_store::TransformDataSource;
     pub use crate::job::error::*;
