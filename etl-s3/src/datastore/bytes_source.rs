@@ -8,13 +8,13 @@ use super::{AsyncBufReadExt, BufReader};
 use etl_core::datastore::bytes_source::*;
 use etl_core::preamble::anyhow;
 use etl_core::preamble::tokio;
-use etl_core::preamble::tokio::sync::mpsc::{channel};
+use etl_core::preamble::tokio::sync::mpsc::channel;
 
 pub struct S3Storage {
     pub s3_bucket: String,
     pub s3_keys: Vec<String>,
     /// path to the credentials file to access aws
-    pub credentials: String,
+    pub credentials_path: String,
     pub region: Region,
 }
 
@@ -25,7 +25,7 @@ impl BytesSource for S3Storage {
 
     fn start_stream(self: Box<Self>) -> Result<BytesSourceTask, DataStoreError> {
         use rusoto_core::RusotoError;
-        let p = ProfileProvider::with_default_configuration(&self.credentials);
+        let p = ProfileProvider::with_default_configuration(&self.credentials_path);
         let client: S3Client = create_client(p, &self.region)?;
         let (tx, rx) = channel(1);
         let files = self.s3_keys.clone();

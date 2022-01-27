@@ -2,7 +2,7 @@ use etl_core::datastore::error::*;
 use etl_core::datastore::*;
 use etl_core::preamble::*;
 use rusoto_core::HttpClient;
-use rusoto_core::Region;
+pub use rusoto_core::Region;
 use rusoto_credential::ProfileProvider;
 use rusoto_s3;
 use rusoto_s3::*;
