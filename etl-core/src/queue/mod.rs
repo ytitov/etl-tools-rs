@@ -4,9 +4,10 @@ use crate::datastore::*;
 use crate::preamble::*;
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;
+use tokio::sync::oneshot;
 
 #[async_trait]
-pub trait QueueClientBuilder<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send {
+pub trait QueueClientBuilder<T: Debug + 'static + Send>: Sync + Send {
     async fn build_client(self: Box<Self>) -> Result<Box<dyn QueueClient<T>>, DataStoreError>;
 }
 
@@ -20,11 +21,15 @@ impl<T: DeserializeOwned + Debug + Send + 'static> QueueClientBuilder<T> for Gen
 */
 
 #[async_trait]
-pub trait QueueClient<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send {
+pub trait QueueClient<T: Debug + 'static + Send>: Sync + Send {
     async fn start_incoming(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         panic!("not implemented");
     }
     async fn pop(&self) -> anyhow::Result<Option<T>> {
+        println!("QueueClient::pop default implementation always returns None");
+        Ok(None)
+    }
+    async fn pop_reply(&self) -> anyhow::Result<Option<(T, oneshot::Receiver<T>)>> {
         println!("QueueClient::pop default implementation always returns None");
         Ok(None)
     }
