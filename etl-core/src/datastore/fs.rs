@@ -1,9 +1,11 @@
 use super::error::*;
 use crate::datastore::bytes_source::*;
 use crate::datastore::SimpleStore;
+use crate::queue::QueueClient;
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::hash::Hash;
 use std::path::Path;
 use tokio::task::JoinHandle;
 
@@ -80,6 +82,8 @@ impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static> 
         }
     }
 
+    /// TODO: no real indication to external user this will end up being JSON, need to rework this
+    /// somehow
     async fn write(&self, path: &str, item: T) -> Result<(), DataStoreError> {
         use std::path::Path;
         use tokio::fs::OpenOptions;
@@ -98,6 +102,24 @@ impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static> 
             },
             Err(err) => Err(DataStoreError::FatalIO(err.to_string())),
         }
+    }
+}
+
+#[async_trait]
+impl<T: Hash + Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static>
+    QueueClient<T> for LocalFs
+{
+    async fn pop(&self) -> anyhow::Result<Option<T>> {
+        panic!("QueueClient::pop for LocalFs is not implemented");
+    }
+    async fn push(&self, m: T) -> anyhow::Result<()> {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::Hasher;
+        let mut hasher = DefaultHasher::new();
+        m.hash(&mut hasher);
+        let name = format!("{}", hasher.finish());
+        self.write(&name, m).await?;
+        panic!("QueueClient::pop is not implemented");
     }
 }
 
