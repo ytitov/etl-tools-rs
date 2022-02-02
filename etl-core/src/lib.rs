@@ -16,6 +16,7 @@ pub mod deps {
     pub use serde;
     pub use thiserror;
     pub use tokio;
+    pub use log;
 }
 pub mod job;
 pub mod job_manager;

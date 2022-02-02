@@ -413,6 +413,7 @@ dependencies = [
  "chrono",
  "csv",
  "futures-core",
+ "log",
  "serde",
  "serde_json",
  "thiserror",

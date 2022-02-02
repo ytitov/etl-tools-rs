@@ -8,6 +8,7 @@ use serde::Serialize;
 use std::hash::Hash;
 use std::path::Path;
 use tokio::task::JoinHandle;
+use log;
 
 pub struct LocalFs {
     pub files: Vec<String>,
@@ -88,7 +89,15 @@ impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static> 
         use std::path::Path;
         use tokio::fs::OpenOptions;
         use tokio::io::AsyncWriteExt;
-        tokio::fs::create_dir_all(Path::new(&self.home)).await?;
+        let full_path = Path::new(&self.home).join(path);
+        log::info!("Writing to file {:?}", &full_path);
+        if let Some(parent_folder) = full_path.parent() {
+            tokio::fs::create_dir_all(parent_folder).await?;
+            log::info!("Writing to folder {:?}", &parent_folder);
+        } else {
+            tokio::fs::create_dir_all(Path::new(&self.home)).await?;
+            log::info!("Writing to folder {}", &self.home);
+        }
         let mut file = OpenOptions::new()
             .write(true)
             .truncate(true)
@@ -119,7 +128,7 @@ impl<T: Hash + Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 's
         m.hash(&mut hasher);
         let name = format!("{}", hasher.finish());
         self.write(&name, m).await?;
-        panic!("QueueClient::pop is not implemented");
+        Ok(())
     }
 }
 

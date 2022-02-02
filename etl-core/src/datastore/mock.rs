@@ -1,11 +1,12 @@
 use super::*;
+use serde::{de::DeserializeOwned, Serialize};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::hash::Hash;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
-use serde::{Serialize, de::DeserializeOwned};
 
 pub mod mock_csv;
 
@@ -63,7 +64,7 @@ impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockJsonDat
             }
             Ok(DataOutputStats {
                 name,
-                lines_written
+                lines_written,
             })
         });
         Ok((tx, jh))
@@ -202,14 +203,14 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
 
 use crate::queue::QueueClient;
 #[async_trait]
-impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> QueueClient<T>
+impl<T: Hash + Serialize + DeserializeOwned + Debug + Send + Sync + 'static> QueueClient<T>
     for MockJsonDataSource
 {
     async fn pop(&self) -> anyhow::Result<Option<T>> {
         use std::cell::RefMut;
         if let Ok(inner) = self.files.lock() {
             match inner.try_borrow_mut() {
-                Ok::<RefMut<'_, HashMap<String, String>>,_>(mut hs) => {
+                Ok::<RefMut<'_, HashMap<String, String>>, _>(mut hs) => {
                     let maybe_key: Option<String> = hs.keys().next().cloned();
                     if let Some(key) = maybe_key {
                         if let Some(item) = hs.remove(&key) {
@@ -223,5 +224,27 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> QueueClien
             }
         }
         Ok(None)
+    }
+
+    async fn push(&self, m: T) -> anyhow::Result<()> {
+        use std::cell::RefMut;
+        if let Ok(inner) = self.files.lock() {
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::Hasher;
+            let mut hasher = DefaultHasher::new();
+            m.hash(&mut hasher);
+            let name = format!("{}", hasher.finish());
+            match inner.try_borrow_mut() {
+                Ok::<RefMut<'_, HashMap<String, String>>, _>(mut hs) => {
+                    let c = serde_json::to_string_pretty(&m)?;
+                    log::info!("Pushed into MockJsonDataSource: {}", &c);
+                    hs.insert(name, c);
+                }
+                Err(e) => {
+                    return Err(anyhow::anyhow!(e));
+                }
+            }
+        };
+        Ok(())
     }
 }
