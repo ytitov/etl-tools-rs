@@ -5,6 +5,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
+use serde::{Serialize, de::DeserializeOwned};
 
 pub mod mock_csv;
 

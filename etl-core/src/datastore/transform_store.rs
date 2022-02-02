@@ -1,6 +1,7 @@
 use super::*;
 use crate::job::*;
 use tokio::task::JoinHandle;
+use serde::{Serialize, de::DeserializeOwned};
 
 /// Allows processing data using the TransformHandler trait to process and
 /// filter a stream, and output that as a new DataSource which can
@@ -14,7 +15,7 @@ pub struct TransformDataSource<I, O: Serialize + Debug + Send + Sync + 'static> 
 
 impl<I, O> TransformDataSource<I, O>
 where
-    I: DeserializeOwned + Debug + Send + Sync,
+    I: Debug + Send + Sync,
     O: Serialize + Debug + Send + Sync,
 {
     pub fn new(

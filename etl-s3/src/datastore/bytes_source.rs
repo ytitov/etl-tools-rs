@@ -6,9 +6,7 @@ use super::Region;
 use super::S3Client;
 use super::{AsyncBufReadExt, BufReader};
 use etl_core::datastore::bytes_source::*;
-use etl_core::preamble::anyhow;
-use etl_core::preamble::tokio;
-use etl_core::preamble::tokio::sync::mpsc::channel;
+use etl_core::deps::{anyhow, tokio, tokio::sync::mpsc::channel};
 
 pub struct S3Storage {
     pub s3_bucket: String,

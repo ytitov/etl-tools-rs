@@ -9,10 +9,11 @@ pub mod preamble {
     pub use crate::job_manager::{
         JobManager, JobManagerChannel, JobManagerConfig, JobManagerHandle, Message,
     };
+}
+pub mod deps {
     pub use anyhow;
     pub use async_trait::async_trait;
     pub use serde;
-    pub use serde_json;
     pub use thiserror;
     pub use tokio;
 }

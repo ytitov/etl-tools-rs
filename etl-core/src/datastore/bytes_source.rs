@@ -1,6 +1,9 @@
 use super::*;
 use bytes::Bytes;
+use serde::de::DeserializeOwned;
 
+// TODO: this all can be gotten rid of by simply removing serde traits from the DataSource and
+// adding an impl of DataSource<T: Bytes>.  did not realize this initially for some reason
 pub type BytesSourceRx = Receiver<Result<BytesSourceMessage, DataStoreError>>;
 pub type BytesSourceTx = Sender<BytesOutputMessage>;
 pub type BytesSourceTask = (
@@ -44,26 +47,6 @@ impl BytesOutputMessage {
         BytesOutputMessage::NoMoreData
     }
 }
-
-#[async_trait]
-/// This is a simple store that acts like a key-val storage.  It is not streamted
-/// so is not meant for big files.  Primarily created for the JobRunner to
-/// store the state of the running job somewhere
-pub trait SimpleStore<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send {
-    async fn read_file_str(&self, _: &str) -> Result<String, DataStoreError> {
-        panic!("This SimpleStore does not support load operation");
-    }
-
-    async fn load(&self, _: &str) -> Result<T, DataStoreError> {
-        panic!("This SimpleStore does not support load operation");
-    }
-
-    async fn write(&self, _: &str, _: T) -> Result<(), DataStoreError> {
-        panic!("This SimpleStore does not support write operation");
-    }
-}
-
-//use crate::job_manager::JobManagerRx;
 
 pub trait BytesSource: Sync + Send {
     fn name(&self) -> String;

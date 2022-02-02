@@ -2,6 +2,7 @@ use crate::datastore::bytes_source::*;
 use crate::datastore::*;
 use bytes::Bytes;
 use futures_core::future::BoxFuture;
+use serde::de::DeserializeOwned;
 use std::time::Duration;
 
 pub struct EnumerateStream<S, O> {

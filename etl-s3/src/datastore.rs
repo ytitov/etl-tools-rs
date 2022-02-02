@@ -6,14 +6,20 @@ pub use rusoto_core::Region;
 use rusoto_credential::ProfileProvider;
 use rusoto_s3;
 use rusoto_s3::*;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 //use std::sync::{Arc, Mutex};
+use etl_core::deps::{
+    serde::de::DeserializeOwned,
+    serde::Serialize,
+    tokio,
+    tokio::io::{AsyncBufReadExt, BufReader},
+    tokio::sync::mpsc::{channel, Receiver},
+    tokio::task::JoinHandle,
+    async_trait,
+    anyhow,
+};
 use etl_core::job_manager::JobManagerTx;
 use std::fmt::Debug;
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::sync::mpsc::{channel, Receiver};
-use tokio::task::JoinHandle;
+//use serde_json::Value;
 
 pub mod bytes_source;
 // TODO: convert to use read_content: ReadContentOptions
@@ -383,32 +389,30 @@ impl S3DataOutput {
                 match rx.recv().await {
                     Some(m) => {
                         match m {
-                            DataOutputMessage::Data(data) => {
-                                match wtr.serialize(data) {
-                                    Ok(()) => {
-                                        if let Ok(bytes_vec) = wtr.into_inner() {
-                                            match std::str::from_utf8(&bytes_vec) {
-                                                Ok(line) => {
-                                                    s3_tx.send(line.to_owned()).await?;
-                                                    num_lines_sent += 1;
-                                                }
-                                                Err(er) => {
-                                                    let m = format!("WARNING: create_s3_csv_writer skipping bad str due to: {}", er);
-                                                    jm_tx
-                                                        .send(Message::log_err("S3DataOutput", m))
-                                                        .await?;
-                                                }
+                            DataOutputMessage::Data(data) => match wtr.serialize(data) {
+                                Ok(()) => {
+                                    if let Ok(bytes_vec) = wtr.into_inner() {
+                                        match std::str::from_utf8(&bytes_vec) {
+                                            Ok(line) => {
+                                                s3_tx.send(line.to_owned()).await?;
+                                                num_lines_sent += 1;
+                                            }
+                                            Err(er) => {
+                                                let m = format!("WARNING: create_s3_csv_writer skipping bad str due to: {}", er);
+                                                jm_tx
+                                                    .send(Message::log_err("S3DataOutput", m))
+                                                    .await?;
                                             }
                                         }
                                     }
-                                    Err(e) => {
-                                        jm_tx
-                                            .send(Message::log_err("S3DataOutput", e.to_string()))
-                                            .await?;
-                                        return Err(anyhow::anyhow!("{}", e));
-                                    }
                                 }
-                            }
+                                Err(e) => {
+                                    jm_tx
+                                        .send(Message::log_err("S3DataOutput", e.to_string()))
+                                        .await?;
+                                    return Err(anyhow::anyhow!("{}", e));
+                                }
+                            },
                             DataOutputMessage::NoMoreData => {
                                 println!("S3DataOutput got DataOutputMessage::NoMoreData");
                                 break;
@@ -422,7 +426,7 @@ impl S3DataOutput {
             s3_jh.await??;
             Ok(DataOutputStats {
                 name: format!("s3://{}/{}", s3_bucket, s3_key),
-                lines_written: num_lines_sent
+                lines_written: num_lines_sent,
             })
         });
         Ok((tx, jh))
@@ -475,7 +479,10 @@ impl S3DataOutput {
             }
             drop(s3_tx);
             s3_jh.await??;
-            Ok(DataOutputStats { name: format!("s3://{}/{}", s3_bucket, s3_key), lines_written })
+            Ok(DataOutputStats {
+                name: format!("s3://{}/{}", s3_bucket, s3_key),
+                lines_written,
+            })
         });
         Ok((tx, jh))
     }

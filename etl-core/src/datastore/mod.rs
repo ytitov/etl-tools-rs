@@ -2,7 +2,6 @@ use self::error::*;
 use crate::job_manager::JobManagerTx;
 use crate::preamble::*;
 use async_trait::async_trait;
-use serde::de::DeserializeOwned;
 use serde::de::Deserializer;
 use serde::Serialize;
 use serde::Deserialize;
@@ -76,7 +75,7 @@ impl<T: Serialize + Debug + Send + Sync> DataOutputMessage<T> {
 /// This is a simple store that acts like a key-val storage.  It is not streamted
 /// so is not meant for big files.  Primarily created for the JobRunner to
 /// store the state of the running job somewhere
-pub trait SimpleStore<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send {
+pub trait SimpleStore<T: Debug + 'static + Send>: Sync + Send {
     async fn read_file_str(&self, _: &str) -> Result<String, DataStoreError> {
         panic!("This SimpleStore does not support load operation");
     }
@@ -95,7 +94,7 @@ pub struct DynDataSource<T> {
     pub ds: Box<dyn DataSource<T>>,
 }
 
-impl<T: DeserializeOwned + Debug + Send + 'static> DynDataSource<T> {
+impl<T: Debug + Send + 'static> DynDataSource<T> {
     pub fn new<C: DataSource<T> + 'static>(t: C) -> Self {
         DynDataSource {
             ds: Box::new(t)
@@ -103,7 +102,7 @@ impl<T: DeserializeOwned + Debug + Send + 'static> DynDataSource<T> {
     }
 }
 
-pub trait DataSource<T: DeserializeOwned + Debug + 'static + Send>: Sync + Send {
+pub trait DataSource<T: Debug + 'static + Send>: Sync + Send {
     fn name(&self) -> String;
 
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError>;
@@ -158,7 +157,7 @@ where
 pub trait CreateDataSource<'de, C, T>: Sync + Send
 where
     C: Deserializer<'de>,
-    T: DeserializeOwned + Debug + 'static + Send,
+    T: Debug + 'static + Send,
 {
     async fn create_data_source(_: C) -> anyhow::Result<Box<dyn DataSource<T>>>;
 }

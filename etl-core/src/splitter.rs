@@ -1,13 +1,11 @@
 use crate::datastore::error::DataStoreError;
 use crate::datastore::*;
-use crate::preamble::*;
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::fmt::Debug;
 use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
-
-use serde::Serialize;
 
 pub struct DuplicateDataSource<I: Serialize + DeserializeOwned + Debug + Send + Sync> {
     pub rx: DataSourceRx<I>,
@@ -101,8 +99,7 @@ where
         }));
     }
     let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
-        let (mut input_rx, input_jh) = data_source
-            .start_stream()?;
+        let (mut input_rx, input_jh) = data_source.start_stream()?;
         let mut lines_scanned = 0_usize;
         loop {
             match input_rx.recv().await {
@@ -130,7 +127,7 @@ where
                             .send(Err(err.clone()))
                             .await
                             .map_err(|e| DataStoreError::send_error("Splitter", "", e))?;
-                        }
+                    }
                 }
                 None => break,
             };
