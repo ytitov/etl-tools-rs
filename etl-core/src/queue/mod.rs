@@ -1,46 +1,38 @@
 //use async_trait::async_trait;
 use crate::datastore::error::*;
 use crate::datastore::*;
-use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 use tokio::sync::oneshot;
 use crate::deps::*;
+use anyhow::Result;
 
 #[async_trait]
 pub trait QueueClientBuilder<T: Debug + 'static + Send>: Sync + Send {
     async fn build_client(self: Box<Self>) -> Result<Box<dyn QueueClient<T>>, DataStoreError>;
 }
 
-/*
-#[async_trait]
-impl<T: DeserializeOwned + Debug + Send + 'static> QueueClientBuilder<T> for GenDataSource<T> {
-    async fn build_client(self: Box<Self>) -> Result<Box<dyn QueueClient<T>>, DataStoreError> {
-        Ok(self.ds)
-    }
-}
-*/
-
 #[async_trait]
 pub trait QueueClient<T: Debug + 'static + Send>: Sync + Send {
+    /// so any QueueClient can be turned into a DataSource<T>
     async fn start_incoming(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         panic!("not implemented");
     }
     async fn pop(&self) -> anyhow::Result<Option<T>> {
-        println!("QueueClient::pop default implementation always returns None");
-        Ok(None)
+        panic!("QueueClient::pop is not implemented");
     }
-    async fn pop_reply(&self) -> anyhow::Result<Option<(T, oneshot::Receiver<T>)>> {
-        println!("QueueClient::pop default implementation always returns None");
-        Ok(None)
+    async fn push(&self, _: T) -> Result<()> {
+        panic!("QueueClient::pop is not implemented");
     }
-    async fn message_ok(&self, _: T) -> Result<(), DataStoreError> {
-        Ok(())
+    /// For cases when a produced item needs some action to be performed afterward by the queue,
+    /// for example to perform some cleanup or deletion by the QueueClient implementation
+    async fn pop_result(&self) -> anyhow::Result<Option<(T, oneshot::Receiver<Result<T>>)>> {
+        panic!("QueueClient::pop_result is not implemented");
     }
 }
 
 /// provide so each DataSource could be a client
 #[async_trait]
-impl<T: DeserializeOwned + Debug + Send + 'static> QueueClient<T> for DynDataSource<T> {
+impl<T: Debug + Send + 'static> QueueClient<T> for DynDataSource<T> {
     async fn start_incoming(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         use tokio::task::JoinHandle;
