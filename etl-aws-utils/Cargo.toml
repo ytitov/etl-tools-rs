@@ -19,6 +19,8 @@ regex = "1"
 bytes = "1"
 
 http = "0.2.6"
+hex = "0.4"
+md-5 = "0.9"
 
 rusoto_core = { version = "0.47.0", default_features = false }
 rusoto_athena = { version = "0.47.0", default_features = false }
