@@ -3,7 +3,7 @@
 members = [
     "etl-core",
 		"etl-mysql",
-		"etl-s3",
+		#"etl-s3",
 		"etl-sftp",
 		"etl-aws-utils",
 		#"etl-examples",

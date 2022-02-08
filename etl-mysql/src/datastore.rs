@@ -1,4 +1,9 @@
 use etl_core::datastore::*;
+use etl_core::deps::anyhow;
+use etl_core::deps::async_trait;
+use etl_core::deps::tokio;
+use etl_core::deps::tokio::sync::mpsc::channel;
+use etl_core::deps::tokio::task::JoinHandle;
 use etl_core::job_manager::JobManagerTx;
 use etl_core::preamble::*;
 use etl_core::utils;
@@ -10,8 +15,6 @@ pub use sqlx::mysql::MySqlPoolOptions;
 pub use sqlx::MySqlPool;
 use std::fmt::Debug;
 use std::time::{Duration, Instant};
-use tokio::sync::mpsc::channel;
-use tokio::task::JoinHandle;
 
 #[derive(Default)]
 pub struct MySqlDataOutput {
@@ -143,8 +146,16 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                 if (value_rows.len() >= on_put_num_rows || source_finished_sending)
                     && value_rows.len() > 0
                 {
-                    match exec_rows_mysql(&mut jm_tx, &pool, &db_name, &table_name, &columns, &value_rows, 0)
-                        .await
+                    match exec_rows_mysql(
+                        &mut jm_tx,
+                        &pool,
+                        &db_name,
+                        &table_name,
+                        &columns,
+                        &value_rows,
+                        0,
+                    )
+                    .await
                     {
                         Ok(r) => {
                             total_inserted += r.inserted;
@@ -176,8 +187,7 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                             )
                             .await
                             {
-                                Ok(_) => {
-                                }
+                                Ok(_) => {}
                                 Err(er) => {
                                     let m = format!(
                                         "Error inserting rows into {}: {} ",
@@ -209,7 +219,7 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
             jm_tx.send(Message::log_info("mysql-datastore", m)).await?;
             Ok(DataOutputStats {
                 name: format!("{}.{}", db_name, table_name),
-                lines_written: total_inserted
+                lines_written: total_inserted,
             })
         });
         Ok((tx, join_handle))

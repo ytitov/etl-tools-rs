@@ -9,9 +9,11 @@ edition = "2018"
 [dependencies]
 ssh2 = { "version" = "0.9.1" }
 etl-core = { path = "../etl-core" }
-serde = { version = "1.0", features = ["derive"] }
-clap = { version = "3.0.0-beta.2" }
 
-[[bin]]
+[dev-dependencies]
+serde = { version = "1.0", features = ["derive"] }
+clap = { version = "3.0.14", features = ["derive"] }
+
+[[example]]
 name = "test_connection"
-path = "bin/test-connection.rs"
+path = "examples/test-connection.rs"

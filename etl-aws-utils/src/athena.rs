@@ -1,4 +1,5 @@
-use anyhow::anyhow;
+use etl_core::deps::anyhow::{self, anyhow};
+use etl_core::deps::async_trait;
 use etl_core::job::command::*;
 use etl_core::preamble::*;
 //use etl_s3::*;
@@ -8,7 +9,7 @@ use rusoto_core::request::HttpClient;
 use rusoto_credential::ProfileProvider;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
-use tokio::time::sleep;
+use etl_core::deps::tokio::time::sleep;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AthenaConfig {
@@ -123,7 +124,7 @@ impl<'a> JobCommand for AthenaQueryJobCommand {
                     region: _,
                 } = &self.config;
                 loop {
-                    if etl_s3::is_result_on_s3(
+                    if crate::s3_utils::is_result_on_s3(
                         s3_credentials,
                         s3_bucket,
                         "",
@@ -140,7 +141,7 @@ impl<'a> JobCommand for AthenaQueryJobCommand {
                         );
                         break;
                     } else {
-                        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+                        sleep(std::time::Duration::from_millis(1000)).await;
                     }
                 }
             }

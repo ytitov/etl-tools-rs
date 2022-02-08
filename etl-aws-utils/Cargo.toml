@@ -4,15 +4,24 @@ version = "0.1.0"
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = ["rustls"]
+rustls = ["rusoto_core/rustls", "rusoto_athena/rustls", "rusoto_sqs/rustls", "rusoto_s3/rustls"]
 
 [dependencies]
 etl-core = { path = "../etl-core" }
-etl-s3 = { path = "../etl-s3" }
 uuid = { version = "0.8.2", features = ["v4", "v1"] }
-http = "0.2.4"
-serde = { version = "1.0", features = ["derive"] }
 
-rusoto_core = "0.47.0"
-rusoto_athena = "0.47.0"
-#rusoto_s3 = "0.47.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0" }
+csv = "1.1"
+regex = "1"
+bytes = "1"
+
+http = "0.2.6"
+
+rusoto_core = { version = "0.47.0", default_features = false }
+rusoto_athena = { version = "0.47.0", default_features = false }
+rusoto_s3 = { version = "0.47.0", default-features = false }
 rusoto_credential = "0.47.0"
+rusoto_sqs = { version = "0.47.0", default_features = false }

@@ -1,19 +1,16 @@
-use clap::Clap;
-use etl_core::preamble::*;
+use clap::Parser;
+use etl_core::deps::anyhow;
+use etl_core::deps::tokio;
 use etl_core::utils;
 use serde::{Deserialize, Serialize};
 
 use etl_sftp::*;
 
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 #[clap(version = "1.0", author = "Yuri Titov <ytitov@gmail.com>")]
 pub struct Args {
-    #[clap(
-        short,
-        long,
-        default_value = "./sftp_config.toml",
-        about = "Path to the input config file"
-    )]
+    #[clap(short, long, default_value = "./sftp_config.toml")]
+    /// Path to the input config file
     pub config: String,
 }
 

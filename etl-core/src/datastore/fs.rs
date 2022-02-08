@@ -126,7 +126,7 @@ impl<T: Hash + Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 's
         use std::hash::Hasher;
         let mut hasher = DefaultHasher::new();
         m.hash(&mut hasher);
-        let name = format!("{}", hasher.finish());
+        let name = format!("{}.push.json", hasher.finish());
         self.write(&name, m).await?;
         Ok(())
     }
