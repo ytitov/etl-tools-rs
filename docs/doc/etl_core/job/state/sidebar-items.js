@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["JOB_STATE_EXT",""]],"enum":[["FileStatus",""],["JobStepStatus",""],["JobStreamStatus",""],["RunStatus",""]],"struct":[["JobState",""],["JobStepDetails",""],["JobStreamsState",""]]});
+initSidebarItems({"constant":[["JOB_STATE_EXT",""]],"enum":[["JobStepStatus",""],["RunStatus",""]],"struct":[["JobState",""],["JobStepDetails",""]]});

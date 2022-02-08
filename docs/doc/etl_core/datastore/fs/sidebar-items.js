@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["LocalFsDataSource",""]]});
+initSidebarItems({"struct":[["LocalFs",""]]});

@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["datastore",""],["job",""],["job_manager",""],["joins",""],["preamble",""],["transformer",""],["utils",""]]});
+initSidebarItems({"mod":[["datastore",""],["decoder",""],["deps",""],["job",""],["job_manager",""],["joins",""],["preamble",""],["queue",""],["splitter","for splitting streams into many identical DataSources"],["transformer",""],["utils",""]]});

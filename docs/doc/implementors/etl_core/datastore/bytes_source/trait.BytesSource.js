@@ -1,0 +1,4 @@
+(function() {var implementors = {};
+implementors["etl_aws_utils"] = [{"text":"impl <a class=\"trait\" href=\"etl_core/datastore/bytes_source/trait.BytesSource.html\" title=\"trait etl_core::datastore::bytes_source::BytesSource\">BytesSource</a> for <a class=\"struct\" href=\"etl_aws_utils/datastore/bytes_source/struct.S3Storage.html\" title=\"struct etl_aws_utils::datastore::bytes_source::S3Storage\">S3Storage</a>","synthetic":false,"types":["etl_aws_utils::datastore::bytes_source::S3Storage"]}];
+implementors["etl_core"] = [];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

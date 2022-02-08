@@ -1,6 +1,5 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `etl-core/src/job_manager.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>job_manager.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../etl_core/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../settings.html" title="settings"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `etl-core&#x2F;src&#x2F;job_manager.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>job_manager.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings" ></script><script src="../../storage.js"></script><script src="../../crates.js"></script><script defer src="../../main.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../etl_core/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -340,33 +339,108 @@
 <span id="338">338</span>
 <span id="339">339</span>
 <span id="340">340</span>
-</pre><pre class="rust">
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::job::JobRunner</span>;
 <span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
 <span class="kw">use</span> <span class="ident">tokio::sync</span>::{
-    <span class="ident">broadcast</span>,
-    <span class="ident">broadcast</span>::{<span class="ident">error::RecvError</span>, <span class="ident">Receiver</span>, <span class="ident">Sender</span>},
+    <span class="ident">mpsc</span>,
+    <span class="ident">mpsc</span>::{<span class="ident">Receiver</span>, <span class="ident">Sender</span>},
+    <span class="comment">//broadcast,</span>
+    <span class="comment">//broadcast::{error::RecvError, Receiver, Sender},</span>
+    <span class="ident">oneshot</span>,
 };
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">JobManagerTx</span> <span class="op">=</span> <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;</span>;
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">JobManagerRx</span> <span class="op">=</span> <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::utils::log</span>::{<span class="ident">log_err</span>, <span class="ident">log_info</span>, <span class="ident">LogMessage</span>};
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::utils</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::utils::log</span>::{<span class="ident">log_err</span>, <span class="ident">log_info</span>, <span class="ident">LogMessage</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::utils</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
 <span class="kw">use</span> <span class="ident">tokio::sync::mpsc::UnboundedSender</span>;
 <span class="kw">use</span> <span class="ident">tokio::task::JoinHandle</span>;
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">NotifyJobRunner</span> {
+    <span class="ident">JobCanRun</span> { <span class="ident">to_job_manager_tx</span>: <span class="ident">JobManagerTx</span> },
     <span class="ident">TooManyErrors</span>,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">NotifyJobManager</span> {
-    <span class="ident">LogInfo</span> { <span class="ident">sender</span>: <span class="ident">String</span>, <span class="ident">message</span>: <span class="ident">String</span> },
-    <span class="ident">LogError</span> { <span class="ident">sender</span>: <span class="ident">String</span>, <span class="ident">message</span>: <span class="ident">String</span> },
-    <span class="ident">TaskStarted</span> { <span class="ident">sender</span>: <span class="ident">String</span> },
-    <span class="ident">TaskFinished</span> { <span class="ident">sender</span>: <span class="ident">String</span> },
-    <span class="ident">JobStarted</span> { <span class="ident">sender</span>: <span class="ident">String</span> },
-    <span class="ident">JobFinished</span> { <span class="ident">sender</span>: <span class="ident">String</span> },
+    <span class="ident">LogInfo</span> {
+        <span class="ident">sender</span>: <span class="ident">String</span>,
+        <span class="ident">message</span>: <span class="ident">String</span>,
+    },
+    <span class="ident">LogError</span> {
+        <span class="ident">sender</span>: <span class="ident">String</span>,
+        <span class="ident">message</span>: <span class="ident">String</span>,
+    },
+    <span class="ident">TaskStarted</span> {
+        <span class="ident">sender</span>: <span class="ident">String</span>,
+    },
+    <span class="ident">TaskFinished</span> {
+        <span class="ident">sender</span>: <span class="ident">String</span>,
+    },
+    <span class="ident">JobStarted</span> {
+        <span class="ident">sender_name</span>: <span class="ident">String</span>,
+        <span class="ident">reply_rx</span>: <span class="ident">oneshot::Sender</span><span class="op">&lt;</span><span class="ident">JobManagerRx</span><span class="op">&gt;</span>,
+    },
+    <span class="ident">JobFinished</span> {
+        <span class="ident">sender</span>: <span class="ident">SenderDetails</span>,
+    },
     <span class="ident">ShutdownJobManager</span>,
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SenderDetails</span> {
+    <span class="kw">pub</span> <span class="ident">id</span>: <span class="ident">String</span>,
+    <span class="kw">pub</span> <span class="ident">name</span>: <span class="ident">String</span>,
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
@@ -383,7 +457,7 @@
     <span class="ident">TooManyErrors</span>,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Message</span> {
     <span class="ident">ToJobManager</span>(<span class="ident">NotifyJobManager</span>),
     <span class="ident">ToJobRunner</span>(<span class="ident">NotifyJobRunner</span>),
@@ -394,7 +468,8 @@
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">JobManagerConfig</span> {
     <span class="doccomment">/// When max_errors is reached, a shutdown message is sent, which stops all</span>
-    <span class="doccomment">/// of the jobs currently running.</span>
+    <span class="doccomment">/// of the jobs currently running. There is no guarantee that this message will arrive at a</span>
+    <span class="doccomment">/// specific time, so max_errors inside the JobRunner is the local allowable errors.</span>
     <span class="kw">pub</span> <span class="ident">max_errors</span>: <span class="ident">usize</span>,
     <span class="doccomment">/// If set to None, the output will go to stdout</span>
     <span class="kw">pub</span> <span class="ident">log_path</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
@@ -402,7 +477,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">JobManagerConfig</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
         <span class="ident">JobManagerConfig</span> {
             <span class="ident">max_errors</span>: <span class="number">1000</span>,
             <span class="ident">log_path</span>: <span class="prelude-val">None</span>,
@@ -412,8 +487,11 @@
 }
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">JobManager</span> {
-    <span class="ident">tx</span>: <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;</span>,
-    <span class="ident">rx</span>: <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// senders to job runners identified by their name</span>
+    <span class="doccomment">/// currently only get the TooManyErrors message to let them know they need to terminate</span>
+    <span class="ident">to_job_runner_tx</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// receives messages from JobRunner and also DataOutput&#39;s</span>
+    <span class="ident">from_job_runner_channel</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">num_log_errors</span>: <span class="ident">usize</span>,
     <span class="ident">logger_tx</span>: <span class="ident">UnboundedSender</span><span class="op">&lt;</span><span class="ident">LogMessage</span><span class="op">&gt;</span>,
     <span class="ident">num_tasks_started</span>: <span class="ident">usize</span>,
@@ -423,61 +501,77 @@
 }
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">JobManagerChannel</span> {
-    <span class="comment">//tx: Sender&lt;Message&gt;,</span>
-    <span class="comment">//rx: Receiver&lt;Message&gt;,</span>
-    <span class="kw">pub</span> <span class="ident">tx</span>: <span class="ident">JobManagerTx</span>,
     <span class="kw">pub</span> <span class="ident">rx</span>: <span class="ident">JobManagerRx</span>,
-    <span class="comment">//join_handle: Option&lt;JoinHandle&lt;()&gt;&gt;,</span>
+    <span class="kw">pub</span> <span class="ident">tx</span>: <span class="ident">JobManagerTx</span>,
 }
 
-<span class="comment">/*
-impl JobManagerChannel {
-    pub async fn shutdown(self) -&gt; anyhow::Result&lt;()&gt; {
-        self.tx.send(Message::shutdown_job_manager())?;
-        match self.join_handle {
-            Some(jh) =&gt; jh.await?,
-            _ =&gt; println!(&quot;Channel already shutdown&quot;),
-        }
-        Ok(())
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
+<span class="doccomment">/// the resulting stats about the job</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">JobManagerOutput</span> {
+    <span class="kw">pub</span> <span class="ident">num_errors</span>: <span class="ident">usize</span>,
+}
+
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">JobManagerHandle</span> {
+    <span class="ident">join_handle</span>: <span class="ident">JoinHandle</span><span class="op">&lt;</span><span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">JobManagerOutput</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">job_manager_tx</span>: <span class="ident">JobManagerTx</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">JobManagerHandle</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_jm_tx</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">JobManagerTx</span> {
+        <span class="self">self</span>.<span class="ident">job_manager_tx</span>.<span class="ident">clone</span>()
     }
-}
-*/</span>
 
-<span class="kw">impl</span> <span class="ident">Clone</span> <span class="kw">for</span> <span class="ident">JobManagerChannel</span> {
-    <span class="kw">fn</span> <span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="ident">JobManagerChannel</span> {
-            <span class="ident">tx</span>: <span class="self">self</span>.<span class="ident">tx</span>.<span class="ident">clone</span>(),
-            <span class="ident">rx</span>: <span class="self">self</span>.<span class="ident">tx</span>.<span class="ident">subscribe</span>(),
-            <span class="comment">//join_handle: None,</span>
-        }
+    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">connect</span><span class="op">&lt;</span><span class="ident">N</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="ident">N</span>) -&gt; <span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">JobManagerChannel</span><span class="op">&gt;</span> {
+        <span class="comment">// this will recieve the reciever from the JobManager so the JobRunner can send</span>
+        <span class="comment">// messages</span>
+        <span class="kw">let</span> (<span class="ident">oneshot_tx</span>, <span class="ident">oneshot_rx</span>): (
+            <span class="ident">oneshot::Sender</span><span class="op">&lt;</span><span class="ident">JobManagerRx</span><span class="op">&gt;</span>,
+            <span class="ident">oneshot::Receiver</span><span class="op">&lt;</span><span class="ident">JobManagerRx</span><span class="op">&gt;</span>,
+        ) <span class="op">=</span> <span class="ident">oneshot::channel</span>();
+        <span class="self">self</span>.<span class="ident">job_manager_tx</span>
+            .<span class="ident">send</span>(<span class="ident">Message::broadcast_job_start</span>(<span class="ident">name</span>, <span class="ident">oneshot_tx</span>))
+            .<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">job_manager_rx</span> <span class="op">=</span> <span class="ident">oneshot_rx</span>.<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(<span class="ident">JobManagerChannel</span> {
+            <span class="ident">tx</span>: <span class="self">self</span>.<span class="ident">job_manager_tx</span>.<span class="ident">clone</span>(),
+            <span class="ident">rx</span>: <span class="ident">job_manager_rx</span>,
+        })
     }
-}
 
-<span class="kw">impl</span> <span class="ident">JobManagerChannel</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">shutdown_job_manager</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">anyhow::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">Message::shutdown_job_manager</span>())<span class="question-mark">?</span>;
+    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">shutdown</span>(<span class="self">self</span>) -&gt; <span class="ident">anyhow::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="macro">println!</span>(<span class="string">&quot;Shutting down JobManager&quot;</span>);
+        <span class="kw">match</span> <span class="self">self</span>
+            .<span class="ident">job_manager_tx</span>
+            .<span class="ident">send</span>(<span class="ident">Message::ToJobManager</span>(<span class="ident">NotifyJobManager::ShutdownJobManager</span>))
+            .<span class="kw">await</span>
+        {
+            <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
+            <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
+                <span class="macro">println!</span>(<span class="string">&quot;There was an error during shutdown of JobManager: {}&quot;</span>, <span class="ident">e</span>);
+            }
+        };
+        <span class="self">self</span>.<span class="ident">join_handle</span>.<span class="kw">await</span><span class="question-mark">?</span><span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 }
 
 <span class="kw">impl</span> <span class="ident">JobManager</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">config</span>: <span class="ident">JobManagerConfig</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">broadcast::channel</span>(<span class="number">16</span>);
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">config</span>: <span class="ident">JobManagerConfig</span>) -&gt; <span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">JobManagerConfig</span> {
             <span class="kw-2">ref</span> <span class="ident">log_path</span>,
             <span class="kw-2">ref</span> <span class="ident">log_name_prefix</span>,
             ..
         } <span class="op">=</span> <span class="ident">config</span>;
         <span class="kw">let</span> <span class="ident">logger_tx</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">log_path</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">log_path</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="prelude-val">Some</span>(<span class="ident">log_path</span>) =&gt; {
                 <span class="ident">std::fs::create_dir_all</span>(<span class="ident">log_path</span>)<span class="question-mark">?</span>;
                 <span class="ident">tx_to_csv_output</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/{}&quot;</span>, <span class="ident">log_path</span>, <span class="ident">log_name_prefix</span>), <span class="bool-val">true</span>)<span class="question-mark">?</span>
             }
-            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">tx_to_stdout_output</span>()<span class="question-mark">?</span>,
+            <span class="prelude-val">None</span> =&gt; <span class="ident">tx_to_stdout_output</span>()<span class="question-mark">?</span>,
         };
         <span class="prelude-val">Ok</span>(<span class="ident">JobManager</span> {
-            <span class="ident">tx</span>,
-            <span class="ident">rx</span>,
+            <span class="ident">to_job_runner_tx</span>: <span class="ident">HashMap::new</span>(),
+            <span class="ident">from_job_runner_channel</span>: <span class="prelude-val">None</span>,
             <span class="ident">num_log_errors</span>: <span class="number">0</span>,
             <span class="ident">logger_tx</span>,
             <span class="ident">num_tasks_started</span>: <span class="number">0</span>,
@@ -487,139 +581,144 @@ impl JobManagerChannel {
         })
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_rx</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">JobManagerRx</span> {
-        <span class="self">self</span>.<span class="ident">tx</span>.<span class="ident">subscribe</span>()
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_tx</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">JobManagerTx</span> {
-        <span class="self">self</span>.<span class="ident">tx</span>.<span class="ident">clone</span>()
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">JoinHandle</span><span class="op">&lt;</span>()<span class="op">&gt;</span>, <span class="ident">JobManagerChannel</span>) {
-        <span class="kw">let</span> <span class="ident">ret_tx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_tx</span>();
-        <span class="kw">let</span> <span class="ident">ret_rx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_rx</span>();
-        <span class="kw">let</span> <span class="ident">jh</span> <span class="op">=</span> <span class="ident">tokio::spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+    <span class="comment">//pub fn start(mut self) -&gt; JoinHandle&lt;()&gt; {</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">mut</span> <span class="self">self</span>) -&gt; <span class="ident">JobManagerHandle</span> {
+        <span class="kw">let</span> (<span class="ident">job_manager_tx</span>, <span class="ident">job_manager_rx</span>) <span class="op">=</span> <span class="ident">mpsc::channel</span>(<span class="number">16</span>);
+        <span class="self">self</span>.<span class="ident">from_job_runner_channel</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">job_manager_rx</span>);
+        <span class="kw">let</span> <span class="ident">jh</span>: <span class="ident">JoinHandle</span><span class="op">&lt;</span><span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">JobManagerOutput</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">tokio::spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
             <span class="kw">loop</span> {
-                <span class="kw">match</span> <span class="self">self</span>.<span class="ident">rx</span>.<span class="ident">recv</span>().<span class="kw">await</span> {
-                    <span class="prelude-val">Ok</span>(<span class="ident">Message::ToJobManager</span>(<span class="ident">m</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="kw">use</span> <span class="ident">NotifyJobManager</span>::<span class="kw-2">*</span>;
-                        <span class="kw">match</span> <span class="ident">m</span> {
-                            <span class="ident">LogInfo</span> { <span class="ident">sender</span>, <span class="ident">message</span> } <span class="op">=</span><span class="op">&gt;</span> {
-                                <span class="ident">log_info</span>(
-                                    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>,
-                                    <span class="macro">format!</span>(<span class="string">&quot;{}: {} &quot;</span>, <span class="ident">sender</span>, <span class="ident">message</span>),
-                                );
-                            }
-                            <span class="ident">LogError</span> { <span class="ident">sender</span>, <span class="ident">message</span> } <span class="op">=</span><span class="op">&gt;</span> {
-                                <span class="ident">log_err</span>(
-                                    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>,
-                                    <span class="macro">format!</span>(<span class="string">&quot;{}: {} &quot;</span>, <span class="ident">sender</span>, <span class="ident">message</span>),
-                                );
-                                <span class="self">self</span>.<span class="ident">num_log_errors</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-
-                                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">num_log_errors</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">max_errors</span> {
-                                    <span class="ident">log_err</span>(
-                                        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>,
-                                        <span class="string">&quot;Reached too many errors, shutting down&quot;</span>,
-                                    );
-                                    <span class="self">self</span>.<span class="ident">tx</span>
-                                        .<span class="ident">send</span>(<span class="ident">Message::ToJobRunner</span>(
-                                            <span class="ident">NotifyJobRunner::TooManyErrors</span>,
-                                        ))
-                                        .<span class="ident">expect</span>(<span class="string">&quot;Fatal&quot;</span>);
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">from_jobs_rx</span>) <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">from_job_runner_channel</span> {
+                    <span class="kw">match</span> <span class="ident">from_jobs_rx</span>.<span class="ident">recv</span>().<span class="kw">await</span> {
+                        <span class="prelude-val">Some</span>(<span class="ident">Message::ToJobManager</span>(<span class="ident">m</span>)) =&gt; {
+                            <span class="kw">use</span> <span class="ident">NotifyJobManager</span>::<span class="kw-2">*</span>;
+                            <span class="kw">match</span> <span class="ident">m</span> {
+                                <span class="ident">LogInfo</span> { <span class="ident">sender</span>, <span class="ident">message</span> } =&gt; {
+                                    <span class="ident">log_info</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>, <span class="macro">format!</span>(<span class="string">&quot;{}: {} &quot;</span>, <span class="ident">sender</span>, <span class="ident">message</span>));
                                 }
-                            }
-                            <span class="ident">TaskStarted</span> { <span class="ident">sender</span> } <span class="op">=</span><span class="op">&gt;</span> {
-                                <span class="self">self</span>.<span class="ident">num_tasks_started</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-                                <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="macro">format!</span>(
-                                    <span class="string">&quot;Started {} tasks: {}/{}&quot;</span>,
-                                    <span class="ident">sender</span>,
-                                    <span class="self">self</span>.<span class="ident">num_tasks_finished</span>,
-                                    <span class="self">self</span>.<span class="ident">num_tasks_started</span>
-                                );
+                                <span class="ident">LogError</span> { <span class="ident">sender</span>, <span class="ident">message</span> } =&gt; {
+                                    <span class="ident">log_err</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>, <span class="macro">format!</span>(<span class="string">&quot;{}: {} &quot;</span>, <span class="ident">sender</span>, <span class="ident">message</span>));
+                                    <span class="self">self</span>.<span class="ident">num_log_errors</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
 
-                                <span class="self">self</span>.<span class="ident">tx</span>
-                                    .<span class="ident">send</span>(<span class="ident">Message::ToJob</span>(<span class="ident">NotifyJob::Scale</span> {
-                                        <span class="ident">started</span>: <span class="self">self</span>.<span class="ident">num_tasks_started</span>,
-                                        <span class="ident">finished</span>: <span class="self">self</span>.<span class="ident">num_tasks_finished</span>,
-                                        <span class="ident">running</span>: <span class="self">self</span>.<span class="ident">num_tasks_started</span>
-                                            <span class="op">-</span> <span class="self">self</span>.<span class="ident">num_tasks_finished</span>,
-                                    }))
-                                    .<span class="ident">expect</span>(<span class="string">&quot;Fatal&quot;</span>);
-                                <span class="ident">log_info</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>, <span class="ident">s</span>);
-                            }
-                            <span class="ident">TaskFinished</span> { <span class="ident">sender</span> } <span class="op">=</span><span class="op">&gt;</span> {
-                                <span class="self">self</span>.<span class="ident">num_tasks_finished</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-                                <span class="self">self</span>.<span class="ident">tx</span>
-                                    .<span class="ident">send</span>(<span class="ident">Message::ToJob</span>(<span class="ident">NotifyJob::Scale</span> {
-                                        <span class="ident">started</span>: <span class="self">self</span>.<span class="ident">num_tasks_started</span>,
-                                        <span class="ident">finished</span>: <span class="self">self</span>.<span class="ident">num_tasks_finished</span>,
-                                        <span class="ident">running</span>: <span class="self">self</span>.<span class="ident">num_tasks_started</span>
-                                            <span class="op">-</span> <span class="self">self</span>.<span class="ident">num_tasks_finished</span>,
-                                    }))
-                                    .<span class="ident">expect</span>(<span class="string">&quot;Fatal&quot;</span>);
-                                <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="macro">format!</span>(
-                                    <span class="string">&quot;Finished {} tasks: {}/{}&quot;</span>,
-                                    <span class="ident">sender</span>,
-                                    <span class="self">self</span>.<span class="ident">num_tasks_finished</span>,
-                                    <span class="self">self</span>.<span class="ident">num_tasks_started</span>
-                                );
-                                <span class="ident">log_info</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>, <span class="ident">s</span>);
-                            }
-                            <span class="comment">// needed so the job manager can finish writing the log</span>
-                            <span class="ident">ShutdownJobManager</span> <span class="op">=</span><span class="op">&gt;</span> {
-                                <span class="kw">break</span>;
-                            }
-                            <span class="ident">JobStarted</span> { .. } <span class="op">=</span><span class="op">&gt;</span> {
-                                <span class="self">self</span>.<span class="ident">num_jobs_running</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-                            }
-                            <span class="ident">JobFinished</span> { .. } <span class="op">=</span><span class="op">&gt;</span> {
-                                <span class="self">self</span>.<span class="ident">num_jobs_running</span> <span class="op">-</span><span class="op">=</span> <span class="number">1</span>;
-                                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">num_jobs_running</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+                                    <span class="kw">if</span> <span class="self">self</span>.<span class="ident">num_log_errors</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">max_errors</span> {
+                                        <span class="ident">log_err</span>(
+                                            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>,
+                                            <span class="string">&quot;Reached too many global errors, shutting down&quot;</span>,
+                                        );
+                                        <span class="kw">for</span> (<span class="kw">_</span>, <span class="ident">tx</span>) <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">to_job_runner_tx</span> {
+                                            <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">Message::ToJobRunner</span>(
+                                                <span class="ident">NotifyJobRunner::TooManyErrors</span>,
+                                            ))
+                                            .<span class="kw">await</span>
+                                            .<span class="ident">expect</span>(<span class="string">&quot;Could not notify job_runner_tx&quot;</span>);
+                                        }
+                                    }
+                                }
+                                <span class="ident">TaskStarted</span> { <span class="ident">sender</span> } =&gt; {
+                                    <span class="self">self</span>.<span class="ident">num_tasks_started</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                                    <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="macro">format!</span>(
+                                        <span class="string">&quot;Started {} tasks: {}/{}&quot;</span>,
+                                        <span class="ident">sender</span>, <span class="self">self</span>.<span class="ident">num_tasks_finished</span>, <span class="self">self</span>.<span class="ident">num_tasks_started</span>
+                                    );
+
+                                    <span class="comment">/*
+                                    self.tx
+                                        .send(Message::ToJob(NotifyJob::Scale {
+                                            started: self.num_tasks_started,
+                                            finished: self.num_tasks_finished,
+                                            running: self.num_tasks_started
+                                                - self.num_tasks_finished,
+                                        }))
+                                        .expect(&quot;Fatal&quot;);
+                                    */</span>
+                                    <span class="ident">log_info</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>, <span class="ident">s</span>);
+                                }
+                                <span class="ident">TaskFinished</span> { <span class="ident">sender</span> } =&gt; {
+                                    <span class="self">self</span>.<span class="ident">num_tasks_finished</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                                    <span class="comment">/*
+                                    self.tx
+                                        .send(Message::ToJob(NotifyJob::Scale {
+                                            started: self.num_tasks_started,
+                                            finished: self.num_tasks_finished,
+                                            running: self.num_tasks_started
+                                                - self.num_tasks_finished,
+                                        }))
+                                        .expect(&quot;Fatal&quot;);
+                                    */</span>
+                                    <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="macro">format!</span>(
+                                        <span class="string">&quot;Finished {} tasks: {}/{}&quot;</span>,
+                                        <span class="ident">sender</span>, <span class="self">self</span>.<span class="ident">num_tasks_finished</span>, <span class="self">self</span>.<span class="ident">num_tasks_started</span>
+                                    );
+                                    <span class="ident">log_info</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>, <span class="ident">s</span>);
+                                }
+                                <span class="comment">// needed so the job manager can finish writing the log</span>
+                                <span class="ident">ShutdownJobManager</span> =&gt; {
+                                    <span class="kw">break</span>;
+                                }
+                                <span class="ident">JobStarted</span> { <span class="ident">sender_name</span>, <span class="ident">reply_rx</span> } =&gt; {
                                     <span class="ident">log_info</span>(
                                         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>,
-                                        <span class="string">&quot;JobManager: no more running jobs, shutting down&quot;</span>,
+                                        <span class="macro">format!</span>(<span class="string">&quot;JobManager: starting {}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">sender_name</span>),
                                     );
-                                    <span class="comment">// TODO: this method still leaves some messages</span>
-                                    <span class="comment">// in the queue</span>
-                                    <span class="kw">break</span>;
+                                    <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>): (<span class="ident">JobManagerTx</span>, <span class="ident">JobManagerRx</span>) <span class="op">=</span> <span class="ident">mpsc::channel</span>(<span class="number">1</span>);
+                                    <span class="ident">reply_rx</span>
+                                        .<span class="ident">send</span>(<span class="ident">rx</span>)
+                                        .<span class="ident">expect</span>(<span class="string">&quot;Fatal error replying with a JobManagerRx to a job, this should never happen&quot;</span>);
+                                    <span class="self">self</span>.<span class="ident">to_job_runner_tx</span>.<span class="ident">insert</span>(<span class="ident">sender_name</span>, <span class="ident">tx</span>);
+                                    <span class="self">self</span>.<span class="ident">num_jobs_running</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                                }
+                                <span class="ident">JobFinished</span> { <span class="ident">sender</span> } =&gt; {
+                                    <span class="self">self</span>.<span class="ident">num_jobs_running</span> <span class="op">-</span><span class="op">=</span> <span class="number">1</span>;
+                                    <span class="ident">log_info</span>(
+                                        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>,
+                                        <span class="macro">format!</span>(<span class="string">&quot;JobManager: finished {}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">sender</span>.<span class="ident">name</span>),
+                                    );
+                                    <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">to_job_runner_tx</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">sender</span>.<span class="ident">name</span>);
+                                    <span class="kw">if</span> <span class="self">self</span>.<span class="ident">num_jobs_running</span> <span class="op">==</span> <span class="number">0</span> {
+                                        <span class="ident">log_info</span>(
+                                            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>,
+                                            <span class="string">&quot;JobManager: no more running jobs, shutting down&quot;</span>,
+                                        );
+                                        <span class="comment">// TODO: this method still leaves some messages</span>
+                                        <span class="comment">// in the queue</span>
+                                        <span class="kw">break</span>;
+                                    }
                                 }
                             }
                         }
+                        <span class="prelude-val">None</span> =&gt; {
+                            <span class="macro">println!</span>(<span class="string">&quot;JobManager exiting got a none&quot;</span>);
+                            <span class="kw">break</span>;
+                        }
+                        <span class="comment">// ignore these here, as they are meant for Jobs, just log them</span>
+                        <span class="prelude-val">Some</span>(<span class="ident">Message::ToJob</span>(<span class="ident">m</span>)) =&gt; {
+                            <span class="ident">log_info</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>, <span class="macro">format!</span>(<span class="string">&quot;ToJob: {:?}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">m</span>));
+                        }
+                        <span class="prelude-val">Some</span>(<span class="ident">Message::ToJobRunner</span>(<span class="ident">m</span>)) =&gt; {
+                            <span class="ident">log_info</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;ToJobRunner: {:?}&quot;</span>, <span class="ident">m</span>));
+                        }
+                        <span class="prelude-val">Some</span>(<span class="ident">Message::ToDataSource</span>(<span class="ident">m</span>)) =&gt; {
+                            <span class="ident">log_info</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;ToDataSource: {:?}&quot;</span>, <span class="ident">m</span>));
+                        }
                     }
-                    <span class="comment">// ignore these here, as they are meant for Jobs, just log them</span>
-                    <span class="prelude-val">Ok</span>(<span class="ident">Message::ToJob</span>(<span class="ident">m</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="ident">log_info</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>, <span class="macro">format!</span>(<span class="string">&quot;ToJob: {:?}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">m</span>));
-                    }
-                    <span class="prelude-val">Ok</span>(<span class="ident">Message::ToJobRunner</span>(<span class="ident">m</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="ident">log_info</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;ToJobRunner: {:?}&quot;</span>, <span class="ident">m</span>));
-                    }
-                    <span class="prelude-val">Ok</span>(<span class="ident">Message::ToDataSource</span>(<span class="ident">m</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="ident">log_info</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;ToDataSource: {:?}&quot;</span>, <span class="ident">m</span>));
-                    }
-                    <span class="prelude-val">Err</span>(<span class="ident">RecvError::Lagged</span>(<span class="ident">num</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="macro">println!</span>(<span class="string">&quot;JobManager RecvError::Lagged by {} messages&quot;</span>, <span class="ident">num</span>);
-                    }
-                    <span class="prelude-val">Err</span>(<span class="ident">RecvError::Closed</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="macro">println!</span>(<span class="string">&quot;JobManager RecvError::Closed&quot;</span>);
-                        <span class="kw">break</span>;
-                    }
+                } <span class="kw">else</span> {
+                    <span class="kw">use</span> <span class="ident">std::time::Duration</span>;
+                    <span class="macro">println!</span>(<span class="string">&quot;WARNING: JobManager is waiting for jobs to start, will not exit if none start&quot;</span>);
+                    <span class="ident">tokio::time::sleep</span>(<span class="ident">Duration::from_millis</span>(<span class="number">500</span>)).<span class="kw">await</span>;
                 }
             }
+            <span class="kw">let</span> <span class="ident">o</span> <span class="op">=</span> <span class="ident">JobManagerOutput</span> { <span class="ident">num_errors</span>: <span class="self">self</span>.<span class="ident">num_log_errors</span> };
+            <span class="ident">log_info</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger_tx</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;JobManager: {:?}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">o</span>));
+            <span class="prelude-val">Ok</span>(<span class="ident">o</span>)
         });
-        (
-            <span class="ident">jh</span>,
-            <span class="ident">JobManagerChannel</span> {
-                <span class="comment">//join_handle: Some(jh),</span>
-                <span class="ident">tx</span>: <span class="ident">ret_tx</span>,
-                <span class="ident">rx</span>: <span class="ident">ret_rx</span>,
-            },
-        )
+        <span class="ident">JobManagerHandle</span> {
+            <span class="ident">join_handle</span>: <span class="ident">jh</span>,
+            <span class="ident">job_manager_tx</span>,
+        }
     }
 }
 
 <span class="kw">impl</span> <span class="ident">Message</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">log_info</span><span class="op">&lt;</span><span class="ident">A</span>, <span class="ident">B</span><span class="op">&gt;</span>(<span class="ident">sender</span>: <span class="ident">A</span>, <span class="ident">message</span>: <span class="ident">B</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">log_info</span><span class="op">&lt;</span><span class="ident">A</span>, <span class="ident">B</span><span class="op">&gt;</span>(<span class="ident">sender</span>: <span class="ident">A</span>, <span class="ident">message</span>: <span class="ident">B</span>) -&gt; <span class="self">Self</span>
     <span class="kw">where</span>
         <span class="ident">A</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
         <span class="ident">B</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
@@ -630,7 +729,7 @@ impl JobManagerChannel {
         })
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">log_err</span><span class="op">&lt;</span><span class="ident">A</span>, <span class="ident">B</span><span class="op">&gt;</span>(<span class="ident">sender</span>: <span class="ident">A</span>, <span class="ident">message</span>: <span class="ident">B</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">log_err</span><span class="op">&lt;</span><span class="ident">A</span>, <span class="ident">B</span><span class="op">&gt;</span>(<span class="ident">sender</span>: <span class="ident">A</span>, <span class="ident">message</span>: <span class="ident">B</span>) -&gt; <span class="self">Self</span>
     <span class="kw">where</span>
         <span class="ident">A</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
         <span class="ident">B</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
@@ -641,7 +740,7 @@ impl JobManagerChannel {
         })
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">broadcast_task_start</span><span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span>(<span class="ident">sender</span>: <span class="ident">A</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">broadcast_task_start</span><span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span>(<span class="ident">sender</span>: <span class="ident">A</span>) -&gt; <span class="self">Self</span>
     <span class="kw">where</span>
         <span class="ident">A</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
     {
@@ -650,7 +749,7 @@ impl JobManagerChannel {
         })
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">broadcast_task_end</span><span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span>(<span class="ident">sender</span>: <span class="ident">A</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">broadcast_task_end</span><span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span>(<span class="ident">sender</span>: <span class="ident">A</span>) -&gt; <span class="self">Self</span>
     <span class="kw">where</span>
         <span class="ident">A</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
     {
@@ -659,27 +758,25 @@ impl JobManagerChannel {
         })
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">broadcast_job_start</span><span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span>(<span class="ident">sender</span>: <span class="ident">A</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">broadcast_job_start</span><span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span>(<span class="ident">sender</span>: <span class="ident">A</span>, <span class="ident">reply_rx</span>: <span class="ident">oneshot::Sender</span><span class="op">&lt;</span><span class="ident">JobManagerRx</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span>
     <span class="kw">where</span>
         <span class="ident">A</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
     {
         <span class="ident">Message::ToJobManager</span>(<span class="ident">NotifyJobManager::JobStarted</span> {
-            <span class="ident">sender</span>: <span class="ident">sender</span>.<span class="ident">into</span>(),
+            <span class="ident">sender_name</span>: <span class="ident">sender</span>.<span class="ident">into</span>(),
+            <span class="ident">reply_rx</span>,
         })
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">broadcast_job_end</span><span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span>(<span class="ident">sender</span>: <span class="ident">A</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>
-    <span class="kw">where</span>
-        <span class="ident">A</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">broadcast_job_end</span>(<span class="ident">job</span>: <span class="kw-2">&amp;</span><span class="ident">JobRunner</span>) -&gt; <span class="self">Self</span> {
         <span class="ident">Message::ToJobManager</span>(<span class="ident">NotifyJobManager::JobFinished</span> {
-            <span class="ident">sender</span>: <span class="ident">sender</span>.<span class="ident">into</span>(),
+            <span class="ident">sender</span>: <span class="ident">SenderDetails</span> {
+                <span class="ident">id</span>: <span class="ident">String::from</span>(<span class="ident">job</span>.<span class="ident">id</span>()),
+                <span class="ident">name</span>: <span class="ident">String::from</span>(<span class="ident">job</span>.<span class="ident">name</span>()),
+            },
         })
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">shutdown_job_manager</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="ident">Message::ToJobManager</span>(<span class="ident">NotifyJobManager::ShutdownJobManager</span>)
     }
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="etl_core" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div><script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="etl_core" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
+</body></html>

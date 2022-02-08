@@ -1,1 +1,1 @@
-window.ALL_CRATES = ["etl_core","etl_mysql","etl_s3"];
+window.ALL_CRATES = ["etl_aws_utils","etl_core","etl_mysql","etl_sftp"];

@@ -1,0 +1,2 @@
+cargo:rustc-env=TYPENUM_BUILD_CONSTS=/home/yuri/workspace/rust/etl-tools-rs/docs/release/build/typenum-50110ea051193a61/out/consts.rs
+cargo:rustc-env=TYPENUM_BUILD_OP=/home/yuri/workspace/rust/etl-tools-rs/docs/release/build/typenum-50110ea051193a61/out/op.rs

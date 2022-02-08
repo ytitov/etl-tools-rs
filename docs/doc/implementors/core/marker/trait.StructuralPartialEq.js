@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["etl_core"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.58.1/core/marker/trait.StructuralPartialEq.html\" title=\"trait core::marker::StructuralPartialEq\">StructuralPartialEq</a> for <a class=\"enum\" href=\"etl_core/job/error/enum.JobRunnerError.html\" title=\"enum etl_core::job::error::JobRunnerError\">JobRunnerError</a>","synthetic":false,"types":["etl_core::job::error::JobRunnerError"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
