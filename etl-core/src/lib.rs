@@ -4,6 +4,7 @@
 //! using these elements.  It also provides some simple state management which is loaded and
 //! saved using the [crate::datastore::SimpleStore] trait which is designed for lading whole
 //! files
+
 pub mod datastore;
 /// Used by the [crate::datastore::bytes_source::BytesSource] to help decode various streams.  So
 /// anything that implements a BytesSource target, can select which decoder they want to use.  For
