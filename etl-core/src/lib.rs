@@ -4,6 +4,7 @@ pub mod datastore;
 /// example either [crate::decoder::csv::CsvDecoder] or [crate::decoder::json::JsonDecoder]
 pub mod decoder;
 pub mod utils;
+/// Adds facilities to implement queues
 pub mod queue;
 pub mod preamble {
     pub use crate::datastore::transform_store::TransformDataSource;
