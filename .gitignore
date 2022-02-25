@@ -1,1 +1,4 @@
 target
+docs/release/build
+docs/release/.*
+docs/debug
