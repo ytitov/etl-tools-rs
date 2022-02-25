@@ -18,8 +18,12 @@ pub mod deps {
     pub use tokio;
     pub use log;
 }
+use crate::datastore::DataSource;
 pub mod job;
+/// Create pipelines linking [DataSource]s together; Provides state management based on a job id,
+/// and records each step.  A successful job with the same job id will not run more than once
 pub mod job_manager;
+/// Perform joins between two [DataSource]s
 pub mod joins;
 /// for splitting streams into many identical DataSources
 pub mod splitter;
