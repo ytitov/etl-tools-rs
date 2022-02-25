@@ -33,6 +33,7 @@
 <span id="32">32</span>
 <span id="33">33</span>
 <span id="34">34</span>
+<span id="35">35</span>
 </pre><pre class="rust"><code><span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">datastore</span>;
 <span class="doccomment">/// Used by the [crate::datastore::bytes_source::BytesSource] to help decode various streams.  So</span>
 <span class="doccomment">/// anything that implements a BytesSource target, can select which decoder they want to use.  For</span>
@@ -58,6 +59,7 @@
     <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">tokio</span>;
     <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">log</span>;
 }
+<span class="doccomment">/// responsible for generating and running pipelines, including any run-time configurations</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">job</span>;
 <span class="doccomment">/// Create pipelines linking [crate::datastore::DataSource]s together; Provides state management based on a job id,</span>
 <span class="doccomment">/// and records each step.  A successful job with the same job id will not run more than once</span>
