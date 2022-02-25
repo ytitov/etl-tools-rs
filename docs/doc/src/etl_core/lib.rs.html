@@ -29,9 +29,17 @@
 <span id="28">28</span>
 <span id="29">29</span>
 <span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
 </pre><pre class="rust"><code><span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">datastore</span>;
+<span class="doccomment">/// Used by the [crate::datastore::bytes_source::BytesSource] to help decode various streams.  So</span>
+<span class="doccomment">/// anything that implements a BytesSource target, can select which decoder they want to use.  For</span>
+<span class="doccomment">/// example either [crate::decoder::csv::CsvDecoder] or [crate::decoder::json::JsonDecoder]</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">decoder</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">utils</span>;
+<span class="doccomment">/// Adds facilities to implement queues</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">queue</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">preamble</span> {
     <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::datastore::transform_store::TransformDataSource</span>;
@@ -41,6 +49,7 @@
         <span class="ident">JobManager</span>, <span class="ident">JobManagerChannel</span>, <span class="ident">JobManagerConfig</span>, <span class="ident">JobManagerHandle</span>, <span class="ident">Message</span>,
     };
 }
+<span class="doccomment">/// deps which are re-exported (and used in the core)</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">deps</span> {
     <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">anyhow</span>;
     <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
@@ -49,12 +58,11 @@
     <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">tokio</span>;
     <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">log</span>;
 }
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::datastore::DataSource</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">job</span>;
-<span class="doccomment">/// Create pipelines linking [DataSource]s together; Provides state management based on a job id,</span>
+<span class="doccomment">/// Create pipelines linking [crate::datastore::DataSource]s together; Provides state management based on a job id,</span>
 <span class="doccomment">/// and records each step.  A successful job with the same job id will not run more than once</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">job_manager</span>;
-<span class="doccomment">/// Perform joins between two [DataSource]s</span>
+<span class="doccomment">/// Perform joins between two [crate::datastore::DataSource]s</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">joins</span>;
 <span class="doccomment">/// for splitting streams into many identical DataSources</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">splitter</span>;
