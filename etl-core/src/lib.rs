@@ -23,6 +23,7 @@ pub mod deps {
     pub use tokio;
     pub use log;
 }
+/// responsible for generating and running pipelines, including any run-time configurations
 pub mod job;
 /// Create pipelines linking [crate::datastore::DataSource]s together; Provides state management based on a job id,
 /// and records each step.  A successful job with the same job id will not run more than once
