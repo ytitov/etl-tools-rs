@@ -40,12 +40,14 @@
 <span id="39">39</span>
 <span id="40">40</span>
 <span id="41">41</span>
+<span id="42">42</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This library provides a foundation to construct pipelines using several basic principles.</span>
 <span class="doccomment">//! There are stream producers and consumers, which must implement the traits [crate::datastore::DataSource]</span>
 <span class="doccomment">//! and [crate::datastore::DataOutput].  [crate::job::JobRunner] is used to construct pipelines </span>
 <span class="doccomment">//! using these elements.  It also provides some simple state management which is loaded and</span>
 <span class="doccomment">//! saved using the [crate::datastore::SimpleStore] trait which is designed for lading whole</span>
 <span class="doccomment">//! files</span>
+
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">datastore</span>;
 <span class="doccomment">/// Used by the [crate::datastore::bytes_source::BytesSource] to help decode various streams.  So</span>
 <span class="doccomment">/// anything that implements a BytesSource target, can select which decoder they want to use.  For</span>
