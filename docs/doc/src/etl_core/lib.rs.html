@@ -41,12 +41,20 @@
 <span id="40">40</span>
 <span id="41">41</span>
 <span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This library provides a foundation to construct pipelines using several basic principles.</span>
 <span class="doccomment">//! There are stream producers and consumers, which must implement the traits [crate::datastore::DataSource]</span>
 <span class="doccomment">//! and [crate::datastore::DataOutput].  [crate::job::JobRunner] is used to construct pipelines </span>
 <span class="doccomment">//! using these elements.  It also provides some simple state management which is loaded and</span>
-<span class="doccomment">//! saved using the [crate::datastore::SimpleStore] trait which is designed for lading whole</span>
+<span class="doccomment">//! saved using the [crate::datastore::SimpleStore] trait which is designed for loading whole</span>
 <span class="doccomment">//! files</span>
+<span class="doccomment">//! It is important to note that the purpose of this library is to provide a framework to manage</span>
+<span class="doccomment">//! and organize pipelines.  It is not meant to replace data anylitical tools or databases.  The</span>
+<span class="doccomment">//! main use case for the author is performing 100 G JSON data merges and mapping them to a schema</span>
+<span class="doccomment">//! located on an MySql database.</span>
 
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">datastore</span>;
 <span class="doccomment">/// Used by the [crate::datastore::bytes_source::BytesSource] to help decode various streams.  So</span>
