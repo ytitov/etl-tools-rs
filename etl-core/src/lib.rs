@@ -2,8 +2,12 @@
 //! There are stream producers and consumers, which must implement the traits [crate::datastore::DataSource]
 //! and [crate::datastore::DataOutput].  [crate::job::JobRunner] is used to construct pipelines 
 //! using these elements.  It also provides some simple state management which is loaded and
-//! saved using the [crate::datastore::SimpleStore] trait which is designed for lading whole
+//! saved using the [crate::datastore::SimpleStore] trait which is designed for loading whole
 //! files
+//! It is important to note that the purpose of this library is to provide a framework to manage
+//! and organize pipelines.  It is not meant to replace data anylitical tools or databases.  The
+//! main use case for the author is performing 100 G JSON data merges and mapping them to a schema
+//! located on an MySql database.
 
 pub mod datastore;
 /// Used by the [crate::datastore::bytes_source::BytesSource] to help decode various streams.  So
