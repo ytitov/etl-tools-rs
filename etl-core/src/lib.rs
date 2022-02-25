@@ -10,6 +10,7 @@ pub mod preamble {
         JobManager, JobManagerChannel, JobManagerConfig, JobManagerHandle, Message,
     };
 }
+/// deps which are re-exported (and used in the core)
 pub mod deps {
     pub use anyhow;
     pub use async_trait::async_trait;
