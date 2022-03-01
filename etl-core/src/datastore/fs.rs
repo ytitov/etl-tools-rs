@@ -22,7 +22,7 @@ impl BytesSource for LocalFs {
 
     fn start_stream(self: Box<Self>) -> Result<BytesSourceTask, DataStoreError> {
         use tokio::fs::File;
-        use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
+        use tokio::io::{AsyncBufReadExt, BufReader};
         use tokio::sync::mpsc::channel;
         let (tx, rx) = channel(1);
         let files = self.files.clone();
@@ -33,7 +33,7 @@ impl BytesSource for LocalFs {
             for fname in files {
                 //TODO: would prefer this to fail higher, but the test is not handled properly
                 //higher up.  must create a test then rectify this
-                let mut file = File::open(Path::new(&home).join(&fname))
+                let file = File::open(Path::new(&home).join(&fname))
                     .await
                     .expect("File not found");
                 // 68 mb in size

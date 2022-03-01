@@ -44,3 +44,5 @@ pub mod joins;
 /// for splitting streams into many identical DataSources
 pub mod splitter;
 pub mod transformer;
+/// take in a stream and output same items but as batches
+pub mod batch;

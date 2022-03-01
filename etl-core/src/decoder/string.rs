@@ -1,7 +1,9 @@
 use super::*;
 pub struct StringDecoder {
+    /// always uses lossy decoder at this time
     pub lossy: bool,
 }
+
 impl StringDecoder {
     pub async fn new(self, source: Box<dyn BytesSource>) -> Box<dyn DataSource<String>>
     where
@@ -23,7 +25,6 @@ impl<T: Debug + 'static + Send + Sync> DecodeStream<T> for StringDecoder
         use tokio::task::JoinHandle;
         let (tx, rx) = channel(1);
 
-        //let (mut source_rx, source_stream_jh) = source.start_stream().await?;
         let source_name = source.name();
         let name = source_name.clone();
 
@@ -44,39 +45,6 @@ impl<T: Debug + 'static + Send + Sync> DecodeStream<T> for StringDecoder
                                             DataStoreError::send_error(&name, &source, e)
                                         })?;
                                     lines_scanned += 1;
-                                    /*
-                                    match String::from_utf8(&*content) {
-                                        Ok(r) => {
-                                            tx.send(Ok(DataSourceMessage::new(
-                                                "MockJsonDataSource",
-                                                r,
-                                            )))
-                                            .await
-                                            .map_err(|e| {
-                                                DataStoreError::send_error(&name, &source, e)
-                                            })?;
-                                            lines_scanned += 1;
-                                        }
-                                        Err(val) => {
-                                            match tx
-                                                .send(Err(DataStoreError::Deserialize {
-                                                    message: val.to_string(),
-                                                    attempted_string: format!("{:?}", content),
-                                                }))
-                                                .await
-                                            {
-                                                Ok(_) => {
-                                                    lines_scanned += 1;
-                                                }
-                                                Err(e) => {
-                                                    return Err(DataStoreError::send_error(
-                                                        &name, &source, e,
-                                                    ));
-                                                }
-                                            }
-                                        }
-                                    };
-                                    */
                                 }
                                 Some(Err(e)) => {
                                     println!("An error happened in StringDecoder: {}", e);

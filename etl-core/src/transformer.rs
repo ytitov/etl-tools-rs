@@ -1,6 +1,5 @@
 use crate::datastore::error::DataStoreError;
 use crate::datastore::*;
-use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
@@ -10,10 +9,8 @@ pub struct Transformer<I, O> {
     pub map: fn(I) -> DataOutputItemResult<O>,
 }
 
-impl<
-        I: DeserializeOwned + Debug + Send + Sync + 'static,
-        O: DeserializeOwned + Debug + Send + Sync + 'static,
-    > DataSource<O> for Transformer<I, O>
+impl<I: Debug + Send + Sync + 'static, O: Debug + Send + Sync + 'static> DataSource<O>
+    for Transformer<I, O>
 {
     fn name(&self) -> String {
         format!("Transformer-{}", self.input.name())
