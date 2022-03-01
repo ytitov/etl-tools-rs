@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["csv",""],["json",""]],"struct":[["DecodedSource",""]],"trait":[["DecodeStream",""]]});
+initSidebarItems({"mod":[["csv",""],["json",""],["string",""]],"struct":[["DecodedSource",""]],"trait":[["DecodeStream",""]]});
