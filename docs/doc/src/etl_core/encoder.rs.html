@@ -215,22 +215,6 @@
 <span id="214">214</span>
 <span id="215">215</span>
 <span id="216">216</span>
-<span id="217">217</span>
-<span id="218">218</span>
-<span id="219">219</span>
-<span id="220">220</span>
-<span id="221">221</span>
-<span id="222">222</span>
-<span id="223">223</span>
-<span id="224">224</span>
-<span id="225">225</span>
-<span id="226">226</span>
-<span id="227">227</span>
-<span id="228">228</span>
-<span id="229">229</span>
-<span id="230">230</span>
-<span id="231">231</span>
-<span id="232">232</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::datastore::error</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::datastore</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
@@ -263,13 +247,11 @@
     }
 }
 
-<span class="doccomment">/// the goal here is to create a DataOutput which can accept a type I and an encoder which can</span>
-<span class="doccomment">/// convert I to Bytes.  </span>
+<span class="doccomment">/// A convenience wrapper which takes in any decoder which will decode to Bytes and accepts any</span>
+<span class="doccomment">/// DataOutput which will accepts bytes and wraps that all into a DataOutput</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">EncodedOutput</span><span class="op">&lt;</span><span class="ident">I</span>: <span class="ident">Debug</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span> {
     <span class="doccomment">/// takes any I and converts to Bytes.  For example csv encoder will implement EncodeStream</span>
     <span class="kw">pub</span> <span class="ident">encoder</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">EncodeStream</span><span class="op">&lt;</span><span class="ident">I</span>, <span class="ident">Bytes</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="comment">//this doesn&#39;t work either because need to send stuff to the encoder</span>
-    <span class="comment">//encoder_ds_task: DataSourceTask&lt;I&gt;,</span>
     <span class="doccomment">/// handles writing the result of the encoder</span>
     <span class="kw">pub</span> <span class="ident">output</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">DataOutput</span><span class="op">&lt;</span><span class="ident">Bytes</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
@@ -297,11 +279,9 @@
         <span class="kw">let</span> (<span class="ident">final_data_output_tx</span>, <span class="ident">final_data_output_jh</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">output</span>.<span class="ident">start_stream</span>(<span class="ident">jm_tx</span>).<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">finalized_output_jh</span>: <span class="ident">JoinHandle</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataOutputStats</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span>
             <span class="ident">tokio::spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">num_lines_sent</span> <span class="op">=</span> <span class="number">0_usize</span>;
                 <span class="kw">loop</span> {
                     <span class="kw">match</span> <span class="ident">encoded_datasource_rx</span>.<span class="ident">recv</span>().<span class="kw">await</span> {
                         <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(<span class="ident">DataSourceMessage::Data</span> { <span class="ident">source</span>, <span class="ident">content</span> })) =&gt; {
-                            <span class="macro">println!</span>(<span class="string">&quot;2: encoded_datasource recv&quot;</span>);
                             <span class="ident">final_data_output_tx</span>
                                 .<span class="ident">send</span>(<span class="ident">DataOutputMessage::Data</span>(<span class="ident">content</span>))
                                 .<span class="kw">await</span>
@@ -312,20 +292,12 @@
                                         <span class="ident">e</span>,
                                     )
                                 })<span class="question-mark">?</span>;
-                            <span class="ident">num_lines_sent</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                         }
                         <span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(<span class="ident">er</span>)) =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">er</span>),
                         <span class="prelude-val">None</span> =&gt; <span class="kw">break</span>,
                     }
                 }
                 <span class="ident">encoded_datasource_jh</span>.<span class="kw">await</span><span class="question-mark">?</span><span class="question-mark">?</span>;
-                <span class="comment">//final_data_output_jh.await??; // wait for final data output</span>
-                <span class="comment">/*
-                Ok(DataOutputStats {
-                    name: &quot;EncodedOutput&quot;.to_string(),
-                    lines_written: num_lines_sent,
-                })
-                */</span>
                 <span class="prelude-val">Ok</span>(<span class="ident">final_data_output_jh</span>.<span class="kw">await</span><span class="question-mark">?</span>.<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">er</span><span class="op">|</span> {
                     <span class="ident">DataStoreError::FatalIO</span>(<span class="macro">format!</span>(
                         <span class="string">&quot;Error inside the DataOutput: {}&quot;</span>,
@@ -344,7 +316,6 @@
             <span class="kw">loop</span> {
                 <span class="kw">match</span> <span class="ident">input_rx</span>.<span class="ident">recv</span>().<span class="kw">await</span> {
                     <span class="prelude-val">Some</span>(<span class="ident">DataOutputMessage::Data</span>(<span class="ident">data</span>)) =&gt; {
-                        <span class="macro">println!</span>(<span class="string">&quot;1: EncodedOutput output getting data&quot;</span>);
                         <span class="ident">data_source_tx</span>
                             .<span class="ident">send</span>(<span class="prelude-val">Ok</span>(<span class="ident">DataSourceMessage::new</span>(<span class="kw-2">&amp;</span><span class="ident">output_name</span>, <span class="ident">data</span>)))
                             .<span class="kw">await</span>
@@ -356,7 +327,6 @@
                     <span class="prelude-val">None</span> =&gt; <span class="kw">break</span>,
                 }
             }
-            <span class="comment">//data_source_jh.await??; // ensure to wait that the data source is done</span>
             <span class="prelude-val">Ok</span>(<span class="ident">finalized_output_jh</span>.<span class="kw">await</span><span class="question-mark">?</span><span class="question-mark">?</span>) <span class="comment">// the actual stats are returned from the passed output</span>
         });
         <span class="prelude-val">Ok</span>((<span class="ident">input_tx</span>, <span class="ident">jh</span>))
@@ -452,12 +422,10 @@
                     });
                 }
                 <span class="prelude-val">Err</span>(<span class="ident">er</span>) =&gt; {
-                    <span class="macro">println!</span>(<span class="string">&quot; RAN INTO ERROR: {} &quot;</span>, <span class="ident">er</span>);
                     <span class="kw">return</span> <span class="ident">Box::new</span>(<span class="ident">EncodedSource</span> {
                         <span class="ident">source_name</span>,
                         <span class="ident">ds_task_result</span>: <span class="prelude-val">Err</span>(<span class="ident">er</span>),
                     });
-                    <span class="comment">//return Err(er);</span>
                 }
             }
         }
