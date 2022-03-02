@@ -48,6 +48,7 @@
 <span id="47">47</span>
 <span id="48">48</span>
 <span id="49">49</span>
+<span id="50">50</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This library provides a foundation to construct pipelines using several basic principles.</span>
 <span class="doccomment">//! There are stream producers and consumers, which must implement the traits [crate::datastore::DataSource]</span>
 <span class="doccomment">//! and [crate::datastore::DataOutput].  [crate::job::JobRunner] is used to construct pipelines </span>
@@ -84,6 +85,7 @@
     <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">thiserror</span>;
     <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">tokio</span>;
     <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">log</span>;
+    <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">bytes</span>;
 }
 <span class="doccomment">/// responsible for generating and running pipelines, including any run-time configurations</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">job</span>;

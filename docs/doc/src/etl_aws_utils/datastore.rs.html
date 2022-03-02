@@ -731,8 +731,6 @@
 <span id="730">730</span>
 <span id="731">731</span>
 <span id="732">732</span>
-<span id="733">733</span>
-<span id="734">734</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">etl_core::datastore::error</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">etl_core::datastore</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">etl_core::preamble</span>::<span class="kw-2">*</span>;
@@ -744,6 +742,7 @@
 <span class="comment">//use std::sync::{Arc, Mutex};</span>
 <span class="kw">use</span> <span class="ident">etl_core::deps</span>::{
     <span class="ident">anyhow</span>, <span class="ident">async_trait</span>,
+    <span class="ident">bytes::Bytes</span>,
     <span class="ident">serde::de::DeserializeOwned</span>,
     <span class="ident">serde::Serialize</span>,
     <span class="ident">tokio</span>,
@@ -1128,7 +1127,7 @@
                                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">bytes_vec</span>) <span class="op">=</span> <span class="ident">wtr</span>.<span class="ident">into_inner</span>() {
                                         <span class="kw">match</span> <span class="ident">std::str::from_utf8</span>(<span class="kw-2">&amp;</span><span class="ident">bytes_vec</span>) {
                                             <span class="prelude-val">Ok</span>(<span class="ident">line</span>) =&gt; {
-                                                <span class="ident">s3_tx</span>.<span class="ident">send</span>(<span class="ident">line</span>.<span class="ident">to_owned</span>()).<span class="kw">await</span><span class="question-mark">?</span>;
+                                                <span class="ident">s3_tx</span>.<span class="ident">send</span>(<span class="ident">Bytes::from</span>(<span class="ident">line</span>.<span class="ident">to_owned</span>())).<span class="kw">await</span><span class="question-mark">?</span>;
                                                 <span class="ident">num_lines_sent</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                                             }
                                             <span class="prelude-val">Err</span>(<span class="ident">er</span>) =&gt; {
@@ -1191,7 +1190,7 @@
                                 <span class="kw">match</span> <span class="ident">serde_json::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">data</span>) {
                                     <span class="prelude-val">Ok</span>(<span class="kw-2">mut</span> <span class="ident">line</span>) =&gt; {
                                         <span class="ident">line</span>.<span class="ident">push_str</span>(<span class="string">&quot;\n&quot;</span>);
-                                        <span class="ident">s3_tx</span>.<span class="ident">send</span>(<span class="ident">line</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+                                        <span class="ident">s3_tx</span>.<span class="ident">send</span>(<span class="ident">Bytes::from</span>(<span class="ident">line</span>)).<span class="kw">await</span><span class="question-mark">?</span>;
                                         <span class="ident">lines_written</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                                     }
                                     <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
@@ -1242,7 +1241,6 @@
     }
     */</span>
 }
-
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_client</span>(
     <span class="ident">profile_provider</span>: <span class="ident">ProfileProvider</span>,
     <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>,
@@ -1254,11 +1252,12 @@
     ))
 }
 
+<span class="doccomment">/// Upload to S3 with 30 mb size increments</span>
 <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">s3_write_bytes_multipart</span>(
     <span class="ident">profile_provider</span>: <span class="ident">ProfileProvider</span>,
     <span class="ident">s3_bucket</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
     <span class="ident">s3_key</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-    <span class="kw-2">mut</span> <span class="ident">body_stream</span>: <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
+    <span class="kw-2">mut</span> <span class="ident">body_stream</span>: <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">Bytes</span><span class="op">&gt;</span>,
     <span class="ident">region</span>: <span class="ident">Region</span>,
 ) -&gt; <span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">JoinHandle</span><span class="op">&lt;</span><span class="ident">anyhow::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">S3Client::new_with</span>(<span class="ident">HttpClient::new</span>().<span class="ident">unwrap</span>(), <span class="ident">profile_provider</span>, <span class="ident">region</span>);
@@ -1279,7 +1278,6 @@
             })
             .<span class="kw">await</span><span class="question-mark">?</span>
         {
-            <span class="kw">use</span> <span class="ident">bytes::Bytes</span>;
             <span class="kw">use</span> <span class="ident">bytes::BytesMut</span>;
             <span class="kw">use</span> <span class="ident">rusoto_core::ByteStream</span>;
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> <span class="ident">BytesMut::with_capacity</span>(<span class="ident">max_size</span>);
@@ -1287,8 +1285,9 @@
             <span class="kw">loop</span> {
                 <span class="kw">match</span> <span class="ident">body_stream</span>.<span class="ident">recv</span>().<span class="kw">await</span> {
                     <span class="prelude-val">Some</span>(<span class="ident">s</span>) =&gt; {
-                        <span class="ident">buf</span>.<span class="ident">extend</span>(<span class="ident">Bytes::from</span>(<span class="ident">s</span>));
+                        <span class="ident">buf</span>.<span class="ident">extend</span>(<span class="ident">s</span>);
                         <span class="kw">if</span> <span class="ident">buf</span>.<span class="ident">len</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident">max_size</span> {
+                            <span class="macro">println!</span>(<span class="string">&quot;uploading because reached max size&quot;</span>);
                             <span class="kw">let</span> <span class="ident">b</span> <span class="op">=</span> <span class="ident">buf</span>;
                             <span class="ident">buf</span> <span class="op">=</span> <span class="ident">BytesMut::with_capacity</span>(<span class="ident">max_size</span>);
                             <span class="kw">let</span> <span class="ident">request</span> <span class="op">=</span> <span class="ident">UploadPartRequest</span> {
@@ -1349,7 +1348,6 @@
                                 <span class="comment">//part_number += 1;</span>
                             }
                             <span class="prelude-val">Err</span>(<span class="ident">er</span>) =&gt; {
-                                <span class="macro">println!</span>(<span class="string">&quot;ERROR: s3_write_bytes_multipart {}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">er</span>);
                                 <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">anyhow::anyhow!</span>(<span class="string">&quot;Error uploading part to s3: {}&quot;</span>, <span class="ident">er</span>));
                             }
                         }
@@ -1415,12 +1413,10 @@
             }
             <span class="prelude-val">Err</span>(<span class="ident">RusotoError::Unknown</span>(<span class="kw-2">ref</span> <span class="ident">e</span>)) =&gt; {
                 <span class="kw">if</span> <span class="ident">e</span>.<span class="ident">status</span> <span class="op">==</span> <span class="kw-2">*</span><span class="kw-2">&amp;</span><span class="ident">status_503</span> {
-                    <span class="comment">//println!(&quot;Retrying after 503: {:?}&quot;, e);</span>
                     <span class="macro">println!</span>(<span class="string">&quot;Retrying after 503: {}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">s3_key</span>);
                 }
             }
             <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
-                <span class="comment">//println!(&quot;ERROR: s3_write_text_file {}&quot;, &amp;e);</span>
                 <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Error: s3_write_text_file: {}&quot;</span>, <span class="ident">e</span>));
             }
         };

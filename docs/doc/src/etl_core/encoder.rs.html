@@ -215,6 +215,10 @@
 <span id="214">214</span>
 <span id="215">215</span>
 <span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::datastore::error</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::datastore</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
@@ -267,7 +271,6 @@
         <span class="comment">// data sent to the data output will be forwarded here</span>
         <span class="kw">let</span> (<span class="ident">data_source_tx</span>, <span class="ident">data_source_rx</span>): (<span class="kw">_</span>, <span class="ident">DataSourceRx</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) <span class="op">=</span> <span class="ident">channel</span>(<span class="number">1</span>);
 
-        <span class="comment">//let data_source_task: DataSourceTask&lt;T&gt; = (data_source_rx, data_source_jh);</span>
         <span class="kw">let</span> <span class="ident">encoded_datasource</span> <span class="op">=</span> <span class="self">self</span>
             .<span class="ident">encoder</span>
             .<span class="ident">encode_source</span>(<span class="ident">Box::new</span>(<span class="ident">data_source_rx</span>) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">DataSource</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>)
@@ -277,7 +280,7 @@
         <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">encoded_datasource_rx</span>, <span class="ident">encoded_datasource_jh</span>) <span class="op">=</span>
             <span class="ident">encoded_datasource</span>.<span class="ident">start_stream</span>()<span class="question-mark">?</span>;
         <span class="kw">let</span> (<span class="ident">final_data_output_tx</span>, <span class="ident">final_data_output_jh</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">output</span>.<span class="ident">start_stream</span>(<span class="ident">jm_tx</span>).<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">finalized_output_jh</span>: <span class="ident">JoinHandle</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataOutputStats</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span>
+        <span class="kw">let</span> <span class="ident">given_output_jh</span>: <span class="ident">JoinHandle</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataOutputStats</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span>
             <span class="ident">tokio::spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
                 <span class="kw">loop</span> {
                     <span class="kw">match</span> <span class="ident">encoded_datasource_rx</span>.<span class="ident">recv</span>().<span class="kw">await</span> {
@@ -294,10 +297,12 @@
                                 })<span class="question-mark">?</span>;
                         }
                         <span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(<span class="ident">er</span>)) =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">er</span>),
-                        <span class="prelude-val">None</span> =&gt; <span class="kw">break</span>,
+                        <span class="prelude-val">None</span> =&gt; {
+                            <span class="kw">break</span>;
+                        }
                     }
                 }
-                <span class="ident">encoded_datasource_jh</span>.<span class="kw">await</span><span class="question-mark">?</span><span class="question-mark">?</span>;
+                <span class="ident">drop</span>(<span class="ident">final_data_output_tx</span>);
                 <span class="prelude-val">Ok</span>(<span class="ident">final_data_output_jh</span>.<span class="kw">await</span><span class="question-mark">?</span>.<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">er</span><span class="op">|</span> {
                     <span class="ident">DataStoreError::FatalIO</span>(<span class="macro">format!</span>(
                         <span class="string">&quot;Error inside the DataOutput: {}&quot;</span>,
@@ -327,7 +332,10 @@
                     <span class="prelude-val">None</span> =&gt; <span class="kw">break</span>,
                 }
             }
-            <span class="prelude-val">Ok</span>(<span class="ident">finalized_output_jh</span>.<span class="kw">await</span><span class="question-mark">?</span><span class="question-mark">?</span>) <span class="comment">// the actual stats are returned from the passed output</span>
+            <span class="ident">drop</span>(<span class="ident">data_source_tx</span>);
+            <span class="ident">encoded_datasource_jh</span>.<span class="kw">await</span><span class="question-mark">?</span><span class="question-mark">?</span>;
+            <span class="comment">// return the output stats from the passed in output as opposed to creating them in this task, because ultimately we likely care about the passed in output and not this one</span>
+            <span class="prelude-val">Ok</span>(<span class="ident">given_output_jh</span>.<span class="kw">await</span><span class="question-mark">?</span><span class="question-mark">?</span>)
         });
         <span class="prelude-val">Ok</span>((<span class="ident">input_tx</span>, <span class="ident">jh</span>))
     }

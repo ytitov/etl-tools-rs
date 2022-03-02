@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Batcher",""]]});
+initSidebarItems({"struct":[["Batcher","For use cases when you want to group stream elements in some form of custom fashion where a decoder can’t handle."]]});

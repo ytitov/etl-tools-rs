@@ -65,6 +65,10 @@
 <span id="64">64</span>
 <span id="65">65</span>
 <span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::datastore::error::DataStoreError</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::datastore</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
@@ -72,8 +76,12 @@
 <span class="kw">use</span> <span class="ident">tokio::sync::mpsc::Receiver</span>;
 <span class="kw">use</span> <span class="ident">tokio::task::JoinHandle</span>;
 
+<span class="doccomment">/// For use cases when you want to group stream elements in some form of custom fashion where a</span>
+<span class="doccomment">/// decoder can&#39;t handle.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Batcher</span><span class="op">&lt;</span><span class="ident">I</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="ident">input</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">DataSource</span><span class="op">&lt;</span><span class="ident">I</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Returns if a new batch should be started.  The element sent will be the first element in a</span>
+    <span class="doccomment">/// new batch</span>
     <span class="kw">pub</span> <span class="ident">new_batch</span>: <span class="kw">fn</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;_</span> <span class="ident">I</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;_</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">I</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span>,
 }
 
