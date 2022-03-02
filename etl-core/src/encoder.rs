@@ -30,13 +30,11 @@ impl<T: Debug + Send + Sync + 'static> DataSource<T> for EncodedSource<T> {
     }
 }
 
-/// the goal here is to create a DataOutput which can accept a type I and an encoder which can
-/// convert I to Bytes.  
+/// A convenience wrapper which takes in any decoder which will decode to Bytes and accepts any
+/// DataOutput which will accepts bytes and wraps that all into a DataOutput
 pub struct EncodedOutput<I: Debug + 'static + Send + Sync> {
     /// takes any I and converts to Bytes.  For example csv encoder will implement EncodeStream
     pub encoder: Box<dyn EncodeStream<I, Bytes>>,
-    //this doesn't work either because need to send stuff to the encoder
-    //encoder_ds_task: DataSourceTask<I>,
     /// handles writing the result of the encoder
     pub output: Box<dyn DataOutput<Bytes>>,
 }
@@ -64,11 +62,9 @@ impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutp
         let (final_data_output_tx, final_data_output_jh) = self.output.start_stream(jm_tx).await?;
         let finalized_output_jh: JoinHandle<Result<DataOutputStats, DataStoreError>> =
             tokio::spawn(async move {
-                let mut num_lines_sent = 0_usize;
                 loop {
                     match encoded_datasource_rx.recv().await {
                         Some(Ok(DataSourceMessage::Data { source, content })) => {
-                            println!("2: encoded_datasource recv");
                             final_data_output_tx
                                 .send(DataOutputMessage::Data(content))
                                 .await
@@ -79,20 +75,12 @@ impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutp
                                         e,
                                     )
                                 })?;
-                            num_lines_sent += 1;
                         }
                         Some(Err(er)) => return Err(er),
                         None => break,
                     }
                 }
                 encoded_datasource_jh.await??;
-                //final_data_output_jh.await??; // wait for final data output
-                /*
-                Ok(DataOutputStats {
-                    name: "EncodedOutput".to_string(),
-                    lines_written: num_lines_sent,
-                })
-                */
                 Ok(final_data_output_jh.await?.map_err(|er| {
                     DataStoreError::FatalIO(format!(
                         "Error inside the DataOutput: {}",
@@ -111,7 +99,6 @@ impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutp
             loop {
                 match input_rx.recv().await {
                     Some(DataOutputMessage::Data(data)) => {
-                        println!("1: EncodedOutput output getting data");
                         data_source_tx
                             .send(Ok(DataSourceMessage::new(&output_name, data)))
                             .await
@@ -123,7 +110,6 @@ impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutp
                     None => break,
                 }
             }
-            //data_source_jh.await??; // ensure to wait that the data source is done
             Ok(finalized_output_jh.await??) // the actual stats are returned from the passed output
         });
         Ok((input_tx, jh))
@@ -219,12 +205,10 @@ pub mod csv_encoder {
                     });
                 }
                 Err(er) => {
-                    println!(" RAN INTO ERROR: {} ", er);
                     return Box::new(EncodedSource {
                         source_name,
                         ds_task_result: Err(er),
                     });
-                    //return Err(er);
                 }
             }
         }
