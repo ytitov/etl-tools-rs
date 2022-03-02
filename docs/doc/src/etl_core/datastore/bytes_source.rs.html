@@ -143,7 +143,7 @@
 <span class="kw">use</span> <span class="ident">serde::de::DeserializeOwned</span>;
 
 <span class="comment">// TODO: this all can be gotten rid of by simply removing serde traits from the DataSource and</span>
-<span class="comment">// adding an impl of DataSource&lt;T: Bytes&gt;.  did not realize this initially for some reason</span>
+<span class="comment">// adding an impl of DataSource&lt;Bytes&gt;.  did not realize this initially for some reason</span>
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">BytesSourceRx</span> <span class="op">=</span> <span class="ident">Receiver</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BytesSourceMessage</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span><span class="op">&gt;</span>;
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">BytesSourceTx</span> <span class="op">=</span> <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">BytesOutputMessage</span><span class="op">&gt;</span>;
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">BytesSourceTask</span> <span class="op">=</span> (

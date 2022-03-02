@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["csv",""],["json",""],["string",""]],"struct":[["DecodedSource",""]],"trait":[["DecodeStream",""]]});
+initSidebarItems({"mod":[["csv",""],["json",""],["string",""]],"struct":[["DecodedSource","Helper wrapper for specific decoders to return so you do not have to construct them manually"]],"trait":[["DecodeStream",""]]});

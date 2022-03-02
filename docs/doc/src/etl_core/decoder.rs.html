@@ -36,6 +36,7 @@
 <span id="35">35</span>
 <span id="36">36</span>
 <span id="37">37</span>
+<span id="38">38</span>
 </pre><pre class="rust"><code><span class="doccomment">/// DecodeStream trait is designed to be used with any BytesSource to decode a CSV. When adding new</span>
 <span class="doccomment">/// kinds of DataSources (like S3) one needs to simply implement a stream which produces Bytes</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::datastore::error</span>::<span class="kw-2">*</span>;
@@ -58,6 +59,7 @@
     ) -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">DataSource</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>;
 }
 
+<span class="doccomment">/// Helper wrapper for specific decoders to return so you do not have to construct them manually</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DecodedSource</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Debug</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span> {
     <span class="ident">source_name</span>: <span class="ident">String</span>,
     <span class="ident">ds_task_result</span>: <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataSourceTask</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span>,

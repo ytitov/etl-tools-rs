@@ -731,6 +731,8 @@
 <span id="730">730</span>
 <span id="731">731</span>
 <span id="732">732</span>
+<span id="733">733</span>
+<span id="734">734</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">etl_core::datastore::error</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">etl_core::datastore</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">etl_core::preamble</span>::<span class="kw-2">*</span>;
@@ -741,14 +743,13 @@
 <span class="kw">use</span> <span class="ident">rusoto_s3</span>::<span class="kw-2">*</span>;
 <span class="comment">//use std::sync::{Arc, Mutex};</span>
 <span class="kw">use</span> <span class="ident">etl_core::deps</span>::{
+    <span class="ident">anyhow</span>, <span class="ident">async_trait</span>,
     <span class="ident">serde::de::DeserializeOwned</span>,
     <span class="ident">serde::Serialize</span>,
     <span class="ident">tokio</span>,
     <span class="ident">tokio::io</span>::{<span class="ident">AsyncBufReadExt</span>, <span class="ident">BufReader</span>},
     <span class="ident">tokio::sync::mpsc</span>::{<span class="ident">channel</span>, <span class="ident">Receiver</span>},
     <span class="ident">tokio::task::JoinHandle</span>,
-    <span class="ident">async_trait</span>,
-    <span class="ident">anyhow</span>,
 };
 <span class="kw">use</span> <span class="ident">etl_core::job_manager::JobManagerTx</span>;
 <span class="kw">use</span> <span class="ident">std::fmt::Debug</span>;
@@ -1223,7 +1224,10 @@
 
 <span class="attribute">#[<span class="ident">async_trait</span>]</span>
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Serialize</span> <span class="op">+</span> <span class="ident">Debug</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">DataOutput</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">S3DataOutput</span> {
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">start_stream</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">jm_tx</span>: <span class="ident">JobManagerTx</span>) -&gt; <span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">DataOutputTask</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">start_stream</span>(
+        <span class="kw-2">mut</span> <span class="self">self</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>,
+        <span class="ident">jm_tx</span>: <span class="ident">JobManagerTx</span>,
+    ) -&gt; <span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">DataOutputTask</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">write_content</span>.<span class="ident">clone</span>() {
             <span class="ident">WriteContentOptions::Json</span> =&gt; <span class="self">self</span>.<span class="ident">start_stream_output_json</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">jm_tx</span>).<span class="kw">await</span>,
             <span class="ident">WriteContentOptions::Csv</span>(<span class="ident">opts</span>) =&gt; <span class="self">self</span>.<span class="ident">start_stream_output_csv</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">opts</span>, <span class="ident">jm_tx</span>).<span class="kw">await</span>,

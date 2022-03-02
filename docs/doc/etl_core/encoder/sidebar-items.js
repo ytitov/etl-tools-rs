@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["csv_encoder",""]],"struct":[["EncodedOutput","the goal here is to create a DataOutput which can accept a type I and an encoder which can convert I to Bytes.  "],["EncodedSource","helper wrapper that specific  encoders can return for convenience"]],"trait":[["EncodeStream",""]]});

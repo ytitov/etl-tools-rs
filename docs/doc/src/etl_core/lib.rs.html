@@ -47,6 +47,7 @@
 <span id="46">46</span>
 <span id="47">47</span>
 <span id="48">48</span>
+<span id="49">49</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This library provides a foundation to construct pipelines using several basic principles.</span>
 <span class="doccomment">//! There are stream producers and consumers, which must implement the traits [crate::datastore::DataSource]</span>
 <span class="doccomment">//! and [crate::datastore::DataOutput].  [crate::job::JobRunner] is used to construct pipelines </span>
@@ -63,6 +64,7 @@
 <span class="doccomment">/// anything that implements a BytesSource target, can select which decoder they want to use.  For</span>
 <span class="doccomment">/// example either [crate::decoder::csv::CsvDecoder] or [crate::decoder::json::JsonDecoder]</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">decoder</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">encoder</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">utils</span>;
 <span class="doccomment">/// Adds facilities to implement queues</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">queue</span>;

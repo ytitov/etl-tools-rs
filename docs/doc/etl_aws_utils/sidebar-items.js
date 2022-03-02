@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["athena",""],["datastore",""],["s3_utils",""],["sqs_queue",""]]});
+initSidebarItems({"mod":[["athena",""],["datastore",""],["deps",""],["s3_utils",""],["sqs_queue",""]]});
