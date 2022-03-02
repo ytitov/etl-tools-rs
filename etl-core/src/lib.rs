@@ -14,6 +14,7 @@ pub mod datastore;
 /// anything that implements a BytesSource target, can select which decoder they want to use.  For
 /// example either [crate::decoder::csv::CsvDecoder] or [crate::decoder::json::JsonDecoder]
 pub mod decoder;
+pub mod encoder;
 pub mod utils;
 /// Adds facilities to implement queues
 pub mod queue;

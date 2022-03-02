@@ -15,6 +15,7 @@ pub use sqlx::mysql::MySqlPoolOptions;
 pub use sqlx::MySqlPool;
 use std::fmt::Debug;
 use std::time::{Duration, Instant};
+use etl_core::deps::log;
 
 #[derive(Default)]
 pub struct MySqlDataOutput {
@@ -54,7 +55,10 @@ impl Default for MySqlDataOutputPool {
 
 #[async_trait]
 impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for MySqlDataOutput {
-    async fn start_stream(&mut self, mut jm_tx: JobManagerTx) -> anyhow::Result<DataOutputTask<T>> {
+    async fn start_stream(
+        self: Box<Self>,
+        mut jm_tx: JobManagerTx,
+    ) -> anyhow::Result<DataOutputTask<T>> {
         let (tx, mut rx): (DataOutputTx<T>, _) = channel(self.on_put_num_rows * 2);
 
         let table_name = self.table_name.clone();
@@ -84,7 +88,7 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                         //.max_lifetime(Some(std::time::Duration::from_secs(60 * 60 * 2)))
                         .after_connect(|_conn| {
                             Box::pin(async move {
-                                println!("MySql connection established");
+                                log::info!("MySql connection established");
                                 Ok(())
                             })
                         })

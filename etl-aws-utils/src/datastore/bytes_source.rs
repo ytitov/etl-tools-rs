@@ -12,8 +12,26 @@ pub struct S3Storage {
     pub s3_bucket: String,
     pub s3_keys: Vec<String>,
     /// path to the credentials file to access aws
-    pub credentials_path: String,
+    pub credentials_path: Option<String>,
     pub region: Region,
+}
+
+impl S3Storage {
+    pub async fn get_object_head(&self, key: &str) -> Result<HeadObjectOutput, DataStoreError> {
+        let p = match &self.credentials_path {
+            Some(credentials_path) => ProfileProvider::with_default_configuration(credentials_path),
+            None => ProfileProvider::new().map_err(|e| DataStoreError::FatalIO(e.to_string()))?,
+        };
+        let client: S3Client = create_client(p, &self.region)?;
+        Ok(client
+            .head_object(HeadObjectRequest {
+                bucket: self.s3_bucket.clone(),
+                key: key.to_string(),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| DataStoreError::FatalIO(e.to_string()))?)
+    }
 }
 
 impl BytesSource for S3Storage {
@@ -23,7 +41,10 @@ impl BytesSource for S3Storage {
 
     fn start_stream(self: Box<Self>) -> Result<BytesSourceTask, DataStoreError> {
         use rusoto_core::RusotoError;
-        let p = ProfileProvider::with_default_configuration(&self.credentials_path);
+        let p = match &self.credentials_path {
+            Some(credentials_path) => ProfileProvider::with_default_configuration(credentials_path),
+            None => ProfileProvider::new().map_err(|e| DataStoreError::FatalIO(e.to_string()))?,
+        };
         let client: S3Client = create_client(p, &self.region)?;
         let (tx, rx) = channel(1);
         let files = self.s3_keys.clone();

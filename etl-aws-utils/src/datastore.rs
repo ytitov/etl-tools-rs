@@ -8,14 +8,13 @@ use rusoto_s3;
 use rusoto_s3::*;
 //use std::sync::{Arc, Mutex};
 use etl_core::deps::{
+    anyhow, async_trait,
     serde::de::DeserializeOwned,
     serde::Serialize,
     tokio,
     tokio::io::{AsyncBufReadExt, BufReader},
     tokio::sync::mpsc::{channel, Receiver},
     tokio::task::JoinHandle,
-    async_trait,
-    anyhow,
 };
 use etl_core::job_manager::JobManagerTx;
 use std::fmt::Debug;
@@ -490,7 +489,10 @@ impl S3DataOutput {
 
 #[async_trait]
 impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for S3DataOutput {
-    async fn start_stream(&mut self, jm_tx: JobManagerTx) -> anyhow::Result<DataOutputTask<T>> {
+    async fn start_stream(
+        mut self: Box<Self>,
+        jm_tx: JobManagerTx,
+    ) -> anyhow::Result<DataOutputTask<T>> {
         match self.write_content.clone() {
             WriteContentOptions::Json => self.start_stream_output_json::<T>(jm_tx).await,
             WriteContentOptions::Csv(opts) => self.start_stream_output_csv::<T>(opts, jm_tx).await,

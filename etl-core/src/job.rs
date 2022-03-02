@@ -291,11 +291,13 @@ impl JobRunner {
 
     /// Same as run except this takes a DataSource and a DataOutput and
     /// moves the data from one to the other.
+    /// TODO: remove serialize and deserialize trait requirements, these should be determined by
+    /// specific trait implementations
     pub async fn run_stream<T>(
         mut self,
         stream_name: &str,
         input: Box<dyn DataSource<T>>,
-        mut output: Box<dyn DataOutput<T>>,
+        output: Box<dyn DataOutput<T>>,
     ) -> Result<Self, JobRunnerError>
     where
         T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static,

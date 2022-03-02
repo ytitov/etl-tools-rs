@@ -3,8 +3,8 @@ use crate::job_manager::JobManagerTx;
 use crate::preamble::*;
 use async_trait::async_trait;
 use serde::de::Deserializer;
-use serde::Serialize;
 use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::Debug;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinHandle;
@@ -14,9 +14,9 @@ pub mod bytes_source;
 pub mod enumerate;
 /// Local file system data stores
 pub mod fs;
-pub mod transform_store;
 /// various data stores used for testing
 pub mod mock;
+pub mod transform_store;
 
 //pub type DataOutputItemResult = Result<String, Box<dyn std::error::Error + Send>>;
 
@@ -96,9 +96,7 @@ pub struct DynDataSource<T> {
 
 impl<T: Debug + Send + 'static> DynDataSource<T> {
     pub fn new<C: DataSource<T> + 'static>(t: C) -> Self {
-        DynDataSource {
-            ds: Box::new(t)
-        }
+        DynDataSource { ds: Box::new(t) }
     }
 }
 
@@ -142,6 +140,15 @@ pub trait DataSource<T: Debug + 'static + Send>: Sync + Send {
     */
 }
 
+impl<T: 'static + Debug + Send> DataSource<T> for DataSourceTask<T> {
+    fn name(&self) -> String {
+        String::from("DataSourceTask")
+    }
+    fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
+        Ok(*self)
+    }
+}
+
 /// Helps with creating DataOutput's during run-time.
 #[async_trait]
 pub trait CreateDataOutput<'de, C, T>: Sync + Send
@@ -164,7 +171,7 @@ where
 
 #[async_trait]
 pub trait DataOutput<T: Serialize + Debug + 'static + Sync + Send>: Sync + Send {
-    async fn start_stream(&mut self, _: JobManagerTx) -> anyhow::Result<DataOutputTask<T>> {
+    async fn start_stream(self: Box<Self>, _: JobManagerTx) -> anyhow::Result<DataOutputTask<T>> {
         unimplemented!();
     }
 
@@ -191,6 +198,39 @@ pub trait DataOutput<T: Serialize + Debug + 'static + Sync + Send>: Sync + Send 
                 e
             )),
         }
+    }
+}
+
+#[async_trait]
+impl<T: Debug + 'static + Sync + Send> DataSource<T> for DataSourceRx<T> {
+    fn name(&self) -> String {
+        String::from("DataSourceRx")
+    }
+
+    fn start_stream(mut self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
+        use tokio::sync::mpsc::channel;
+        use tokio::task::JoinHandle;
+        let (tx, rx) = channel(1);
+        let name = self.name();
+        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
+            let mut lines_scanned = 0_usize;
+            loop {
+                match self.recv().await {
+                    Some(Ok(DataSourceMessage::Data {source, content})) => {
+                        lines_scanned += 1;
+                        tx.send(Ok(DataSourceMessage::new(&name, content)))
+                            .await
+                            .map_err(|e| DataStoreError::send_error(&name, &source, e))?;
+                    }
+                    Some(Err(e)) => {
+                        return Err(e);
+                    }
+                    None => break,
+                }
+            }
+            Ok(DataSourceStats { lines_scanned })
+        });
+        Ok((rx, jh))
     }
 }
 

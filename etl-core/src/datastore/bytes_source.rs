@@ -3,7 +3,7 @@ use bytes::Bytes;
 use serde::de::DeserializeOwned;
 
 // TODO: this all can be gotten rid of by simply removing serde traits from the DataSource and
-// adding an impl of DataSource<T: Bytes>.  did not realize this initially for some reason
+// adding an impl of DataSource<Bytes>.  did not realize this initially for some reason
 pub type BytesSourceRx = Receiver<Result<BytesSourceMessage, DataStoreError>>;
 pub type BytesSourceTx = Sender<BytesOutputMessage>;
 pub type BytesSourceTask = (

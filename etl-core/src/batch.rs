@@ -28,15 +28,15 @@ impl<I: Debug + Send + Sync + 'static> DataSource<Vec<I>> for Batcher<I> {
         let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             let mut batch_vec: Vec<I> = Vec::new();
-            let mut source: String = name.clone();
+            let source: String = name.clone();
             loop {
                 match input_rx.recv().await {
                     Some(Ok(DataSourceMessage::Data {
-                        source: s,
+                        source: _,
                         content: input_item,
                     })) => match new_batch_func(&input_item, &batch_vec) {
                         true => {
-                            source = s;
+                            //source = s;
                             lines_scanned += 1;
                             if batch_vec.len() > 0 {
                                 tx.send(Ok(DataSourceMessage::new(&source, batch_vec)))

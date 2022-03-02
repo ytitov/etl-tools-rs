@@ -4,6 +4,12 @@ pub struct StringDecoder {
     pub lossy: bool,
 }
 
+impl Default for StringDecoder {
+    fn default() -> Self {
+        StringDecoder { lossy: true }
+    }
+}
+
 impl StringDecoder {
     pub async fn new(self, source: Box<dyn BytesSource>) -> Box<dyn DataSource<String>>
     where
@@ -39,7 +45,7 @@ impl<T: Debug + 'static + Send + Sync> DecodeStream<T> for StringDecoder
                                 Some(Ok(BytesSourceMessage::Data { source, content })) => {
                                     lines_scanned += 1;
                                     let s = String::from_utf8_lossy(&*content).to_string();
-                                    tx.send(Ok(DataSourceMessage::new("StringDecoder", s)))
+                                    tx.send(Ok(DataSourceMessage::new(&name, s)))
                                         .await
                                         .map_err(|e| {
                                             DataStoreError::send_error(&name, &source, e)

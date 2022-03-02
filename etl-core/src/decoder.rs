@@ -20,6 +20,7 @@ pub trait DecodeStream<T: Debug + 'static + Send>: Sync + Send {
     ) -> Box<dyn DataSource<T>>;
 }
 
+/// Helper wrapper for specific decoders to return so you do not have to construct them manually
 pub struct DecodedSource<T: Debug + 'static + Send + Send> {
     source_name: String,
     ds_task_result: Result<DataSourceTask<T>, DataStoreError>,

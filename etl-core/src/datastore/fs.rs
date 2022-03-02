@@ -1,8 +1,13 @@
 use super::error::*;
 use crate::datastore::bytes_source::*;
 use crate::datastore::SimpleStore;
+use crate::datastore::{
+    DataOutput, DataOutputMessage, DataOutputStats, DataOutputTask, DataOutputTx,
+};
+use crate::job_manager::JobManagerTx;
 use crate::queue::QueueClient;
 use async_trait::async_trait;
+use bytes::Bytes;
 use log;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -13,6 +18,17 @@ use tokio::task::JoinHandle;
 pub struct LocalFs {
     pub files: Vec<String>,
     pub home: String,
+    pub output_name: Option<String>,
+}
+
+impl Default for LocalFs {
+    fn default() -> Self {
+        LocalFs {
+            files: Vec::new(),
+            home: "".to_string(),
+            output_name: Some("output".to_string()),
+        }
+    }
 }
 
 impl BytesSource for LocalFs {
@@ -162,5 +178,66 @@ impl LocalFs {
                 }
             }
         }
+    }
+}
+
+#[async_trait]
+impl DataOutput<Bytes> for LocalFs {
+    async fn start_stream(
+        self: Box<Self>,
+        _: JobManagerTx,
+    ) -> anyhow::Result<DataOutputTask<Bytes>> {
+        use tokio::fs::OpenOptions;
+        use tokio::io::AsyncWriteExt;
+        use tokio::sync::mpsc::channel;
+        let filename = match self.output_name {
+            Some(n) => n,
+            None => "output".to_string(),
+        };
+        //let filepath = format!("{}/{}", &self.home, &filename);
+        let full_path = Path::new(&self.home).join(&filename);
+        log::info!("Writing to file {:?}", &full_path);
+        if let Some(parent_folder) = full_path.parent() {
+            tokio::fs::create_dir_all(parent_folder).await?;
+            log::info!("Writing to folder {:?}", &parent_folder);
+        } else {
+            tokio::fs::create_dir_all(Path::new(&self.home)).await?;
+            log::info!("Writing to folder {}", &self.home);
+        }
+        let mut file = OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(&full_path)
+            .await
+            .map_err(|e| {
+                DataStoreError::FatalIO(format!(
+                    "LocalFs ran into an error trying to open the file: {:?} caused by error: {}",
+                    &full_path, e
+                ))
+            })?;
+        let (tx, mut rx): (DataOutputTx<Bytes>, _) = channel(1);
+        let jh: JoinHandle<anyhow::Result<DataOutputStats>> = tokio::spawn(async move {
+            let mut num_lines_sent = 0_usize;
+            loop {
+                match rx.recv().await {
+                    Some(DataOutputMessage::Data(item)) => {
+                        file.write_all(&item).await?;
+                        num_lines_sent += 1;
+                    }
+                    Some(DataOutputMessage::NoMoreData) => {
+                        break;
+                    }
+                    None => {
+                        break;
+                    }
+                }
+            }
+            Ok(DataOutputStats {
+                name: filename,
+                lines_written: num_lines_sent,
+            })
+        });
+        Ok((tx, jh))
     }
 }
