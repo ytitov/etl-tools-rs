@@ -30,7 +30,7 @@ impl<T: Debug + Send + Sync + 'static> DataSource<T>
     for DecodedSource<T>
 {
     fn name(&self) -> String {
-        format!("DecodedSource-{}", &self.source_name)
+        format!("Decoded-{}", &self.source_name)
     }
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         self.ds_task_result

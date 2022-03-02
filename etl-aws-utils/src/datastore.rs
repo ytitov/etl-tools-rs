@@ -9,6 +9,7 @@ use rusoto_s3::*;
 //use std::sync::{Arc, Mutex};
 use etl_core::deps::{
     anyhow, async_trait,
+    bytes::Bytes,
     serde::de::DeserializeOwned,
     serde::Serialize,
     tokio,
@@ -393,7 +394,7 @@ impl S3DataOutput {
                                     if let Ok(bytes_vec) = wtr.into_inner() {
                                         match std::str::from_utf8(&bytes_vec) {
                                             Ok(line) => {
-                                                s3_tx.send(line.to_owned()).await?;
+                                                s3_tx.send(Bytes::from(line.to_owned())).await?;
                                                 num_lines_sent += 1;
                                             }
                                             Err(er) => {
@@ -456,7 +457,7 @@ impl S3DataOutput {
                                 match serde_json::to_string(&data) {
                                     Ok(mut line) => {
                                         line.push_str("\n");
-                                        s3_tx.send(line).await?;
+                                        s3_tx.send(Bytes::from(line)).await?;
                                         lines_written += 1;
                                     }
                                     Err(e) => {
@@ -507,7 +508,6 @@ impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for S3DataOutpu
     }
     */
 }
-
 pub fn create_client(
     profile_provider: ProfileProvider,
     region: &Region,
@@ -519,11 +519,12 @@ pub fn create_client(
     ))
 }
 
+/// Upload to S3 with 30 mb size increments
 pub async fn s3_write_bytes_multipart(
     profile_provider: ProfileProvider,
     s3_bucket: &str,
     s3_key: &str,
-    mut body_stream: Receiver<String>,
+    mut body_stream: Receiver<Bytes>,
     region: Region,
 ) -> anyhow::Result<JoinHandle<anyhow::Result<()>>> {
     let client = S3Client::new_with(HttpClient::new().unwrap(), profile_provider, region);
@@ -544,7 +545,6 @@ pub async fn s3_write_bytes_multipart(
             })
             .await?
         {
-            use bytes::Bytes;
             use bytes::BytesMut;
             use rusoto_core::ByteStream;
             let mut buf = BytesMut::with_capacity(max_size);
@@ -552,8 +552,9 @@ pub async fn s3_write_bytes_multipart(
             loop {
                 match body_stream.recv().await {
                     Some(s) => {
-                        buf.extend(Bytes::from(s));
+                        buf.extend(s);
                         if buf.len() >= max_size {
+                            println!("uploading because reached max size");
                             let b = buf;
                             buf = BytesMut::with_capacity(max_size);
                             let request = UploadPartRequest {
@@ -614,7 +615,6 @@ pub async fn s3_write_bytes_multipart(
                                 //part_number += 1;
                             }
                             Err(er) => {
-                                println!("ERROR: s3_write_bytes_multipart {}", &er);
                                 return Err(anyhow::anyhow!("Error uploading part to s3: {}", er));
                             }
                         }
@@ -680,12 +680,10 @@ pub async fn s3_write_text_file(
             }
             Err(RusotoError::Unknown(ref e)) => {
                 if e.status == *&status_503 {
-                    //println!("Retrying after 503: {:?}", e);
                     println!("Retrying after 503: {}", &s3_key);
                 }
             }
             Err(e) => {
-                //println!("ERROR: s3_write_text_file {}", &e);
                 return Err(anyhow!("Error: s3_write_text_file: {}", e));
             }
         };

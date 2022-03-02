@@ -50,7 +50,6 @@ impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutp
         // data sent to the data output will be forwarded here
         let (data_source_tx, data_source_rx): (_, DataSourceRx<T>) = channel(1);
 
-        //let data_source_task: DataSourceTask<T> = (data_source_rx, data_source_jh);
         let encoded_datasource = self
             .encoder
             .encode_source(Box::new(data_source_rx) as Box<dyn DataSource<T>>)
@@ -60,7 +59,7 @@ impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutp
         let (mut encoded_datasource_rx, encoded_datasource_jh) =
             encoded_datasource.start_stream()?;
         let (final_data_output_tx, final_data_output_jh) = self.output.start_stream(jm_tx).await?;
-        let finalized_output_jh: JoinHandle<Result<DataOutputStats, DataStoreError>> =
+        let given_output_jh: JoinHandle<Result<DataOutputStats, DataStoreError>> =
             tokio::spawn(async move {
                 loop {
                     match encoded_datasource_rx.recv().await {
@@ -77,10 +76,12 @@ impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutp
                                 })?;
                         }
                         Some(Err(er)) => return Err(er),
-                        None => break,
+                        None => {
+                            break;
+                        }
                     }
                 }
-                encoded_datasource_jh.await??;
+                drop(final_data_output_tx);
                 Ok(final_data_output_jh.await?.map_err(|er| {
                     DataStoreError::FatalIO(format!(
                         "Error inside the DataOutput: {}",
@@ -110,7 +111,10 @@ impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutp
                     None => break,
                 }
             }
-            Ok(finalized_output_jh.await??) // the actual stats are returned from the passed output
+            drop(data_source_tx);
+            encoded_datasource_jh.await??;
+            // return the output stats from the passed in output as opposed to creating them in this task, because ultimately we likely care about the passed in output and not this one
+            Ok(given_output_jh.await??)
         });
         Ok((input_tx, jh))
     }

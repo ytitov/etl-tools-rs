@@ -5,12 +5,20 @@ use super::ProfileProvider;
 use super::Region;
 use super::S3Client;
 use super::{AsyncBufReadExt, BufReader};
+use crate::datastore::s3_write_bytes_multipart;
 use etl_core::datastore::bytes_source::*;
+use etl_core::datastore::*;
+use etl_core::deps::async_trait;
+use etl_core::deps::bytes::Bytes;
 use etl_core::deps::{anyhow, tokio, tokio::sync::mpsc::channel};
+use etl_core::job_manager::JobManagerTx;
+use tokio::task::JoinHandle;
 
 pub struct S3Storage {
     pub s3_bucket: String,
     pub s3_keys: Vec<String>,
+    /// When using this as a DataOutput this must be filled in
+    pub s3_output_key: Option<String>,
     /// path to the credentials file to access aws
     pub credentials_path: Option<String>,
     pub region: Region,
@@ -30,7 +38,59 @@ impl S3Storage {
                 ..Default::default()
             })
             .await
-            .map_err(|e| DataStoreError::FatalIO(e.to_string()))?)
+            .map_err(|e| {
+                DataStoreError::FatalIO(format!(
+                    "S3Storage failed with get_object_head due to: {}",
+                    e.to_string()
+                ))
+            })?)
+    }
+}
+
+#[async_trait]
+impl DataOutput<Bytes> for S3Storage {
+    async fn start_stream(
+        self: Box<Self>,
+        _: JobManagerTx,
+    ) -> anyhow::Result<DataOutputTask<Bytes>> {
+        let (tx, mut rx): (DataOutputTx<Bytes>, _) = channel(1);
+        let name = self.name();
+        let p = match &self.credentials_path {
+            Some(credentials_path) => ProfileProvider::with_default_configuration(credentials_path),
+            None => ProfileProvider::new().map_err(|e| DataStoreError::FatalIO(e.to_string()))?,
+        };
+        let (s3_tx, s3_rx) = channel(1);
+        let s3_output_key = self.s3_output_key.ok_or_else(|| {
+            DataStoreError::FatalIO(
+                "s3_output_key is required when using as a DataOutput".to_string(),
+            )
+        })?;
+        let s3_jh =
+            s3_write_bytes_multipart(p, &self.s3_bucket, &s3_output_key, s3_rx, self.region)
+                .await
+                .map_err(|e| {
+                    DataStoreError::FatalIO(format!("S3Storage Error: {}", e.to_string()))
+                })?;
+        let jh: JoinHandle<anyhow::Result<DataOutputStats>> = tokio::spawn(async move {
+            let mut num_lines = 0_usize;
+            loop {
+                match rx.recv().await {
+                    Some(DataOutputMessage::Data(data)) => {
+                        s3_tx.send(data).await?;
+                        num_lines += 1;
+                    }
+                    Some(DataOutputMessage::NoMoreData) => break,
+                    None => break,
+                }
+            }
+            drop(s3_tx);
+            s3_jh.await??;
+            Ok(DataOutputStats {
+                name,
+                lines_written: num_lines,
+            })
+        });
+        Ok((tx, jh))
     }
 }
 
@@ -53,7 +113,6 @@ impl BytesSource for S3Storage {
         let jh = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             for s3_key in files {
-                //println!("s3_key {}", &s3_key);
                 let request = GetObjectRequest {
                     bucket: s3_bucket.clone(),
                     key: s3_key.to_owned(),
@@ -87,9 +146,10 @@ impl BytesSource for S3Storage {
                         .map_err(|e| DataStoreError::send_error(&name, "", e))?;
                     }
                     Err(e) => {
-                        tx.send(Err(DataStoreError::from(anyhow::Error::from(e))))
-                            .await
-                            .map_err(|e| DataStoreError::send_error(&name, "", e))?;
+                        return Err(DataStoreError::FatalIO(format!(
+                            "S3Storage Error calling get_object due to: {}",
+                            e.to_string()
+                        )));
                     }
                 }
             }

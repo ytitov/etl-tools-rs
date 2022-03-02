@@ -5,8 +5,12 @@ use std::fmt::Debug;
 use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
 
+/// For use cases when you want to group stream elements in some form of custom fashion where a
+/// decoder can't handle.
 pub struct Batcher<I> {
     pub input: Box<dyn DataSource<I>>,
+    /// Returns if a new batch should be started.  The element sent will be the first element in a
+    /// new batch
     pub new_batch: fn(&'_ I, &'_ Vec<I>) -> bool,
 }
 
