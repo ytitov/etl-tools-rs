@@ -1,6 +1,4 @@
-use crate::datastore::bytes_source::*;
 use crate::datastore::*;
-use bytes::Bytes;
 use futures_core::future::BoxFuture;
 use serde::de::DeserializeOwned;
 use std::time::Duration;
@@ -136,48 +134,3 @@ impl<S: Send + Sync + 'static, O: DeserializeOwned + Debug + Send + Sync + 'stat
     }
 }
 
-impl<S: Send + Sync + 'static, O: Into<Bytes> + Debug + Send + Sync + 'static> BytesSource
-    for EnumerateStreamAsync<S, O>
-{
-    fn name(&self) -> String {
-        format!("{}", &self.name)
-    }
-
-    fn start_stream(self: Box<Self>) -> Result<BytesSourceTask, DataStoreError> {
-        use tokio::sync::mpsc::channel;
-        let (tx, rx): (_, Receiver<Result<BytesSourceMessage, DataStoreError>>) = channel(1);
-        let create_func = self.create;
-        let name = self.name;
-        let maybe_pause = self.pause;
-        let maybe_max = self.max;
-        let state = self.state;
-        let jh: JoinHandle<Result<BytesSourceStats, DataStoreError>> = tokio::spawn(async move {
-            let mut lines_scanned = 0_usize;
-            loop {
-                if let Some(max) = &maybe_max {
-                    if lines_scanned >= *max {
-                        break;
-                    }
-                }
-                match create_func(&state, lines_scanned).await {
-                    Ok(output_item) => {
-                        tx.send(Ok(BytesSourceMessage::new(&name, output_item)))
-                            .await
-                            .map_err(|e| DataStoreError::send_error(&name, &name, e))?;
-                    }
-                    Err(err) => {
-                        tx.send(Err(DataStoreError::Generic(err.to_string())))
-                            .await
-                            .map_err(|e| DataStoreError::send_error(&name, &name, e))?;
-                    }
-                }
-                if let Some(pause) = &maybe_pause {
-                    tokio::time::sleep(*pause).await;
-                }
-                lines_scanned += 1;
-            }
-            Ok(BytesSourceStats { lines_scanned })
-        });
-        Ok((rx, jh))
-    }
-}

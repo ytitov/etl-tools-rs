@@ -11,7 +11,7 @@ impl Default for StringDecoder {
 }
 
 impl StringDecoder {
-    pub async fn new(self, source: Box<dyn BytesSource>) -> Box<dyn DataSource<String>>
+    pub async fn new(self, source: Box<dyn DataSource<Bytes>>) -> Box<dyn DataSource<String>>
     where
         String: Debug + Send + Sync + 'static,
     {
@@ -25,7 +25,7 @@ impl<T: Debug + 'static + Send + Sync> DecodeStream<T> for StringDecoder
 {
     async fn decode_source(
         self: Box<Self>,
-        source: Box<dyn BytesSource>,
+        source: Box<dyn DataSource<Bytes>>,
     ) -> Box<dyn DataSource<T>> {
         use tokio::sync::mpsc::channel;
         use tokio::task::JoinHandle;
@@ -42,7 +42,7 @@ impl<T: Debug + 'static + Send + Sync> DecodeStream<T> for StringDecoder
                         let mut lines_scanned = 0_usize;
                         loop {
                             match source_rx.recv().await {
-                                Some(Ok(BytesSourceMessage::Data { source, content })) => {
+                                Some(Ok(DataSourceMessage::Data { source, content })) => {
                                     lines_scanned += 1;
                                     let s = String::from_utf8_lossy(&*content).to_string();
                                     tx.send(Ok(DataSourceMessage::new(&name, s)))

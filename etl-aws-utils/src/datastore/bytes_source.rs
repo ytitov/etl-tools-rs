@@ -6,7 +6,6 @@ use super::Region;
 use super::S3Client;
 use super::{AsyncBufReadExt, BufReader};
 use crate::datastore::s3_write_bytes_multipart;
-use etl_core::datastore::bytes_source::*;
 use etl_core::datastore::*;
 use etl_core::deps::async_trait;
 use etl_core::deps::bytes::Bytes;
@@ -94,12 +93,12 @@ impl DataOutput<Bytes> for S3Storage {
     }
 }
 
-impl BytesSource for S3Storage {
+impl DataSource<Bytes> for S3Storage {
     fn name(&self) -> String {
         format!("S3-{}", &self.s3_bucket)
     }
 
-    fn start_stream(self: Box<Self>) -> Result<BytesSourceTask, DataStoreError> {
+    fn start_stream(self: Box<Self>) -> Result<DataSourceTask<Bytes>, DataStoreError> {
         use rusoto_core::RusotoError;
         let p = match &self.credentials_path {
             Some(credentials_path) => ProfileProvider::with_default_configuration(credentials_path),
@@ -128,7 +127,7 @@ impl BytesSource for S3Storage {
                         loop {
                             if let Some(line) = lines.next_line().await? {
                                 lines_scanned += 1;
-                                tx.send(Ok(BytesSourceMessage::new(&s3_key, line)))
+                                tx.send(Ok(DataSourceMessage::new(&s3_key, Bytes::from(line))))
                                     .await
                                     .map_err(|er| DataStoreError::send_error(&name, &s3_key, er))?;
                             } else {
@@ -153,7 +152,7 @@ impl BytesSource for S3Storage {
                     }
                 }
             }
-            Ok(BytesSourceStats { lines_scanned })
+            Ok(DataSourceStats { lines_scanned })
         });
         Ok((rx, jh))
     }

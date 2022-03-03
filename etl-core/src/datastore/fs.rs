@@ -1,7 +1,7 @@
 use super::error::*;
-use crate::datastore::bytes_source::*;
 use crate::datastore::SimpleStore;
 use crate::datastore::{
+    DataSource, DataSourceStats, DataSourceTask, DataSourceMessage,
     DataOutput, DataOutputMessage, DataOutputStats, DataOutputTask, DataOutputTx,
 };
 use crate::job_manager::JobManagerTx;
@@ -31,12 +31,12 @@ impl Default for LocalFs {
     }
 }
 
-impl BytesSource for LocalFs {
+impl DataSource<Bytes> for LocalFs {
     fn name(&self) -> String {
         format!("LocalFs-{}", &self.home)
     }
 
-    fn start_stream(self: Box<Self>) -> Result<BytesSourceTask, DataStoreError> {
+    fn start_stream(self: Box<Self>) -> Result<DataSourceTask<Bytes>, DataStoreError> {
         use tokio::fs::File;
         use tokio::io::{AsyncBufReadExt, BufReader};
         use tokio::sync::mpsc::channel;
@@ -44,7 +44,7 @@ impl BytesSource for LocalFs {
         let files = self.files.clone();
         let home = self.home.clone();
         let name = self.name();
-        let jh: JoinHandle<Result<BytesSourceStats, DataStoreError>> = tokio::spawn(async move {
+        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             for fname in files {
                 //TODO: would prefer this to fail higher, but the test is not handled properly
@@ -57,7 +57,7 @@ impl BytesSource for LocalFs {
                 loop {
                     if let Some(line) = lines.next_line().await? {
                         lines_scanned += 1;
-                        tx.send(Ok(BytesSourceMessage::new(&fname, line)))
+                        tx.send(Ok(DataSourceMessage::new(&fname, Bytes::from(line))))
                             .await
                             .map_err(|er| DataStoreError::send_error(&name, &fname, er))?;
                     } else {
@@ -65,7 +65,7 @@ impl BytesSource for LocalFs {
                     }
                 }
             }
-            Ok(BytesSourceStats { lines_scanned })
+            Ok(DataSourceStats { lines_scanned })
         });
         Ok((rx, jh))
     }

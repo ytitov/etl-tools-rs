@@ -3,7 +3,7 @@ use super::*;
 pub struct JsonDecoder {}
 
 impl JsonDecoder {
-    pub async fn new<T>(source: Box<dyn BytesSource>) -> Box<dyn DataSource<T>>
+    pub async fn new<T>(source: Box<dyn DataSource<Bytes>>) -> Box<dyn DataSource<T>>
     where
         T: DeserializeOwned + Debug + Send + Sync + 'static,
     {
@@ -15,7 +15,7 @@ impl JsonDecoder {
 impl<T: DeserializeOwned + Debug + 'static + Send + Sync> DecodeStream<T> for JsonDecoder {
     async fn decode_source(
         self: Box<Self>,
-        source: Box<dyn BytesSource>,
+        source: Box<dyn DataSource<Bytes>>,
     ) -> Box<dyn DataSource<T>> {
         use tokio::sync::mpsc::channel;
         use tokio::task::JoinHandle;
@@ -33,7 +33,7 @@ impl<T: DeserializeOwned + Debug + 'static + Send + Sync> DecodeStream<T> for Js
                         let mut lines_scanned = 0_usize;
                         loop {
                             match source_rx.recv().await {
-                                Some(Ok(BytesSourceMessage::Data { source, content })) => {
+                                Some(Ok(DataSourceMessage::Data { source, content })) => {
                                     lines_scanned += 1;
                                     match serde_json::from_slice::<T>(&content) {
                                         Ok(r) => {

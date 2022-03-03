@@ -8,7 +8,7 @@ pub struct CsvDecoder {
 impl CsvDecoder {
     pub async fn new<T>(
         csv_options: CsvReadOptions,
-        source: Box<dyn BytesSource>,
+        source: Box<dyn DataSource<Bytes>>,
     ) -> Box<dyn DataSource<T>> 
         where T: DeserializeOwned + Debug + Send + Sync + 'static
     {
@@ -20,7 +20,7 @@ impl CsvDecoder {
 impl<T: DeserializeOwned + Debug + 'static + Send + Sync> DecodeStream<T> for CsvDecoder {
     async fn decode_source(
         self: Box<Self>,
-        source: Box<dyn BytesSource>,
+        source: Box<dyn DataSource<Bytes>>,
         //) -> DecodedSource<T> {
     ) -> Box<dyn DataSource<T>> {
         use tokio::sync::mpsc::channel;
@@ -50,7 +50,7 @@ impl<T: DeserializeOwned + Debug + 'static + Send + Sync> DecodeStream<T> for Cs
                         let mut lines_scanned = 0_usize;
                         loop {
                             match source_rx.recv().await {
-                                Some(Ok(BytesSourceMessage::Data { source, content })) => {
+                                Some(Ok(DataSourceMessage::Data { source, content })) => {
                                     if has_headers == true && lines_scanned == 0 {
                                         headers_str =
                                             std::string::String::from_utf8_lossy(&*content)

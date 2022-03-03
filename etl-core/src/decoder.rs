@@ -4,8 +4,8 @@ use crate::datastore::error::*;
 use crate::datastore::*;
 use async_trait::async_trait;
 use std::fmt::Debug;
-use crate::datastore::bytes_source::*;
 use serde::de::DeserializeOwned;
+use bytes::Bytes;
 
 pub mod csv;
 pub mod json;
@@ -16,7 +16,7 @@ pub mod string;
 pub trait DecodeStream<T: Debug + 'static + Send>: Sync + Send {
     async fn decode_source(
         self: Box<Self>,
-        source: Box<dyn BytesSource>,
+        source: Box<dyn DataSource<Bytes>>,
     ) -> Box<dyn DataSource<T>>;
 }
 
