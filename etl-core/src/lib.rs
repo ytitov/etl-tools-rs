@@ -10,7 +10,7 @@
 //! located on an MySql database.
 
 pub mod datastore;
-/// Used by the [crate::datastore::bytes_source::BytesSource] to help decode various streams.  So
+/// Used by the [crate::datastore::DataSource<Bytes>] to help decode various streams.  So
 /// anything that implements a BytesSource target, can select which decoder they want to use.  For
 /// example either [crate::decoder::csv::CsvDecoder] or [crate::decoder::json::JsonDecoder]
 pub mod decoder;

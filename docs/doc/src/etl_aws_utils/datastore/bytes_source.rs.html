@@ -158,7 +158,6 @@
 <span id="157">157</span>
 <span id="158">158</span>
 <span id="159">159</span>
-<span id="160">160</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::create_client</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::rusoto_s3</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::DataStoreError</span>;
@@ -167,7 +166,6 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::S3Client</span>;
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">AsyncBufReadExt</span>, <span class="ident">BufReader</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::datastore::s3_write_bytes_multipart</span>;
-<span class="kw">use</span> <span class="ident">etl_core::datastore::bytes_source</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">etl_core::datastore</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">etl_core::deps::async_trait</span>;
 <span class="kw">use</span> <span class="ident">etl_core::deps::bytes::Bytes</span>;
@@ -255,12 +253,12 @@
     }
 }
 
-<span class="kw">impl</span> <span class="ident">BytesSource</span> <span class="kw">for</span> <span class="ident">S3Storage</span> {
+<span class="kw">impl</span> <span class="ident">DataSource</span><span class="op">&lt;</span><span class="ident">Bytes</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">S3Storage</span> {
     <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
         <span class="macro">format!</span>(<span class="string">&quot;S3-{}&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">s3_bucket</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">start_stream</span>(<span class="self">self</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BytesSourceTask</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">start_stream</span>(<span class="self">self</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataSourceTask</span><span class="op">&lt;</span><span class="ident">Bytes</span><span class="op">&gt;</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span> {
         <span class="kw">use</span> <span class="ident">rusoto_core::RusotoError</span>;
         <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">credentials_path</span> {
             <span class="prelude-val">Some</span>(<span class="ident">credentials_path</span>) =&gt; <span class="ident">ProfileProvider::with_default_configuration</span>(<span class="ident">credentials_path</span>),
@@ -289,7 +287,7 @@
                         <span class="kw">loop</span> {
                             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">line</span>) <span class="op">=</span> <span class="ident">lines</span>.<span class="ident">next_line</span>().<span class="kw">await</span><span class="question-mark">?</span> {
                                 <span class="ident">lines_scanned</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-                                <span class="ident">tx</span>.<span class="ident">send</span>(<span class="prelude-val">Ok</span>(<span class="ident">BytesSourceMessage::new</span>(<span class="kw-2">&amp;</span><span class="ident">s3_key</span>, <span class="ident">line</span>)))
+                                <span class="ident">tx</span>.<span class="ident">send</span>(<span class="prelude-val">Ok</span>(<span class="ident">DataSourceMessage::new</span>(<span class="kw-2">&amp;</span><span class="ident">s3_key</span>, <span class="ident">Bytes::from</span>(<span class="ident">line</span>))))
                                     .<span class="kw">await</span>
                                     .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">er</span><span class="op">|</span> <span class="ident">DataStoreError::send_error</span>(<span class="kw-2">&amp;</span><span class="ident">name</span>, <span class="kw-2">&amp;</span><span class="ident">s3_key</span>, <span class="ident">er</span>))<span class="question-mark">?</span>;
                             } <span class="kw">else</span> {
@@ -314,7 +312,7 @@
                     }
                 }
             }
-            <span class="prelude-val">Ok</span>(<span class="ident">BytesSourceStats</span> { <span class="ident">lines_scanned</span> })
+            <span class="prelude-val">Ok</span>(<span class="ident">DataSourceStats</span> { <span class="ident">lines_scanned</span> })
         });
         <span class="prelude-val">Ok</span>((<span class="ident">rx</span>, <span class="ident">jh</span>))
     }
