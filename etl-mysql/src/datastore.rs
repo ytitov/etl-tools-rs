@@ -30,7 +30,7 @@ pub struct MySqlDataOutput {
     pub table_name: String,
     pub db_name: String,
     pub pool: MySqlDataOutputPool,
-    pub pre_insert: Option<PreInsertFn>,
+    pub map_query: Option<PreInsertFn>,
 }
 
 #[derive(Clone)]
@@ -70,7 +70,7 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
         let on_put_num_rows_max = *&self.on_put_num_rows_max;
         let db_name = self.db_name.clone();
         let pool_config = self.pool.clone();
-        let pre_insert_func = self.pre_insert;
+        let map_query_func = self.map_query;
         let join_handle: JoinHandle<anyhow::Result<DataOutputStats>> = tokio::spawn(async move {
             let mut time_started = std::time::Instant::now();
             let mut value_rows: Vec<String> = Vec::with_capacity(on_put_num_rows_max);
@@ -163,7 +163,7 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                         &columns,
                         &value_rows,
                         0,
-                        pre_insert_func.as_ref(),
+                        map_query_func.as_ref(),
                     )
                     .await
                     {
@@ -194,7 +194,7 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                                 &columns,
                                 &value_rows,
                                 1,
-                                pre_insert_func.as_ref(),
+                                map_query_func.as_ref(),
                             )
                             .await
                             {
@@ -309,7 +309,7 @@ pub async fn exec_rows_mysql(
     } else {
         // either gets the rest of them or all of them
         value_rows_buf = value_rows.iter().map(|s| s).collect();
-        let query = format!(
+        let mut query = format!(
             "INSERT INTO `{}`.`{}` ({}) \nVALUES \n{}",
             db_name,
             table_name,
@@ -324,6 +324,14 @@ pub async fn exec_rows_mysql(
                 .collect::<Vec<String>>()
                 .join(",")
         );
+        if let Some(f) = pre_insert_func {
+            match (f)(&mut query).await {
+                Ok(result) => {
+                    query = result;
+                }
+                Err(_) => {}
+            };
+        }
         match sqlx::query(&query).execute(pool).await {
             Ok(_) => {
                 count_ok += value_rows_buf.len(); //println!(" ** OK ** ");
@@ -451,7 +459,7 @@ impl<
                     table_name,
                     db_name,
                     pool: MySqlDataOutputPool::Pool(pool),
-                    pre_insert: None,
+                    map_query: None,
                 }));
             }
             Err(e) => {
