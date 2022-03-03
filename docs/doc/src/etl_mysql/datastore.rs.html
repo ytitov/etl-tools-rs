@@ -445,9 +445,28 @@
 <span id="444">444</span>
 <span id="445">445</span>
 <span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">etl_core::datastore</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">etl_core::deps::anyhow</span>;
 <span class="kw">use</span> <span class="ident">etl_core::deps::async_trait</span>;
+<span class="kw">use</span> <span class="ident">etl_core::deps::futures_core::future::BoxFuture</span>;
+<span class="kw">use</span> <span class="ident">etl_core::deps::log</span>;
 <span class="kw">use</span> <span class="ident">etl_core::deps::tokio</span>;
 <span class="kw">use</span> <span class="ident">etl_core::deps::tokio::sync::mpsc::channel</span>;
 <span class="kw">use</span> <span class="ident">etl_core::deps::tokio::task::JoinHandle</span>;
@@ -462,8 +481,10 @@
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">sqlx::MySqlPool</span>;
 <span class="kw">use</span> <span class="ident">std::fmt::Debug</span>;
 <span class="kw">use</span> <span class="ident">std::time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
-<span class="kw">use</span> <span class="ident">etl_core::deps::log</span>;
 
+<span class="kw">type</span> <span class="ident">PreInsertFn</span> <span class="op">=</span> <span class="ident">Box</span><span class="op">&lt;</span>
+    <span class="kw">dyn</span> <span class="kw">for</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">Fn</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;_</span> <span class="ident">String</span>) -&gt; <span class="ident">BoxFuture</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span>,
+<span class="op">&gt;</span>;
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MySqlDataOutput</span> {
     <span class="comment">// TODO: scaling may never need to happen</span>
@@ -473,6 +494,7 @@
     <span class="kw">pub</span> <span class="ident">table_name</span>: <span class="ident">String</span>,
     <span class="kw">pub</span> <span class="ident">db_name</span>: <span class="ident">String</span>,
     <span class="kw">pub</span> <span class="ident">pool</span>: <span class="ident">MySqlDataOutputPool</span>,
+    <span class="kw">pub</span> <span class="ident">pre_insert</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">PreInsertFn</span><span class="op">&gt;</span>,
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
@@ -507,12 +529,12 @@
         <span class="kw-2">mut</span> <span class="ident">jm_tx</span>: <span class="ident">JobManagerTx</span>,
     ) -&gt; <span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">DataOutputTask</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="kw-2">mut</span> <span class="ident">rx</span>): (<span class="ident">DataOutputTx</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="ident">channel</span>(<span class="self">self</span>.<span class="ident">on_put_num_rows</span> <span class="op">*</span> <span class="number">2</span>);
-
         <span class="kw">let</span> <span class="ident">table_name</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">table_name</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">on_put_num_rows_orig</span> <span class="op">=</span> <span class="kw-2">*</span><span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">on_put_num_rows</span>;
         <span class="kw">let</span> <span class="ident">on_put_num_rows_max</span> <span class="op">=</span> <span class="kw-2">*</span><span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">on_put_num_rows_max</span>;
         <span class="kw">let</span> <span class="ident">db_name</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">db_name</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">pool_config</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pool</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">pre_insert_func</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pre_insert</span>;
         <span class="kw">let</span> <span class="ident">join_handle</span>: <span class="ident">JoinHandle</span><span class="op">&lt;</span><span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">DataOutputStats</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">tokio::spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">time_started</span> <span class="op">=</span> <span class="ident">std::time::Instant::now</span>();
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">value_rows</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">on_put_num_rows_max</span>);
@@ -583,8 +605,8 @@
                                 <span class="kw">break</span>;
                             }
                             <span class="prelude-val">None</span> =&gt; {
+                                <span class="comment">//TODO: this logic looks dubious, refactor</span>
                                 <span class="ident">source_finished_sending</span> <span class="op">=</span> <span class="bool-val">true</span>;
-                                <span class="comment">// get out because source is done</span>
                                 <span class="kw">break</span>;
                             }
                         }
@@ -605,6 +627,7 @@
                         <span class="kw-2">&amp;</span><span class="ident">columns</span>,
                         <span class="kw-2">&amp;</span><span class="ident">value_rows</span>,
                         <span class="number">0</span>,
+                        <span class="ident">pre_insert_func</span>.<span class="ident">as_ref</span>(),
                     )
                     .<span class="kw">await</span>
                     {
@@ -635,6 +658,7 @@
                                 <span class="kw-2">&amp;</span><span class="ident">columns</span>,
                                 <span class="kw-2">&amp;</span><span class="ident">value_rows</span>,
                                 <span class="number">1</span>,
+                                <span class="ident">pre_insert_func</span>.<span class="ident">as_ref</span>(),
                             )
                             .<span class="kw">await</span>
                             {
@@ -697,6 +721,7 @@
     <span class="ident">columns</span>: <span class="kw-2">&amp;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
     <span class="ident">value_rows</span>: <span class="kw-2">&amp;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
     <span class="ident">step</span>: <span class="ident">usize</span>,
+    <span class="ident">pre_insert_func</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">PreInsertFn</span><span class="op">&gt;</span>,
 ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ExecRowsOutput</span>, <span class="ident">sqlx::Error</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">value_rows_buf</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">step</span>);
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">count_ok</span> <span class="op">=</span> <span class="number">0_usize</span>;
@@ -705,7 +730,7 @@
         <span class="kw">for</span> <span class="kw-2">ref</span> <span class="ident">value_row</span> <span class="kw">in</span> <span class="ident">value_rows</span> {
             <span class="ident">value_rows_buf</span>.<span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="ident">value_row</span>);
             <span class="kw">if</span> <span class="ident">value_rows_buf</span>.<span class="ident">len</span>() <span class="op">==</span> <span class="ident">step</span> {
-                <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="macro">format!</span>(
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">query</span> <span class="op">=</span> <span class="macro">format!</span>(
                     <span class="string">&quot;INSERT INTO `{}`.`{}` ({}) \nVALUES \n{}&quot;</span>,
                     <span class="ident">db_name</span>,
                     <span class="ident">table_name</span>,
@@ -721,6 +746,14 @@
                         .<span class="ident">join</span>(<span class="string">&quot;,&quot;</span>)
                 );
                 <span class="comment">//println!(&quot;QUERY: {}&quot;, &amp;query);</span>
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">f</span>) <span class="op">=</span> <span class="ident">pre_insert_func</span> {
+                    <span class="kw">match</span> (<span class="ident">f</span>)(<span class="kw-2">&amp;mut</span> <span class="ident">query</span>).<span class="kw">await</span> {
+                        <span class="prelude-val">Ok</span>(<span class="ident">result</span>) =&gt; {
+                            <span class="ident">query</span> <span class="op">=</span> <span class="ident">result</span>;
+                        }
+                        <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {}
+                    };
+                }
                 <span class="kw">match</span> <span class="ident">sqlx::query</span>(<span class="kw-2">&amp;</span><span class="ident">query</span>).<span class="ident">execute</span>(<span class="ident">pool</span>).<span class="kw">await</span> {
                     <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {
                         <span class="ident">count_ok</span> <span class="op">+</span><span class="op">=</span> <span class="ident">value_rows_buf</span>.<span class="ident">len</span>(); <span class="comment">//println!(&quot; ** OK ** &quot;);</span>
@@ -882,6 +915,7 @@
                     <span class="ident">table_name</span>,
                     <span class="ident">db_name</span>,
                     <span class="ident">pool</span>: <span class="ident">MySqlDataOutputPool::Pool</span>(<span class="ident">pool</span>),
+                    <span class="ident">pre_insert</span>: <span class="prelude-val">None</span>,
                 }));
             }
             <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
