@@ -35,6 +35,7 @@ pub mod deps {
     pub use tokio;
     pub use log;
     pub use bytes;
+    pub use futures_core;
 }
 /// responsible for generating and running pipelines, including any run-time configurations
 pub mod job;

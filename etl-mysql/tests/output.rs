@@ -8,6 +8,17 @@ use etl_core::preamble::*;
 use etl_mysql::datastore::*;
 use serde::{Deserialize, Serialize};
 
+#[derive(sqlx::FromRow)]
+struct SampleRow {
+    pub name: String,
+    pub id: u64,
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+async fn test_generate_insert() {
+    create_insert(SampleRow { name: "testname".to_owned(), id: 123 });
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_simple_mysql_output() {
     let job_manager = JobManager::new(JobManagerConfig {

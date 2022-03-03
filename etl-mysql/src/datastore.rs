@@ -1,6 +1,8 @@
 use etl_core::datastore::*;
 use etl_core::deps::anyhow;
 use etl_core::deps::async_trait;
+use etl_core::deps::futures_core::future::BoxFuture;
+use etl_core::deps::log;
 use etl_core::deps::tokio;
 use etl_core::deps::tokio::sync::mpsc::channel;
 use etl_core::deps::tokio::task::JoinHandle;
@@ -15,8 +17,10 @@ pub use sqlx::mysql::MySqlPoolOptions;
 pub use sqlx::MySqlPool;
 use std::fmt::Debug;
 use std::time::{Duration, Instant};
-use etl_core::deps::log;
 
+type PreInsertFn = Box<
+    dyn for<'a> Fn(&'_ String) -> BoxFuture<'_, anyhow::Result<String>> + 'static + Send + Sync,
+>;
 #[derive(Default)]
 pub struct MySqlDataOutput {
     // TODO: scaling may never need to happen
@@ -26,6 +30,7 @@ pub struct MySqlDataOutput {
     pub table_name: String,
     pub db_name: String,
     pub pool: MySqlDataOutputPool,
+    pub pre_insert: Option<PreInsertFn>,
 }
 
 #[derive(Clone)]
@@ -60,12 +65,12 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
         mut jm_tx: JobManagerTx,
     ) -> anyhow::Result<DataOutputTask<T>> {
         let (tx, mut rx): (DataOutputTx<T>, _) = channel(self.on_put_num_rows * 2);
-
         let table_name = self.table_name.clone();
         let on_put_num_rows_orig = *&self.on_put_num_rows;
         let on_put_num_rows_max = *&self.on_put_num_rows_max;
         let db_name = self.db_name.clone();
         let pool_config = self.pool.clone();
+        let pre_insert_func = self.pre_insert;
         let join_handle: JoinHandle<anyhow::Result<DataOutputStats>> = tokio::spawn(async move {
             let mut time_started = std::time::Instant::now();
             let mut value_rows: Vec<String> = Vec::with_capacity(on_put_num_rows_max);
@@ -136,8 +141,8 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                                 break;
                             }
                             None => {
+                                //TODO: this logic looks dubious, refactor
                                 source_finished_sending = true;
-                                // get out because source is done
                                 break;
                             }
                         }
@@ -158,6 +163,7 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                         &columns,
                         &value_rows,
                         0,
+                        pre_insert_func.as_ref(),
                     )
                     .await
                     {
@@ -188,6 +194,7 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                                 &columns,
                                 &value_rows,
                                 1,
+                                pre_insert_func.as_ref(),
                             )
                             .await
                             {
@@ -250,6 +257,7 @@ pub async fn exec_rows_mysql(
     columns: &Vec<String>,
     value_rows: &Vec<String>,
     step: usize,
+    pre_insert_func: Option<&PreInsertFn>,
 ) -> Result<ExecRowsOutput, sqlx::Error> {
     let mut value_rows_buf: Vec<&String> = Vec::with_capacity(step);
     let mut count_ok = 0_usize;
@@ -258,7 +266,7 @@ pub async fn exec_rows_mysql(
         for ref value_row in value_rows {
             value_rows_buf.push(&value_row);
             if value_rows_buf.len() == step {
-                let query = format!(
+                let mut query = format!(
                     "INSERT INTO `{}`.`{}` ({}) \nVALUES \n{}",
                     db_name,
                     table_name,
@@ -274,6 +282,14 @@ pub async fn exec_rows_mysql(
                         .join(",")
                 );
                 //println!("QUERY: {}", &query);
+                if let Some(f) = pre_insert_func {
+                    match (f)(&mut query).await {
+                        Ok(result) => {
+                            query = result;
+                        }
+                        Err(_) => {}
+                    };
+                }
                 match sqlx::query(&query).execute(pool).await {
                     Ok(_) => {
                         count_ok += value_rows_buf.len(); //println!(" ** OK ** ");
@@ -435,6 +451,7 @@ impl<
                     table_name,
                     db_name,
                     pool: MySqlDataOutputPool::Pool(pool),
+                    pre_insert: None,
                 }));
             }
             Err(e) => {

@@ -57,12 +57,12 @@ impl<T: Send> DataSourceMessage<T> {
 }
 
 #[derive(Debug)]
-pub enum DataOutputMessage<T: Serialize + Debug + Send + Sync> {
+pub enum DataOutputMessage<T: Debug + Send + Sync> {
     Data(T),
     NoMoreData,
 }
 
-impl<T: Serialize + Debug + Send + Sync> DataOutputMessage<T> {
+impl<T: Debug + Send + Sync> DataOutputMessage<T> {
     pub fn new(data: T) -> Self {
         DataOutputMessage::Data(data)
     }
@@ -154,7 +154,7 @@ impl<T: 'static + Debug + Send> DataSource<T> for DataSourceTask<T> {
 pub trait CreateDataOutput<'de, C, T>: Sync + Send
 where
     C: Deserializer<'de>,
-    T: Serialize + Debug + 'static + Send,
+    T: Debug + 'static + Send,
 {
     async fn create_data_output(_: C) -> anyhow::Result<Box<dyn DataOutput<T>>>;
 }
@@ -170,7 +170,7 @@ where
 }
 
 #[async_trait]
-pub trait DataOutput<T: Serialize + Debug + 'static + Sync + Send>: Sync + Send {
+pub trait DataOutput<T: Debug + 'static + Sync + Send>: Sync + Send {
     async fn start_stream(self: Box<Self>, _: JobManagerTx) -> anyhow::Result<DataOutputTask<T>> {
         unimplemented!();
     }
@@ -247,7 +247,7 @@ pub async fn data_output_shutdown<T>(
     (c, jh): DataOutputTask<T>,
 ) -> anyhow::Result<DataOutputStats>
 where
-    T: Serialize + Debug + Send + Sync,
+    T: Debug + Send + Sync,
 {
     drop(c);
     match jh.await {
