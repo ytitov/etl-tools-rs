@@ -23,14 +23,17 @@ pub mod transform_store;
 pub type DataOutputItemResult<T> = Result<T, DataStoreError>;
 
 pub type DataSourceRx<T> = Receiver<Result<DataSourceMessage<T>, DataStoreError>>;
+pub type DataSourceTx<T> = Sender<DataSourceMessage<T>>;
 pub type DataSourceTask<T> = (
     DataSourceRx<T>,
     JoinHandle<Result<DataSourceStats, DataStoreError>>,
 );
 pub type DataOutputTx<T> = Sender<DataOutputMessage<T>>;
+pub type DataOutputRx<T> = Receiver<DataOutputMessage<T>>;
 pub type DataOutputTask<T> = (DataOutputTx<T>, JoinHandle<anyhow::Result<DataOutputStats>>);
 
 pub type DataOutputJoinHandle = JoinHandle<anyhow::Result<DataOutputStats>>;
+pub type DataSourceJoinHandle = JoinHandle<Result<DataSourceStats, DataStoreError>>;
 
 pub struct DataSourceStats {
     pub lines_scanned: usize,
@@ -69,6 +72,10 @@ impl<T: Debug + Send + Sync> DataOutputMessage<T> {
     pub fn no_more_data() -> Self {
         DataOutputMessage::NoMoreData
     }
+}
+#[async_trait]
+pub trait OutputTask: Sync + Send {
+    fn create(self: Box<Self>) -> Result<DataOutputJoinHandle, DataStoreError>;
 }
 
 #[async_trait]
@@ -224,6 +231,36 @@ impl<T: Debug + 'static + Sync + Send> DataSource<T> for DataSourceRx<T> {
                     }
                     Some(Err(e)) => {
                         return Err(e);
+                    }
+                    None => break,
+                }
+            }
+            Ok(DataSourceStats { lines_scanned })
+        });
+        Ok((rx, jh))
+    }
+}
+
+#[async_trait]
+impl<T: Debug + 'static + Sync + Send> DataSource<T> for Receiver<DataSourceMessage<T>> {
+    fn name(&self) -> String {
+        String::from("DataSourceRx")
+    }
+
+    fn start_stream(mut self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
+        use tokio::sync::mpsc::channel;
+        use tokio::task::JoinHandle;
+        let (tx, rx) = channel(1);
+        let name = self.name();
+        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
+            let mut lines_scanned = 0_usize;
+            loop {
+                match self.recv().await {
+                    Some(DataSourceMessage::Data {source, content}) => {
+                        lines_scanned += 1;
+                        tx.send(Ok(DataSourceMessage::new(&name, content)))
+                            .await
+                            .map_err(|e| DataStoreError::send_error(&name, &source, e))?;
                     }
                     None => break,
                 }

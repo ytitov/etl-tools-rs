@@ -3,18 +3,17 @@ use super::*;
 pub struct JsonDecoder {}
 
 impl JsonDecoder {
-    pub async fn new<T>(source: Box<dyn DataSource<Bytes>>) -> Box<dyn DataSource<T>>
+    pub fn new<T>(source: Box<dyn DataSource<Bytes>>) -> Box<dyn DataSource<T>>
     where
         T: DeserializeOwned + Debug + Send + Sync + 'static,
     {
-        DecodeStream::decode_source(Box::new(JsonDecoder {}), source).await
+        DecodeStream::decode_source(JsonDecoder {}, source)
     }
 }
 
-#[async_trait]
 impl<T: DeserializeOwned + Debug + 'static + Send + Sync> DecodeStream<T> for JsonDecoder {
-    async fn decode_source(
-        self: Box<Self>,
+    fn decode_source(
+        self,
         source: Box<dyn DataSource<Bytes>>,
     ) -> Box<dyn DataSource<T>> {
         use tokio::sync::mpsc::channel;

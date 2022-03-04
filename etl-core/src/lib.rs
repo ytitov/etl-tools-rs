@@ -49,3 +49,5 @@ pub mod splitter;
 pub mod transformer;
 /// take in a stream and output same items but as batches
 pub mod batch;
+/// accept a DataSource and execute an async function with a custom state
+pub mod apply;

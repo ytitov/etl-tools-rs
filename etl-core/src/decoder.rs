@@ -2,22 +2,16 @@
 /// kinds of DataSources (like S3) one needs to simply implement a stream which produces Bytes
 use crate::datastore::error::*;
 use crate::datastore::*;
-use async_trait::async_trait;
-use std::fmt::Debug;
-use serde::de::DeserializeOwned;
 use bytes::Bytes;
+use serde::de::DeserializeOwned;
+use std::fmt::Debug;
 
 pub mod csv;
 pub mod json;
 pub mod string;
 
-
-#[async_trait]
 pub trait DecodeStream<T: Debug + 'static + Send>: Sync + Send {
-    async fn decode_source(
-        self: Box<Self>,
-        source: Box<dyn DataSource<Bytes>>,
-    ) -> Box<dyn DataSource<T>>;
+    fn decode_source(self, source: Box<dyn DataSource<Bytes>>) -> Box<dyn DataSource<T>>;
 }
 
 /// Helper wrapper for specific decoders to return so you do not have to construct them manually
@@ -26,9 +20,7 @@ pub struct DecodedSource<T: Debug + 'static + Send + Send> {
     ds_task_result: Result<DataSourceTask<T>, DataStoreError>,
 }
 
-impl<T: Debug + Send + Sync + 'static> DataSource<T>
-    for DecodedSource<T>
-{
+impl<T: Debug + Send + Sync + 'static> DataSource<T> for DecodedSource<T> {
     fn name(&self) -> String {
         format!("Decoded-{}", &self.source_name)
     }

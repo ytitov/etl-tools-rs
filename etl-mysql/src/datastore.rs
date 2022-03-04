@@ -21,6 +21,12 @@ use std::time::{Duration, Instant};
 type PreInsertFn = Box<
     dyn for<'a> Fn(&'_ String) -> BoxFuture<'_, anyhow::Result<String>> + 'static + Send + Sync,
 >;
+#[derive(Debug)]
+pub struct FailedQuery {
+    pub error: sqlx::Error,
+    pub query: String,
+}
+
 #[derive(Default)]
 pub struct MySqlDataOutput {
     // TODO: scaling may never need to happen
@@ -31,6 +37,7 @@ pub struct MySqlDataOutput {
     pub db_name: String,
     pub pool: MySqlDataOutputPool,
     pub map_query: Option<PreInsertFn>,
+    pub failed_query_tx: Option<DataSourceTx<FailedQuery>>,
 }
 
 #[derive(Clone)]
@@ -71,6 +78,7 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
         let db_name = self.db_name.clone();
         let pool_config = self.pool.clone();
         let map_query_func = self.map_query;
+        let failed_query_tx = self.failed_query_tx;
         let join_handle: JoinHandle<anyhow::Result<DataOutputStats>> = tokio::spawn(async move {
             let mut time_started = std::time::Instant::now();
             let mut value_rows: Vec<String> = Vec::with_capacity(on_put_num_rows_max);
@@ -118,6 +126,7 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
             let mut source_finished_sending = false;
             loop {
                 if num_bytes >= 4_000_000 {
+                    // TODO: should be fatal error
                     println!(" for table {} Packet exceeded 4mb consider reducing max commit size or setting the server max_allowed_packet", &table_name);
                 }
                 // 1. loop until we have enough rows
@@ -164,6 +173,7 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                         &value_rows,
                         0,
                         map_query_func.as_ref(),
+                        failed_query_tx.as_ref(),
                     )
                     .await
                     {
@@ -195,6 +205,7 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                                 &value_rows,
                                 1,
                                 map_query_func.as_ref(),
+                                failed_query_tx.as_ref(),
                             )
                             .await
                             {
@@ -258,7 +269,9 @@ pub async fn exec_rows_mysql(
     value_rows: &Vec<String>,
     step: usize,
     pre_insert_func: Option<&PreInsertFn>,
+    failed_query_tx: Option<&DataSourceTx<FailedQuery>>,
 ) -> Result<ExecRowsOutput, sqlx::Error> {
+    use std::io::{ErrorKind, Error as IoError};
     let mut value_rows_buf: Vec<&String> = Vec::with_capacity(step);
     let mut count_ok = 0_usize;
     let instance = Instant::now();
@@ -281,7 +294,6 @@ pub async fn exec_rows_mysql(
                         .collect::<Vec<String>>()
                         .join(",")
                 );
-                //println!("QUERY: {}", &query);
                 if let Some(f) = pre_insert_func {
                     match (f)(&mut query).await {
                         Ok(result) => {
@@ -294,13 +306,36 @@ pub async fn exec_rows_mysql(
                     Ok(_) => {
                         count_ok += value_rows_buf.len(); //println!(" ** OK ** ");
                     }
+                    /*
                     Err(sqlx::Error::Io(e)) => {
-                        println!("Error::Io {}", e);
+                        if let Some(tx) = failed_query_tx {
+                            tx.send(DataSourceMessage::new(
+                                "mysql-datasource",
+                                FailedQuery {
+                                    error: e,
+                                    query: query.to_owned(),
+                                },
+                            ))
+                            .await
+                            .map_err(|e| IoError::new(ErrorKind::Other, e.to_string()))?;
+                        }
                     }
+                    */
                     Err(e) => {
                         let m = format!("MYSQL `{}` ERROR: {}", table_name, e);
-                        println!("QUERY: {}", &query);
-                        let _ = jm_tx.send(Message::log_info("mysql-datastore", m)).await;
+                        let _ = jm_tx.send(Message::log_info("mysql-datasource", m)).await;
+                        if let Some(tx) = failed_query_tx {
+                            tx.send(DataSourceMessage::new(
+                                "mysql-datasource",
+                                FailedQuery {
+                                    error: e,
+                                    query: query.to_owned(),
+                                },
+                            ))
+                            .await
+                            //TODO: this should be a fatal error that stops everything
+                            .map_err(|e| IoError::new(ErrorKind::Other, e.to_string()))?;
+                        }
                     }
                 }
                 value_rows_buf.clear();
@@ -460,6 +495,7 @@ impl<
                     db_name,
                     pool: MySqlDataOutputPool::Pool(pool),
                     map_query: None,
+                    failed_query_tx: None,
                 }));
             }
             Err(e) => {

@@ -6,20 +6,19 @@ pub struct CsvDecoder {
 }
 
 impl CsvDecoder {
-    pub async fn new<T>(
+    pub fn new<T>(
         csv_options: CsvReadOptions,
         source: Box<dyn DataSource<Bytes>>,
     ) -> Box<dyn DataSource<T>> 
         where T: DeserializeOwned + Debug + Send + Sync + 'static
     {
-        DecodeStream::decode_source(Box::new(CsvDecoder { csv_options }), source).await
+        DecodeStream::decode_source(CsvDecoder { csv_options }, source)
     }
 }
 
-#[async_trait]
 impl<T: DeserializeOwned + Debug + 'static + Send + Sync> DecodeStream<T> for CsvDecoder {
-    async fn decode_source(
-        self: Box<Self>,
+    fn decode_source(
+        self,
         source: Box<dyn DataSource<Bytes>>,
         //) -> DecodedSource<T> {
     ) -> Box<dyn DataSource<T>> {

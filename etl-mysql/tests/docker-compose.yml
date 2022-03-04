@@ -6,6 +6,7 @@ services:
     volumes:
       - db_data:/var/lib/mysql
     restart: always
+    command: --lower-case-table-names=1
     environment:
       MYSQL_ROOT_PASSWORD: admin
       MYSQL_DATABASE: default 

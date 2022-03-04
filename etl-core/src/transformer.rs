@@ -6,7 +6,7 @@ use tokio::task::JoinHandle;
 
 pub struct Transformer<I, O> {
     pub input: Box<dyn DataSource<I>>,
-    pub map: fn(I) -> DataOutputItemResult<O>,
+    pub map: fn(I) -> DataOutputItemResult<Option<O>>,
 }
 
 impl<I: Debug + Send + Sync + 'static, O: Debug + Send + Sync + 'static> DataSource<O>
@@ -30,12 +30,13 @@ impl<I: Debug + Send + Sync + 'static, O: Debug + Send + Sync + 'static> DataSou
                         source,
                         content: input_item,
                     })) => match map_func(input_item) {
-                        Ok(output_item) => {
+                        Ok(Some(output_item)) => {
                             lines_scanned += 1;
                             tx.send(Ok(DataSourceMessage::new(&source, output_item)))
                                 .await
                                 .map_err(|e| DataStoreError::send_error(&name, &source, e))?;
                         }
+                        Ok(None) => {},
                         Err(val) => {
                             match tx
                                 .send(Err(DataStoreError::Deserialize {

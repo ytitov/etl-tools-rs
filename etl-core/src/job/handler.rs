@@ -2,8 +2,18 @@ use super::*;
 use futures_core::future::BoxFuture;
 
 pub type BoxedCreateStreamHandlerResult<T> = anyhow::Result<Box<dyn StreamHandler<T>>>;
-pub type CreateStreamHandlerFn<'a, R> =
-    Box<dyn Fn(&'_ mut JobRunner) -> BoxFuture<'a, BoxedCreateStreamHandlerResult<R>> + 'static + Send + Sync>;
+pub type CreateStreamHandlerFn<'a, R> = Box<
+    dyn Fn(&'_ mut JobRunner) -> BoxFuture<'a, BoxedCreateStreamHandlerResult<R>>
+        + 'static
+        + Send
+        + Sync,
+>;
+pub type CreateStreamHandlerForEachFn<'a, T> = Box<
+    dyn Fn(T) -> BoxFuture<'a, anyhow::Result<()>>
+        + 'static
+        + Send
+        + Sync,
+>;
 
 #[async_trait]
 /// Meant to be used for a variety situations like calling external apis, or
@@ -21,12 +31,7 @@ where
 
     async fn shutdown(self: Box<Self>, _: &mut JobRunner) -> anyhow::Result<()>;
 
-    async fn process_item(
-        &self,
-        _: JobItemInfo,
-        item: T,
-        job: &JobRunner,
-    ) -> anyhow::Result<()>;
+    async fn process_item(&self, _: JobItemInfo, item: T, job: &JobRunner) -> anyhow::Result<()>;
 }
 
 pub enum TransformOutput<T>
@@ -59,4 +64,3 @@ where
         item: I,
     ) -> anyhow::Result<Option<TransformOutput<O>>>;
 }
-

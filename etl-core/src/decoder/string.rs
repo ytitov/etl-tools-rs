@@ -11,20 +11,19 @@ impl Default for StringDecoder {
 }
 
 impl StringDecoder {
-    pub async fn new(self, source: Box<dyn DataSource<Bytes>>) -> Box<dyn DataSource<String>>
+    pub fn new(self, source: Box<dyn DataSource<Bytes>>) -> Box<dyn DataSource<String>>
     where
         String: Debug + Send + Sync + 'static,
     {
-        DecodeStream::decode_source(Box::new(self), source).await
+        DecodeStream::decode_source(self, source)
     }
 }
 
-#[async_trait]
 impl<T: Debug + 'static + Send + Sync> DecodeStream<T> for StringDecoder 
     where DecodedSource<String>: DataSource<T>
 {
-    async fn decode_source(
-        self: Box<Self>,
+    fn decode_source(
+        self,
         source: Box<dyn DataSource<Bytes>>,
     ) -> Box<dyn DataSource<T>> {
         use tokio::sync::mpsc::channel;

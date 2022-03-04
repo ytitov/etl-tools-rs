@@ -276,7 +276,15 @@ impl JobRunner {
     }
 
     /// must be run once the JobRunner is done otherwise JobManager will not exit
-    pub async fn complete(self) -> Result<JobState, JobRunnerError> {
+    pub async fn complete(mut self) -> Result<JobState, JobRunnerError> {
+        let outputhandles = self.data_output_handles;
+        self.data_output_handles = Vec::new();
+        let mut output_stats = Vec::new();
+        for join_handle in outputhandles {
+            let s = join_handle.await??;
+            output_stats.push(s);
+        }
+        println!("OUTPUT STATS: {:#?}", output_stats);
         self.save_job_state().await?;
         match self
             .job_manager_channel
@@ -383,7 +391,8 @@ impl JobRunner {
                 drop(input_rx);
                 drop(output_tx);
                 let output_stats = output_jh.await??;
-                self.job_state.stream_ok(name, &self.config, vec![output_stats])?;
+                self.job_state
+                    .stream_ok(name, &self.config, vec![output_stats])?;
                 self.save_job_state().await?;
             }
         }
@@ -405,6 +414,20 @@ impl JobRunner {
         } else {
             let sh = create_sh(&mut self).await?;
             Ok(self.run_stream_handler::<I, &str>(name, ds, sh).await?)
+        }
+    }
+
+    /// runs an output in parallel
+    pub fn run_output_task(mut self, t: Box<dyn OutputTask>) -> Result<Self, JobRunnerError> {
+        match t.create() {
+            Ok(jh) => {
+                // ensure that the job continues but in the end this task finishes
+                self.await_data_output(jh);
+                Ok(self)
+            }
+            Err(e) => Err(JobRunnerError::GenericError {
+                message: format!("Failed running an DataOutput task due to: {}", e),
+            }),
         }
     }
 
@@ -444,11 +467,8 @@ impl JobRunner {
                     JobRunnerAction::Resume { index } => *index,
                     JobRunnerAction::Skip => {
                         //self.job_state.streams.complete(stream_name)?;
-                        self.job_state.stream_ok(
-                            stream_name,
-                            &self.config,
-                            Vec::new(),
-                        )?;
+                        self.job_state
+                            .stream_ok(stream_name, &self.config, Vec::new())?;
                         self.save_job_state().await?;
                         self.log_info(
                             self.job_state.name(),
@@ -553,7 +573,8 @@ impl JobRunner {
                     let s = join_handle.await??;
                     output_stats.push(s);
                 }
-                self.job_state.stream_ok(stream_name, &self.config, output_stats)?;
+                self.job_state
+                    .stream_ok(stream_name, &self.config, output_stats)?;
                 self.data_output_handles = Vec::new();
                 self.save_job_state().await?;
             }
