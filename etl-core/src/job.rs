@@ -281,10 +281,22 @@ impl JobRunner {
         self.data_output_handles = Vec::new();
         let mut output_stats = Vec::new();
         for join_handle in outputhandles {
-            let s = join_handle.await??;
-            output_stats.push(s);
+            match join_handle.await {
+                Err(join_handle_err) => {
+                    self.job_state.caught_errors.push(join_handle_err.into());
+                }
+                Ok(Err(task_err)) => {
+                    self.job_state.caught_errors.push(task_err.into());
+                }
+                Ok(Ok(data_output_stats)) => {
+                    output_stats.push(data_output_stats);
+                }
+            }
         }
-        println!("OUTPUT STATS: {:#?}", output_stats);
+        //println!("OUTPUT STATS: {:#?}", output_stats);
+        if self.job_state.caught_errors.len() == 0 {
+            self.job_state.set_run_status_complete()?;
+        }
         self.save_job_state().await?;
         match self
             .job_manager_channel
@@ -418,10 +430,15 @@ impl JobRunner {
     }
 
     /// runs an output in parallel
-    pub fn run_output_task(mut self, t: Box<dyn OutputTask>) -> Result<Self, JobRunnerError> {
+    pub fn run_output_task<N: ToString>(
+        mut self,
+        name: N,
+        t: Box<dyn OutputTask>,
+    ) -> Result<Self, JobRunnerError> {
         match t.create() {
             Ok(jh) => {
                 // ensure that the job continues but in the end this task finishes
+                self.cur_step_index += 1;
                 self.await_data_output(jh);
                 Ok(self)
             }
@@ -662,10 +679,12 @@ pub enum JobRunnerAction {
 }
 
 pub mod error {
+    use super::Serialize;
     use thiserror::Error;
     /// These are all fatal errors which can stop the execution of a pipeline defined by the
     /// JobRunner
-    #[derive(Error, Debug, PartialEq)]
+    #[derive(Serialize, Error, Clone, Debug, PartialEq)]
+    #[serde(tag = "error", content = "details")]
     pub enum JobRunnerError {
         /// Triggered when some particular DataSource or DataOutput reach a maximum amount of
         /// errors
@@ -686,6 +705,9 @@ pub mod error {
         },
         #[error("GenericError: {message}")]
         GenericError { message: String },
+        /// Errors returned from DataSource or DataOutputs
+        #[error("StreamError: {message}")]
+        StreamError { message: String },
     }
 
     impl From<anyhow::Error> for JobRunnerError {
@@ -699,7 +721,7 @@ pub mod error {
     use crate::datastore::error::DataStoreError;
     impl From<DataStoreError> for JobRunnerError {
         fn from(er: DataStoreError) -> Self {
-            JobRunnerError::GenericError {
+            JobRunnerError::StreamError {
                 message: er.to_string(),
             }
         }

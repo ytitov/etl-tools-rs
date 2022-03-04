@@ -1,10 +1,10 @@
+use bytes::Bytes;
 use enumerate::EnumerateStreamAsync;
 use etl_core::datastore::*;
-use etl_core::job::*;
 use etl_core::job::state::*;
-use etl_core::job_manager::*;
 use etl_core::job::stream::*;
-use etl_core::preamble::*;
+use etl_core::job::*;
+use etl_core::job_manager::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -30,7 +30,9 @@ async fn test_basic_csv_decoder() {
         JobRunnerConfig {
             ..Default::default()
         },
-    ).await.expect("Error creating JobRunner");
+    )
+    .await
+    .expect("Error creating JobRunner");
     jr.run_stream::<TestCsv>(
         "basic csv",
         CsvDecoder::new(
@@ -43,19 +45,18 @@ async fn test_basic_csv_decoder() {
                 |_, idx| {
                     Box::pin(async move {
                         if idx == 0 {
-                            Ok(String::from("index,words"))
+                            Ok(Bytes::from(String::from("index,words")))
                         } else {
                             if idx == 7 {
-                                Ok(format!("{},stuff,\"should error\"", idx))
+                                Ok(Bytes::from(format!("{},stuff,\"should error\"", idx)))
                             } else {
-                                Ok(format!("{},stuff", idx))
+                                Ok(Bytes::from(format!("{},stuff", idx)))
                             }
                         }
                     })
                 },
             )),
-        )
-        .await,
+        ),
         Box::new(mock::MockJsonDataOutput::default()),
     )
     .await
@@ -63,7 +64,10 @@ async fn test_basic_csv_decoder() {
     .complete()
     .await
     .expect("Fail completing");
-    jm_handle.shutdown().await.expect("failure shutting down JobManager");
+    jm_handle
+        .shutdown()
+        .await
+        .expect("failure shutting down JobManager");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -82,40 +86,48 @@ async fn test_basic_json_decoder() {
         JobRunnerConfig {
             ..Default::default()
         },
-    ).await.expect("Error creating JobRunner");
-    let job_state = jr.run_stream::<TestCsv>(
-        "basic json",
-        JsonDecoder::new(
-            // generate a pretty boring csv stream
-            Box::new(EnumerateStreamAsync::with_max(
-                "create test json",
-                10,
-                (),
-                |_, idx| {
-                    Box::pin(async move {
-                        if idx == 7 {
-                            Ok(serde_json::to_string(&TestCsv {
-                                index: format!("{}", idx),
-                                words: String::from("words"),
-                            }).expect("fail serializing"))
-                        } else {
-                            Ok(serde_json::to_string(&TestCsv {
-                                index: format!("{}", idx),
-                                words: String::from("nice words"),
-                            }).expect("fail serializing"))
-                        }
-                    })
-                },
-            )),
-        )
-        .await,
-        Box::new(mock::MockJsonDataOutput::default()),
     )
     .await
-    .expect("Failed run_stream")
-    .complete()
-    .await
-    .expect("Fail completing");
+    .expect("Error creating JobRunner");
+    let job_state = jr
+        .run_stream::<TestCsv>(
+            "basic json",
+            JsonDecoder::new(
+                // generate a pretty boring csv stream
+                Box::new(EnumerateStreamAsync::with_max(
+                    "create test json",
+                    10,
+                    (),
+                    |_, idx| {
+                        Box::pin(async move {
+                            if idx == 7 {
+                                Ok(Bytes::from(
+                                    serde_json::to_string(&TestCsv {
+                                        index: format!("{}", idx),
+                                        words: String::from("words"),
+                                    })
+                                    .expect("fail serializing"),
+                                ))
+                            } else {
+                                Ok(Bytes::from(
+                                    serde_json::to_string(&TestCsv {
+                                        index: format!("{}", idx),
+                                        words: String::from("nice words"),
+                                    })
+                                    .expect("fail serializing"),
+                                ))
+                            }
+                        })
+                    },
+                )),
+            ),
+            Box::new(mock::MockJsonDataOutput::default()),
+        )
+        .await
+        .expect("Failed run_stream")
+        .complete()
+        .await
+        .expect("Fail completing");
     if let Some(cmd_status) = job_state.step_history.get("basic json") {
         if let JobStepDetails {
             step:
@@ -139,5 +151,3 @@ async fn test_basic_json_decoder() {
     }
     jm_handle.shutdown().await.expect("failure waiting for jm");
 }
-
-

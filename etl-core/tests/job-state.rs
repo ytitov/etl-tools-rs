@@ -4,7 +4,6 @@ use etl_core::datastore::*;
 use etl_core::decoder::csv::*;
 use etl_core::job::*;
 use etl_core::job_manager::*;
-use etl_core::preamble::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -70,8 +69,7 @@ async fn test_state() {
                         })
                     },
                 )),
-            )
-            .await,
+            ),
             Box::new(mock::MockJsonDataOutput::default()),
         )
         .await

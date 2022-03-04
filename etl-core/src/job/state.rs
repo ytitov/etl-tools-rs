@@ -34,11 +34,14 @@ pub struct JobStepDetails {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-// TODO: when JobRunner completes it doesn't set the run_status to complete
 pub struct JobState {
     pub settings: HashMap<String, JsonValue>,
     name: String,
     id: String,
+    /// used for sequentual steps.  Tasks such as DataOutputTask are not associated with an index
+    /// and run in parallel.  Note that, tasks between these steps will not be executed until a
+    /// particular step finishes.  In this way if ordering is necessary for a task, then interleave
+    /// between steps
     #[serde(skip_serializing, default)]
     cur_step_index: usize,
     run_status: RunStatus,
@@ -49,7 +52,11 @@ pub struct JobState {
     // how to fix this issue because ideally I want it to panic.  This means we need to have a
     // runtime tracker of what ran so far and not have it be serialized when the file is ran or
     // deserialized when things are written
+    /// these are sequential steps in the pipeline
     pub step_history: HashMap<String, JobStepDetails>,
+    #[serde(skip_deserializing, default)]
+    pub caught_errors: Vec<JobRunnerError>,
+    // TODO: need to save task results
 }
 
 impl JobState {
@@ -63,6 +70,7 @@ impl JobState {
             cur_step_index: 0,
             run_status: RunStatus::InProgress,
             step_history: HashMap::new(),
+            caught_errors: Vec::new(),
         }
     }
 
@@ -152,6 +160,12 @@ impl JobState {
         };
     }
 
+    pub fn set_run_status_complete(&mut self) -> Result<(), JobRunnerError> {
+        // in anticipation of future errors, leaving this as a result
+        self.run_status = RunStatus::Completed;
+        Ok(())
+    }
+
     pub fn start_new_cmd<N: Into<String> + Clone>(
         &mut self,
         name: N,
@@ -169,7 +183,7 @@ impl JobState {
                     self.add_command(name, StepCommandStatus::InProgress { started });
                 }
                 RunStatus::Completed => {
-                    panic!("Job already completed, this needs to be checked");
+                    self.add_command(name, StepCommandStatus::InProgress { started });
                 }
                 RunStatus::FatalError {
                     step_index: _,
@@ -208,7 +222,9 @@ impl JobState {
                 RunStatus::InProgress => {
                     self.add_stream(name, StepStreamStatus::new_in_progress());
                 }
-                RunStatus::Completed => {}
+                RunStatus::Completed => {
+                    self.add_stream(name, StepStreamStatus::new_in_progress());
+                }
                 RunStatus::FatalError {
                     step_index: _,
                     step_name: _,

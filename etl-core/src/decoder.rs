@@ -22,7 +22,7 @@ pub struct DecodedSource<T: Debug + 'static + Send + Send> {
 
 impl<T: Debug + Send + Sync + 'static> DataSource<T> for DecodedSource<T> {
     fn name(&self) -> String {
-        format!("Decoded-{}", &self.source_name)
+        format!("DecodedSource-{}", &self.source_name)
     }
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         self.ds_task_result

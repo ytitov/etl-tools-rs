@@ -2,10 +2,11 @@
 /// TODO: 1. test with errors inside the process element function itself
 /// TODO: 2. test max_errors
 use etl_core::datastore::*;
+use etl_core::deps::*;
+use etl_core::job::stream::*;
 use etl_core::job::*;
 use etl_core::job_manager::*;
 use etl_core::preamble::*;
-use etl_core::job::stream::*;
 use mock::mock_csv::*;
 use mock::MockJsonDataOutput;
 use serde::{Deserialize, Serialize};
@@ -21,10 +22,10 @@ async fn basic_stream_handler_all_errors() {
     .expect("Could not initialize job_manager");
     let jm_handle = job_manager.start();
     let testjob = TestJob {
-        output: MockJsonDataOutput::default()
+        output: Box::new(MockJsonDataOutput::default())
             .start_stream(jm_handle.get_jm_tx())
             .await
-            .expect("Could not create mock json data output"),
+            .unwrap(),
     };
     let jr = JobRunner::create(
         "test",
@@ -33,7 +34,9 @@ async fn basic_stream_handler_all_errors() {
         JobRunnerConfig {
             ..Default::default()
         },
-    ).await.expect("Error creating JobRunner");
+    )
+    .await
+    .expect("Error creating JobRunner");
 
     let job_state = jr
         .run_stream_handler(
@@ -46,7 +49,8 @@ async fn basic_stream_handler_all_errors() {
         .complete()
         .await
         .expect("Job completed with an error");
-    jm_handle.shutdown()
+    jm_handle
+        .shutdown()
         .await
         .expect("Fatal error awaiting on JobManager handle");
     if let Some(cmd_status) = job_state.step_history.get("TestJob") {

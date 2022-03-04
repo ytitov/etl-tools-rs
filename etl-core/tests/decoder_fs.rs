@@ -41,9 +41,9 @@ async fn test_basic_fs_json_decoder() {
                 Box::new(LocalFs {
                     home: String::from("tests/test_data"),
                     files: vec!["10_lines.ndjson".to_string()],
+                    ..Default::default()
                 }),
-            )
-            .await,
+            ),
             Box::new(mock::MockJsonDataOutput::default()),
         )
         .await
@@ -105,9 +105,9 @@ async fn test_basic_fs_csv_decoder() {
                 Box::new(LocalFs {
                     home: String::from("tests/test_data"),
                     files: vec!["14_good_lines.csv".to_string()],
+                    ..Default::default()
                 }),
-            )
-            .await,
+            ),
             Box::new(mock::MockJsonDataOutput::default()),
         )
         .await

@@ -108,6 +108,7 @@ async fn test_simple_pipeline_max_error_with_failure() {
 }
 
 pub struct TestTransformer;
+use etl_core::deps::async_trait;
 #[async_trait]
 impl TransformHandler<TestSourceData, TestOutputData> for TestTransformer {
     async fn transform_item(

@@ -9,6 +9,7 @@ use etl_core::deps::tokio::task::JoinHandle;
 use etl_core::job_manager::JobManagerTx;
 use etl_core::preamble::*;
 use etl_core::utils;
+use etl_core::utils::key_values;
 use serde::de;
 use serde::Deserialize;
 use serde::Serialize;
@@ -271,7 +272,7 @@ pub async fn exec_rows_mysql(
     pre_insert_func: Option<&PreInsertFn>,
     failed_query_tx: Option<&DataSourceTx<FailedQuery>>,
 ) -> Result<ExecRowsOutput, sqlx::Error> {
-    use std::io::{ErrorKind, Error as IoError};
+    use std::io::{Error as IoError, ErrorKind};
     let mut value_rows_buf: Vec<&String> = Vec::with_capacity(step);
     let mut count_ok = 0_usize;
     let instance = Instant::now();
@@ -504,4 +505,45 @@ impl<
         };
         unimplemented!();
     }
+}
+
+pub fn create_insert_statement<'de, T>(
+    db_name: &str,
+    table_name: &str,
+    t: Vec<T>,
+) -> anyhow::Result<String>
+where
+    T: Serialize,
+{
+    let mut columns = Vec::new();
+    let mut lines = Vec::new();
+    for (idx, row) in t.iter().enumerate() {
+        let keyvals = key_values(row)?;
+        let mut vals = Vec::new();
+        if idx == 0 {
+            for (key, val) in keyvals {
+                columns.push(key);
+                vals.push(val.clone());
+            }
+        } else {
+            for (_, val) in keyvals {
+                vals.push(val.clone());
+            }
+        }
+        lines.push(vals.join(","));
+    }
+    Ok(format!(
+        "INSERT INTO `{}`.`{}` ({}) \nVALUES \n{}",
+        db_name,
+        table_name,
+        columns
+            .iter()
+            .map(|s| format!("`{}`", s))
+            .collect::<Vec<String>>()
+            .join(","),
+        lines.iter()
+            .map(|s| format!("({})", s))
+            .collect::<Vec<String>>()
+            .join(",")
+    ))
 }
