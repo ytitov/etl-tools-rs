@@ -48,16 +48,17 @@ pub fn tx_to_stdout_output<T: Serialize + std::fmt::Debug + Send + Sync + 'stati
         UnboundedSender<CsvMessage<T>>,
         UnboundedReceiver<CsvMessage<T>>,
     ) = unbounded_channel();
+    use ::log;
 
     thread::spawn(move || {
         println!("tx_to_stdout_output logger started");
         loop {
             match rx.blocking_recv() {
                 Some(data) => {
-                    println!("{:?}", data.content);
+                    log::debug!("{:?}", data.content);
                 }
                 None => {
-                    println!("Closing rx_to_stdout_output");
+                    log::debug!("Closing rx_to_stdout_output");
                     break;
                 }
             }
