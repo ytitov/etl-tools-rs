@@ -419,6 +419,43 @@
 <span id="418">418</span>
 <span id="419">419</span>
 <span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="self">self</span>::error</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::job_manager::JobManagerTx</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::preamble</span>::<span class="kw-2">*</span>;
@@ -444,14 +481,17 @@
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">DataOutputItemResult</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span>;
 
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">DataSourceRx</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Receiver</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataSourceMessage</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">DataSourceTx</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">DataSourceMessage</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>;
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">DataSourceTask</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> (
     <span class="ident">DataSourceRx</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
     <span class="ident">JoinHandle</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataSourceStats</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 );
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">DataOutputTx</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">DataOutputMessage</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">DataOutputRx</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">DataOutputMessage</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>;
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">DataOutputTask</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> (<span class="ident">DataOutputTx</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">JoinHandle</span><span class="op">&lt;</span><span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">DataOutputStats</span><span class="op">&gt;</span><span class="op">&gt;</span>);
 
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">DataOutputJoinHandle</span> <span class="op">=</span> <span class="ident">JoinHandle</span><span class="op">&lt;</span><span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">DataOutputStats</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">DataSourceJoinHandle</span> <span class="op">=</span> <span class="ident">JoinHandle</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataSourceStats</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span><span class="op">&gt;</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DataSourceStats</span> {
     <span class="kw">pub</span> <span class="ident">lines_scanned</span>: <span class="ident">usize</span>,
@@ -490,6 +530,10 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">no_more_data</span>() -&gt; <span class="self">Self</span> {
         <span class="ident">DataOutputMessage::NoMoreData</span>
     }
+}
+<span class="attribute">#[<span class="ident">async_trait</span>]</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">OutputTask</span>: <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span> {
+    <span class="kw">fn</span> <span class="ident">create</span>(<span class="self">self</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataOutputJoinHandle</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span>;
 }
 
 <span class="attribute">#[<span class="ident">async_trait</span>]</span>
@@ -645,6 +689,36 @@
                     }
                     <span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(<span class="ident">e</span>)) =&gt; {
                         <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
+                    }
+                    <span class="prelude-val">None</span> =&gt; <span class="kw">break</span>,
+                }
+            }
+            <span class="prelude-val">Ok</span>(<span class="ident">DataSourceStats</span> { <span class="ident">lines_scanned</span> })
+        });
+        <span class="prelude-val">Ok</span>((<span class="ident">rx</span>, <span class="ident">jh</span>))
+    }
+}
+
+<span class="attribute">#[<span class="ident">async_trait</span>]</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Debug</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">DataSource</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">DataSourceMessage</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
+        <span class="ident">String::from</span>(<span class="string">&quot;DataSourceRx&quot;</span>)
+    }
+
+    <span class="kw">fn</span> <span class="ident">start_stream</span>(<span class="kw-2">mut</span> <span class="self">self</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataSourceTask</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span> {
+        <span class="kw">use</span> <span class="ident">tokio::sync::mpsc::channel</span>;
+        <span class="kw">use</span> <span class="ident">tokio::task::JoinHandle</span>;
+        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">channel</span>(<span class="number">1</span>);
+        <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">name</span>();
+        <span class="kw">let</span> <span class="ident">jh</span>: <span class="ident">JoinHandle</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataSourceStats</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">tokio::spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lines_scanned</span> <span class="op">=</span> <span class="number">0_usize</span>;
+            <span class="kw">loop</span> {
+                <span class="kw">match</span> <span class="self">self</span>.<span class="ident">recv</span>().<span class="kw">await</span> {
+                    <span class="prelude-val">Some</span>(<span class="ident">DataSourceMessage::Data</span> {<span class="ident">source</span>, <span class="ident">content</span>}) =&gt; {
+                        <span class="ident">lines_scanned</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                        <span class="ident">tx</span>.<span class="ident">send</span>(<span class="prelude-val">Ok</span>(<span class="ident">DataSourceMessage::new</span>(<span class="kw-2">&amp;</span><span class="ident">name</span>, <span class="ident">content</span>)))
+                            .<span class="kw">await</span>
+                            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">DataStoreError::send_error</span>(<span class="kw-2">&amp;</span><span class="ident">name</span>, <span class="kw-2">&amp;</span><span class="ident">source</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
                     }
                     <span class="prelude-val">None</span> =&gt; <span class="kw">break</span>,
                 }

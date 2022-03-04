@@ -470,6 +470,42 @@
 <span id="469">469</span>
 <span id="470">470</span>
 <span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">etl_core::datastore</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">etl_core::deps::anyhow</span>;
 <span class="kw">use</span> <span class="ident">etl_core::deps::async_trait</span>;
@@ -493,6 +529,12 @@
 <span class="kw">type</span> <span class="ident">PreInsertFn</span> <span class="op">=</span> <span class="ident">Box</span><span class="op">&lt;</span>
     <span class="kw">dyn</span> <span class="kw">for</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">Fn</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;_</span> <span class="ident">String</span>) -&gt; <span class="ident">BoxFuture</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span>,
 <span class="op">&gt;</span>;
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FailedQuery</span> {
+    <span class="kw">pub</span> <span class="ident">error</span>: <span class="ident">sqlx::Error</span>,
+    <span class="kw">pub</span> <span class="ident">query</span>: <span class="ident">String</span>,
+}
+
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MySqlDataOutput</span> {
     <span class="comment">// TODO: scaling may never need to happen</span>
@@ -503,6 +545,7 @@
     <span class="kw">pub</span> <span class="ident">db_name</span>: <span class="ident">String</span>,
     <span class="kw">pub</span> <span class="ident">pool</span>: <span class="ident">MySqlDataOutputPool</span>,
     <span class="kw">pub</span> <span class="ident">map_query</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">PreInsertFn</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">failed_query_tx</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DataSourceTx</span><span class="op">&lt;</span><span class="ident">FailedQuery</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
@@ -543,6 +586,7 @@
         <span class="kw">let</span> <span class="ident">db_name</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">db_name</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">pool_config</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pool</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">map_query_func</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">map_query</span>;
+        <span class="kw">let</span> <span class="ident">failed_query_tx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">failed_query_tx</span>;
         <span class="kw">let</span> <span class="ident">join_handle</span>: <span class="ident">JoinHandle</span><span class="op">&lt;</span><span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">DataOutputStats</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">tokio::spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">time_started</span> <span class="op">=</span> <span class="ident">std::time::Instant::now</span>();
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">value_rows</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">on_put_num_rows_max</span>);
@@ -590,6 +634,7 @@
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">source_finished_sending</span> <span class="op">=</span> <span class="bool-val">false</span>;
             <span class="kw">loop</span> {
                 <span class="kw">if</span> <span class="ident">num_bytes</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">4_000_000</span> {
+                    <span class="comment">// TODO: should be fatal error</span>
                     <span class="macro">println!</span>(<span class="string">&quot; for table {} Packet exceeded 4mb consider reducing max commit size or setting the server max_allowed_packet&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">table_name</span>);
                 }
                 <span class="comment">// 1. loop until we have enough rows</span>
@@ -636,6 +681,7 @@
                         <span class="kw-2">&amp;</span><span class="ident">value_rows</span>,
                         <span class="number">0</span>,
                         <span class="ident">map_query_func</span>.<span class="ident">as_ref</span>(),
+                        <span class="ident">failed_query_tx</span>.<span class="ident">as_ref</span>(),
                     )
                     .<span class="kw">await</span>
                     {
@@ -667,6 +713,7 @@
                                 <span class="kw-2">&amp;</span><span class="ident">value_rows</span>,
                                 <span class="number">1</span>,
                                 <span class="ident">map_query_func</span>.<span class="ident">as_ref</span>(),
+                                <span class="ident">failed_query_tx</span>.<span class="ident">as_ref</span>(),
                             )
                             .<span class="kw">await</span>
                             {
@@ -730,7 +777,9 @@
     <span class="ident">value_rows</span>: <span class="kw-2">&amp;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
     <span class="ident">step</span>: <span class="ident">usize</span>,
     <span class="ident">pre_insert_func</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">PreInsertFn</span><span class="op">&gt;</span>,
+    <span class="ident">failed_query_tx</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">DataSourceTx</span><span class="op">&lt;</span><span class="ident">FailedQuery</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ExecRowsOutput</span>, <span class="ident">sqlx::Error</span><span class="op">&gt;</span> {
+    <span class="kw">use</span> <span class="ident">std::io</span>::{<span class="ident">ErrorKind</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">IoError</span>};
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">value_rows_buf</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">step</span>);
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">count_ok</span> <span class="op">=</span> <span class="number">0_usize</span>;
     <span class="kw">let</span> <span class="ident">instance</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
@@ -753,7 +802,6 @@
                         .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>()
                         .<span class="ident">join</span>(<span class="string">&quot;,&quot;</span>)
                 );
-                <span class="comment">//println!(&quot;QUERY: {}&quot;, &amp;query);</span>
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">f</span>) <span class="op">=</span> <span class="ident">pre_insert_func</span> {
                     <span class="kw">match</span> (<span class="ident">f</span>)(<span class="kw-2">&amp;mut</span> <span class="ident">query</span>).<span class="kw">await</span> {
                         <span class="prelude-val">Ok</span>(<span class="ident">result</span>) =&gt; {
@@ -766,13 +814,36 @@
                     <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {
                         <span class="ident">count_ok</span> <span class="op">+</span><span class="op">=</span> <span class="ident">value_rows_buf</span>.<span class="ident">len</span>(); <span class="comment">//println!(&quot; ** OK ** &quot;);</span>
                     }
-                    <span class="prelude-val">Err</span>(<span class="ident">sqlx::Error::Io</span>(<span class="ident">e</span>)) =&gt; {
-                        <span class="macro">println!</span>(<span class="string">&quot;Error::Io {}&quot;</span>, <span class="ident">e</span>);
+                    <span class="comment">/*
+                    Err(sqlx::Error::Io(e)) =&gt; {
+                        if let Some(tx) = failed_query_tx {
+                            tx.send(DataSourceMessage::new(
+                                &quot;mysql-datasource&quot;,
+                                FailedQuery {
+                                    error: e,
+                                    query: query.to_owned(),
+                                },
+                            ))
+                            .await
+                            .map_err(|e| IoError::new(ErrorKind::Other, e.to_string()))?;
+                        }
                     }
+                    */</span>
                     <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
                         <span class="kw">let</span> <span class="ident">m</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;MYSQL `{}` ERROR: {}&quot;</span>, <span class="ident">table_name</span>, <span class="ident">e</span>);
-                        <span class="macro">println!</span>(<span class="string">&quot;QUERY: {}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">query</span>);
-                        <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">jm_tx</span>.<span class="ident">send</span>(<span class="ident">Message::log_info</span>(<span class="string">&quot;mysql-datastore&quot;</span>, <span class="ident">m</span>)).<span class="kw">await</span>;
+                        <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">jm_tx</span>.<span class="ident">send</span>(<span class="ident">Message::log_info</span>(<span class="string">&quot;mysql-datasource&quot;</span>, <span class="ident">m</span>)).<span class="kw">await</span>;
+                        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">tx</span>) <span class="op">=</span> <span class="ident">failed_query_tx</span> {
+                            <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">DataSourceMessage::new</span>(
+                                <span class="string">&quot;mysql-datasource&quot;</span>,
+                                <span class="ident">FailedQuery</span> {
+                                    <span class="ident">error</span>: <span class="ident">e</span>,
+                                    <span class="ident">query</span>: <span class="ident">query</span>.<span class="ident">to_owned</span>(),
+                                },
+                            ))
+                            .<span class="kw">await</span>
+                            <span class="comment">//TODO: this should be a fatal error that stops everything</span>
+                            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">IoError::new</span>(<span class="ident">ErrorKind::Other</span>, <span class="ident">e</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>;
+                        }
                     }
                 }
                 <span class="ident">value_rows_buf</span>.<span class="ident">clear</span>();
@@ -932,6 +1003,7 @@
                     <span class="ident">db_name</span>,
                     <span class="ident">pool</span>: <span class="ident">MySqlDataOutputPool::Pool</span>(<span class="ident">pool</span>),
                     <span class="ident">map_query</span>: <span class="prelude-val">None</span>,
+                    <span class="ident">failed_query_tx</span>: <span class="prelude-val">None</span>,
                 }));
             }
             <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
