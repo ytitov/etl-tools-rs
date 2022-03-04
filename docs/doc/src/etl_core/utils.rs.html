@@ -177,6 +177,7 @@
 <span id="176">176</span>
 <span id="177">177</span>
 <span id="178">178</span>
+<span id="179">179</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">csv::WriterBuilder</span>;
 <span class="kw">use</span> <span class="ident">serde::de::DeserializeOwned</span>;
 <span class="kw">use</span> <span class="ident">serde::Serialize</span>;
@@ -227,16 +228,17 @@
         <span class="ident">UnboundedSender</span><span class="op">&lt;</span><span class="ident">CsvMessage</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">UnboundedReceiver</span><span class="op">&lt;</span><span class="ident">CsvMessage</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ) <span class="op">=</span> <span class="ident">unbounded_channel</span>();
+    <span class="kw">use</span> <span class="ident">::log</span>;
 
     <span class="ident">thread::spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
         <span class="macro">println!</span>(<span class="string">&quot;tx_to_stdout_output logger started&quot;</span>);
         <span class="kw">loop</span> {
             <span class="kw">match</span> <span class="ident">rx</span>.<span class="ident">blocking_recv</span>() {
                 <span class="prelude-val">Some</span>(<span class="ident">data</span>) =&gt; {
-                    <span class="macro">println!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">data</span>.<span class="ident">content</span>);
+                    <span class="macro">log::debug!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">data</span>.<span class="ident">content</span>);
                 }
                 <span class="prelude-val">None</span> =&gt; {
-                    <span class="macro">println!</span>(<span class="string">&quot;Closing rx_to_stdout_output&quot;</span>);
+                    <span class="macro">log::debug!</span>(<span class="string">&quot;Closing rx_to_stdout_output&quot;</span>);
                     <span class="kw">break</span>;
                 }
             }
