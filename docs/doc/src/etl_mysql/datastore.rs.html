@@ -506,6 +506,48 @@
 <span id="505">505</span>
 <span id="506">506</span>
 <span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">etl_core::datastore</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">etl_core::deps::anyhow</span>;
 <span class="kw">use</span> <span class="ident">etl_core::deps::async_trait</span>;
@@ -517,6 +559,7 @@
 <span class="kw">use</span> <span class="ident">etl_core::job_manager::JobManagerTx</span>;
 <span class="kw">use</span> <span class="ident">etl_core::preamble</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">etl_core::utils</span>;
+<span class="kw">use</span> <span class="ident">etl_core::utils::key_values</span>;
 <span class="kw">use</span> <span class="ident">serde::de</span>;
 <span class="kw">use</span> <span class="ident">serde::Deserialize</span>;
 <span class="kw">use</span> <span class="ident">serde::Serialize</span>;
@@ -779,7 +822,7 @@
     <span class="ident">pre_insert_func</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">PreInsertFn</span><span class="op">&gt;</span>,
     <span class="ident">failed_query_tx</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">DataSourceTx</span><span class="op">&lt;</span><span class="ident">FailedQuery</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ExecRowsOutput</span>, <span class="ident">sqlx::Error</span><span class="op">&gt;</span> {
-    <span class="kw">use</span> <span class="ident">std::io</span>::{<span class="ident">ErrorKind</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">IoError</span>};
+    <span class="kw">use</span> <span class="ident">std::io</span>::{<span class="ident">Error</span> <span class="kw">as</span> <span class="ident">IoError</span>, <span class="ident">ErrorKind</span>};
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">value_rows_buf</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">step</span>);
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">count_ok</span> <span class="op">=</span> <span class="number">0_usize</span>;
     <span class="kw">let</span> <span class="ident">instance</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
@@ -1012,6 +1055,47 @@
         };
         <span class="macro">unimplemented!</span>();
     }
+}
+
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_insert_statement</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span>, <span class="ident">T</span><span class="op">&gt;</span>(
+    <span class="ident">db_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
+    <span class="ident">table_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
+    <span class="ident">t</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+) -&gt; <span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">T</span>: <span class="ident">Serialize</span>,
+{
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">columns</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lines</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
+    <span class="kw">for</span> (<span class="ident">idx</span>, <span class="ident">row</span>) <span class="kw">in</span> <span class="ident">t</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
+        <span class="kw">let</span> <span class="ident">keyvals</span> <span class="op">=</span> <span class="ident">key_values</span>(<span class="ident">row</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">vals</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
+        <span class="kw">if</span> <span class="ident">idx</span> <span class="op">==</span> <span class="number">0</span> {
+            <span class="kw">for</span> (<span class="ident">key</span>, <span class="ident">val</span>) <span class="kw">in</span> <span class="ident">keyvals</span> {
+                <span class="ident">columns</span>.<span class="ident">push</span>(<span class="ident">key</span>);
+                <span class="ident">vals</span>.<span class="ident">push</span>(<span class="ident">val</span>.<span class="ident">clone</span>());
+            }
+        } <span class="kw">else</span> {
+            <span class="kw">for</span> (<span class="kw">_</span>, <span class="ident">val</span>) <span class="kw">in</span> <span class="ident">keyvals</span> {
+                <span class="ident">vals</span>.<span class="ident">push</span>(<span class="ident">val</span>.<span class="ident">clone</span>());
+            }
+        }
+        <span class="ident">lines</span>.<span class="ident">push</span>(<span class="ident">vals</span>.<span class="ident">join</span>(<span class="string">&quot;,&quot;</span>));
+    }
+    <span class="prelude-val">Ok</span>(<span class="macro">format!</span>(
+        <span class="string">&quot;INSERT INTO `{}`.`{}` ({}) \nVALUES \n{}&quot;</span>,
+        <span class="ident">db_name</span>,
+        <span class="ident">table_name</span>,
+        <span class="ident">columns</span>
+            .<span class="ident">iter</span>()
+            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;`{}`&quot;</span>, <span class="ident">s</span>))
+            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>()
+            .<span class="ident">join</span>(<span class="string">&quot;,&quot;</span>),
+        <span class="ident">lines</span>.<span class="ident">iter</span>()
+            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;({})&quot;</span>, <span class="ident">s</span>))
+            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>()
+            .<span class="ident">join</span>(<span class="string">&quot;,&quot;</span>)
+    ))
 }
 </code></pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="etl_mysql" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>

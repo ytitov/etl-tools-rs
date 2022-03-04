@@ -389,6 +389,22 @@
 <span id="388">388</span>
 <span id="389">389</span>
 <span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::stream</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::job</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">anyhow</span>;
@@ -425,11 +441,14 @@
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="comment">// TODO: when JobRunner completes it doesn&#39;t set the run_status to complete</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">JobState</span> {
     <span class="kw">pub</span> <span class="ident">settings</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">JsonValue</span><span class="op">&gt;</span>,
     <span class="ident">name</span>: <span class="ident">String</span>,
     <span class="ident">id</span>: <span class="ident">String</span>,
+    <span class="doccomment">/// used for sequentual steps.  Tasks such as DataOutputTask are not associated with an index</span>
+    <span class="doccomment">/// and run in parallel.  Note that, tasks between these steps will not be executed until a</span>
+    <span class="doccomment">/// particular step finishes.  In this way if ordering is necessary for a task, then interleave</span>
+    <span class="doccomment">/// between steps</span>
     <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">skip_serializing</span>, <span class="ident">default</span>)]</span>
     <span class="ident">cur_step_index</span>: <span class="ident">usize</span>,
     <span class="ident">run_status</span>: <span class="ident">RunStatus</span>,
@@ -440,7 +459,11 @@
     <span class="comment">// how to fix this issue because ideally I want it to panic.  This means we need to have a</span>
     <span class="comment">// runtime tracker of what ran so far and not have it be serialized when the file is ran or</span>
     <span class="comment">// deserialized when things are written</span>
+    <span class="doccomment">/// these are sequential steps in the pipeline</span>
     <span class="kw">pub</span> <span class="ident">step_history</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">JobStepDetails</span><span class="op">&gt;</span>,
+    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">skip_deserializing</span>, <span class="ident">default</span>)]</span>
+    <span class="kw">pub</span> <span class="ident">caught_errors</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">JobRunnerError</span><span class="op">&gt;</span>,
+    <span class="comment">// TODO: need to save task results</span>
 }
 
 <span class="kw">impl</span> <span class="ident">JobState</span> {
@@ -454,6 +477,7 @@
             <span class="ident">cur_step_index</span>: <span class="number">0</span>,
             <span class="ident">run_status</span>: <span class="ident">RunStatus::InProgress</span>,
             <span class="ident">step_history</span>: <span class="ident">HashMap::new</span>(),
+            <span class="ident">caught_errors</span>: <span class="ident">Vec::new</span>(),
         }
     }
 
@@ -543,6 +567,12 @@
         };
     }
 
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_run_status_complete</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">JobRunnerError</span><span class="op">&gt;</span> {
+        <span class="comment">// in anticipation of future errors, leaving this as a result</span>
+        <span class="self">self</span>.<span class="ident">run_status</span> <span class="op">=</span> <span class="ident">RunStatus::Completed</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
+
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_new_cmd</span><span class="op">&lt;</span><span class="ident">N</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
         <span class="ident">name</span>: <span class="ident">N</span>,
@@ -560,7 +590,7 @@
                     <span class="self">self</span>.<span class="ident">add_command</span>(<span class="ident">name</span>, <span class="ident">StepCommandStatus::InProgress</span> { <span class="ident">started</span> });
                 }
                 <span class="ident">RunStatus::Completed</span> =&gt; {
-                    <span class="macro">panic!</span>(<span class="string">&quot;Job already completed, this needs to be checked&quot;</span>);
+                    <span class="self">self</span>.<span class="ident">add_command</span>(<span class="ident">name</span>, <span class="ident">StepCommandStatus::InProgress</span> { <span class="ident">started</span> });
                 }
                 <span class="ident">RunStatus::FatalError</span> {
                     <span class="ident">step_index</span>: <span class="kw">_</span>,
@@ -599,7 +629,9 @@
                 <span class="ident">RunStatus::InProgress</span> =&gt; {
                     <span class="self">self</span>.<span class="ident">add_stream</span>(<span class="ident">name</span>, <span class="ident">StepStreamStatus::new_in_progress</span>());
                 }
-                <span class="ident">RunStatus::Completed</span> =&gt; {}
+                <span class="ident">RunStatus::Completed</span> =&gt; {
+                    <span class="self">self</span>.<span class="ident">add_stream</span>(<span class="ident">name</span>, <span class="ident">StepStreamStatus::new_in_progress</span>());
+                }
                 <span class="ident">RunStatus::FatalError</span> {
                     <span class="ident">step_index</span>: <span class="kw">_</span>,
                     <span class="ident">step_name</span>: <span class="kw">_</span>,
