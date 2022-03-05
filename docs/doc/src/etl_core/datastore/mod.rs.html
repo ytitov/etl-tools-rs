@@ -531,7 +531,7 @@
         <span class="ident">DataOutputMessage::NoMoreData</span>
     }
 }
-<span class="attribute">#[<span class="ident">async_trait</span>]</span>
+
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">OutputTask</span>: <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span> {
     <span class="kw">fn</span> <span class="ident">create</span>(<span class="self">self</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataOutputJoinHandle</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span>;
 }

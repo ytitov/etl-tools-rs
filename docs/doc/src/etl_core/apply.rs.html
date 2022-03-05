@@ -49,15 +49,10 @@
 <span id="48">48</span>
 <span id="49">49</span>
 <span id="50">50</span>
-<span id="51">51</span>
-<span id="52">52</span>
-<span id="53">53</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::datastore::error::DataStoreError</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::datastore</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">futures_core::future::BoxFuture</span>;
 <span class="kw">use</span> <span class="ident">std::fmt::Debug</span>;
-<span class="comment">//use tokio::task::JoinHandle;</span>
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::deps::async_trait</span>;
 
 <span class="doccomment">/// Apply an async function to every element of a DataSource.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Apply</span><span class="op">&lt;</span><span class="ident">S</span>, <span class="ident">I</span><span class="op">&gt;</span> {
@@ -96,7 +91,6 @@
         <span class="prelude-val">Ok</span>(<span class="ident">DataOutputStats</span> {<span class="ident">name</span>: <span class="ident">source_name</span>, <span class="ident">lines_written</span>})
     }
 }
-<span class="attribute">#[<span class="ident">async_trait</span>]</span>
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span>, <span class="ident">I</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Debug</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">OutputTask</span> <span class="kw">for</span> <span class="ident">Apply</span><span class="op">&lt;</span><span class="ident">S</span>, <span class="ident">I</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">create</span>(<span class="self">self</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataOutputJoinHandle</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span> 
     {
