@@ -145,6 +145,8 @@ impl DataSource<Bytes> for S3Storage {
                         .map_err(|e| DataStoreError::send_error(&name, "", e))?;
                     }
                     Err(e) => {
+                        use etl_core::deps::log;
+                        log::error!("{}", &e);
                         return Err(DataStoreError::FatalIO(format!(
                             "S3Storage Error calling get_object due to: {}",
                             e.to_string()

@@ -51,7 +51,7 @@ pub fn tx_to_stdout_output<T: Serialize + std::fmt::Debug + Send + Sync + 'stati
     use ::log;
 
     thread::spawn(move || {
-        println!("tx_to_stdout_output logger started");
+        log::info!("tx_to_stdout_output logger started");
         loop {
             match rx.blocking_recv() {
                 Some(data) => {
@@ -76,10 +76,8 @@ pub fn tx_to_csv_output<T: Serialize + std::fmt::Debug + Send + Sync + 'static>(
         UnboundedSender<CsvMessage<T>>,
         UnboundedReceiver<CsvMessage<T>>,
     ) = unbounded_channel();
+    use ::log;
 
-    //let mut idx = series.clone();
-    //let mut p = Path::new(base_folder).join(format!("{}.{}.csv", file_name, idx));
-    //let s = format!("{}.csv", file_name);
     let s = {
         use chrono::Utc;
         if add_date {
@@ -88,16 +86,8 @@ pub fn tx_to_csv_output<T: Serialize + std::fmt::Debug + Send + Sync + 'static>(
             format!("{}.csv", file_name)
         }
     };
-    println!("Creating log file {}", &s);
+    log::info!("Creating log file {}", &s);
     let p = Path::new(&s);
-    /*
-    while Path::new(&p).exists() {
-        idx += 1;
-        //p = Path::new(base_folder).join(format!("{}.{}.csv", file_name, idx));
-        s = format!("{}.{}.csv", file_name, idx);
-        p = Path::new(&s);
-    }
-    */
     let csv_file = std::fs::OpenOptions::new()
         .truncate(false)
         .append(true)
@@ -112,7 +102,7 @@ pub fn tx_to_csv_output<T: Serialize + std::fmt::Debug + Send + Sync + 'static>(
         .from_writer(csv_file);
 
     thread::spawn(move || {
-        println!("logger started");
+        log::info!("logger started");
         loop {
             match rx.blocking_recv() {
                 Some(data) => {

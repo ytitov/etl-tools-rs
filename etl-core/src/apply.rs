@@ -2,8 +2,6 @@ use crate::datastore::error::DataStoreError;
 use crate::datastore::*;
 use futures_core::future::BoxFuture;
 use std::fmt::Debug;
-//use tokio::task::JoinHandle;
-use crate::deps::async_trait;
 
 /// Apply an async function to every element of a DataSource.
 pub struct Apply<S, I> {
@@ -42,7 +40,6 @@ impl<S: 'static + Send + Sync, I: 'static + Debug + Send> Apply<S, I> {
         Ok(DataOutputStats {name: source_name, lines_written})
     }
 }
-#[async_trait]
 impl<S: 'static + Send + Sync, I: 'static + Debug + Send> OutputTask for Apply<S, I> {
     fn create(self: Box<Self>) -> Result<DataOutputJoinHandle, DataStoreError> 
     {

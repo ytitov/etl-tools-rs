@@ -7,6 +7,7 @@ use std::hash::Hash;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
+use ::log;
 
 pub mod mock_csv;
 
@@ -47,7 +48,7 @@ impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockJsonDat
                                 // serialize
                                 match serde_json::to_string(&data) {
                                     Ok(line) => {
-                                        println!("{} received: {}", &name, line);
+                                        log::debug!("{} received: {}", &name, line);
                                         lines_written += 1;
                                     }
                                     Err(e) => {
@@ -57,7 +58,7 @@ impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockJsonDat
                                 }
                             }
                             DataOutputMessage::NoMoreData => {
-                                println!("received DataOutputMessage::NoMoreData");
+                                log::debug!("received DataOutputMessage::NoMoreData");
                                 break;
                             }
                         };
@@ -145,14 +146,13 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
     for MockJsonDataSource
 {
     async fn load(&self, path: &str) -> Result<T, DataStoreError> {
-        //println!("MockJsonDataSource::load({}) current files: {:?}", path, &self.files);
         match self.files.lock() {
             Ok(files) => {
                 let files_hs = files.borrow();
                 if let Some(content) = files_hs.get(path) {
                     match serde_json::from_str::<T>(content) {
                         Ok(result) => {
-                            println!(
+                            log::debug!(
                                 "MockJsonDataOutput::load: {} ===>\n{}",
                                 path,
                                 serde_json::to_string_pretty(&result).unwrap()
@@ -167,7 +167,7 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
                         }
                     }
                 } else {
-                    println!("Loading from MockJsonDataSource will result as not found");
+                    log::info!("Loading from MockJsonDataSource will result as not found");
                     return Err(DataStoreError::NotExist {
                         key: path.to_owned(),
                         error: "Loading from MockJsonDataSource will always result in not found"
@@ -189,7 +189,7 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
                     Ok(files) => {
                         files.borrow_mut().insert(path.to_string(), content);
                         for (_, f) in files.borrow().iter() {
-                            println!("MockJsonDataOutput::write: {} ===>\n{}", path, f);
+                            log::debug!("MockJsonDataOutput::write: {} ===>\n{}", path, f);
                         }
                     }
                     Err(er) => {

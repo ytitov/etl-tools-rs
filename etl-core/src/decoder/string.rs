@@ -1,4 +1,5 @@
 use super::*;
+use bytes::Bytes;
 pub struct StringDecoder {
     /// always uses lossy decoder at this time
     pub lossy: bool,

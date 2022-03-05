@@ -73,7 +73,7 @@ impl<T: Debug + Send + Sync> DataOutputMessage<T> {
         DataOutputMessage::NoMoreData
     }
 }
-#[async_trait]
+
 pub trait OutputTask: Sync + Send {
     fn create(self: Box<Self>) -> Result<DataOutputJoinHandle, DataStoreError>;
 }
