@@ -16,6 +16,7 @@ pub mod datastore;
 pub mod decoder;
 pub mod encoder;
 pub mod utils;
+pub mod task;
 /// Adds facilities to implement queues
 pub mod queue;
 pub mod preamble {
@@ -49,5 +50,3 @@ pub mod splitter;
 pub mod transformer;
 /// take in a stream and output same items but as batches
 pub mod batch;
-/// accept a DataSource and execute an async function with a custom state
-pub mod apply;

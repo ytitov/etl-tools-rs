@@ -12,7 +12,7 @@ impl Default for StringDecoder {
 }
 
 impl StringDecoder {
-    pub fn new(self, source: Box<dyn DataSource<Bytes>>) -> Box<dyn DataSource<String>>
+    pub fn as_datasource(self, source: Box<dyn DataSource<Bytes>>) -> Box<dyn DataSource<String>>
     where
         String: Debug + Send + Sync + 'static,
     {
