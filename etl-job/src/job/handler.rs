@@ -1,5 +1,5 @@
 use super::*;
-use futures_core::future::BoxFuture;
+use etl_core::deps::futures_core::future::BoxFuture;
 
 pub type BoxedCreateStreamHandlerResult<T> = anyhow::Result<Box<dyn StreamHandler<T>>>;
 pub type CreateStreamHandlerFn<'a, R> = Box<

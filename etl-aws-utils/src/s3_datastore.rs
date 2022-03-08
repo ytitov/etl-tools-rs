@@ -9,6 +9,7 @@ use etl_core::deps::{
     tokio::io::{AsyncBufReadExt, BufReader},
     tokio::sync::mpsc::{channel, Receiver},
     tokio::task::JoinHandle,
+    log,
 };
 use etl_core::job_manager::JobManagerTx;
 use rusoto_core::HttpClient;
@@ -172,7 +173,6 @@ impl DataSource<Bytes> for S3Storage {
                         .map_err(|e| DataStoreError::send_error(&name, "", e))?;
                     }
                     Err(e) => {
-                        use etl_core::deps::log;
                         log::error!("{}", &e);
                         return Err(DataStoreError::FatalIO(format!(
                             "S3Storage Error calling get_object due to: {}",
@@ -426,7 +426,7 @@ pub async fn s3_write_text_file(
         if wait_ms > max_wait_ms {
             wait_ms = max_wait_ms;
         }
-        println!("waiting {} ms", wait_ms);
+        log::info!("waiting {} ms", wait_ms);
         tokio::time::sleep(std::time::Duration::from_millis(wait_ms as u64)).await;
     }
     Err(anyhow!(

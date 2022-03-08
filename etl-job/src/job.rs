@@ -1,10 +1,16 @@
-use super::datastore::error::*;
-use super::datastore::*;
+use etl_core::datastore::error::*;
+use etl_core::deps::{
+    tokio,
+    serde,
+    serde::de::DeserializeOwned,
+    serde::Serialize,
+    async_trait,
+    anyhow,
+};
+use etl_core::datastore::*;
+use etl_core::datastore::simple::SimpleStore;
 use crate::job_manager::*;
-use async_trait::async_trait;
 use mock::*;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use state::*;
 use std::fmt;
 use std::fmt::Debug;
@@ -343,7 +349,7 @@ impl JobRunner {
                 // no need to wait on input JoinHandle
                 let (mut input_rx, _) = input.start_stream()?;
                 let (output_tx, output_jh) = output
-                    .start_stream(self.job_manager_channel.tx.clone())
+                    .start_stream()
                     .await?;
                 self.save_job_state().await?;
                 let mut lines_scanned = 0_usize;
@@ -642,6 +648,7 @@ impl JobRunner {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(crate = "serde")]
 pub struct JobItemInfo {
     pub index: usize,
     /// filename or bucket key
@@ -679,12 +686,12 @@ pub enum JobRunnerAction {
 }
 
 pub mod error {
-    use super::Serialize;
-    use thiserror::Error;
+    use super::*;
+    use etl_core::deps::thiserror::{self, Error};
     /// These are all fatal errors which can stop the execution of a pipeline defined by the
     /// JobRunner
     #[derive(Serialize, Error, Clone, Debug, PartialEq)]
-    #[serde(tag = "error", content = "details")]
+    #[serde(crate = "serde", tag = "error", content = "details")]
     pub enum JobRunnerError {
         /// Triggered when some particular DataSource or DataOutput reach a maximum amount of
         /// errors
@@ -718,7 +725,7 @@ pub mod error {
         }
     }
 
-    use crate::datastore::error::DataStoreError;
+    use etl_core::datastore::error::DataStoreError;
     impl From<DataStoreError> for JobRunnerError {
         fn from(er: DataStoreError) -> Self {
             JobRunnerError::StreamError {

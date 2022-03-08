@@ -1,14 +1,15 @@
 use super::stream::*;
 use crate::job::*;
 use anyhow;
-use chrono::Utc;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use etl_core::deps::chrono::Utc;
+use etl_core::deps::thiserror;
+use serde::{self, de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub const JOB_STATE_EXT: &'static str = "job.json";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "state")]
+#[serde(tag = "state", crate = "serde")]
 pub enum RunStatus {
     InProgress,
     FatalError {
@@ -20,13 +21,14 @@ pub enum RunStatus {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "step_type")]
+#[serde(tag = "step_type", crate = "serde")]
 pub enum JobStepStatus {
     Stream(StepStreamStatus),
     Command(StepCommandStatus),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(crate = "serde")]
 pub struct JobStepDetails {
     pub step: JobStepStatus,
     pub name: String,
@@ -34,6 +36,7 @@ pub struct JobStepDetails {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(crate = "serde")]
 pub struct JobState {
     pub settings: HashMap<String, JsonValue>,
     name: String,

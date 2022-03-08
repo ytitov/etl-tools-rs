@@ -1,7 +1,7 @@
 use super::*;
-use chrono::{DateTime, Utc};
-use futures_core::future::BoxFuture;
-use serde::{Deserialize, Serialize};
+use etl_core::deps::chrono::{DateTime, Utc};
+use etl_core::deps::futures_core::future::BoxFuture;
+use etl_core::deps::serde::{Deserialize, Serialize};
 
 #[async_trait]
 /// Designed for situations where you need to execute a single action like sql queries, cleanup, or
@@ -128,7 +128,7 @@ impl<'a> JobCommand for Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send +
 */
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "status")]
+#[serde(crate = "serde", tag = "status")]
 pub enum StepCommandStatus {
     InProgress {
         started: DateTime<Utc>,

@@ -1,10 +1,9 @@
 use super::error::*;
-use crate::datastore::SimpleStore;
+use crate::datastore::simple::SimpleStore;
 use crate::datastore::{
     DataSource, DataSourceStats, DataSourceTask, DataSourceMessage,
     DataOutput, DataOutputMessage, DataOutputStats, DataOutputTask, DataOutputTx,
 };
-use crate::job_manager::JobManagerTx;
 use crate::queue::QueueClient;
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -185,7 +184,6 @@ impl LocalFs {
 impl DataOutput<Bytes> for LocalFs {
     async fn start_stream(
         self: Box<Self>,
-        _: JobManagerTx,
     ) -> anyhow::Result<DataOutputTask<Bytes>> {
         use tokio::fs::OpenOptions;
         use tokio::io::AsyncWriteExt;

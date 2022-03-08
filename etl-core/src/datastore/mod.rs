@@ -1,6 +1,6 @@
 use self::error::*;
-use crate::job_manager::JobManagerTx;
-use crate::preamble::*;
+//use crate::job_manager::JobManagerTx;
+//use crate::preamble::*;
 use async_trait::async_trait;
 use serde::de::Deserializer;
 use serde::Deserialize;
@@ -16,8 +16,12 @@ pub mod enumerate;
 pub mod fs;
 /// various data stores used for testing
 pub mod mock;
-pub mod transform_store;
+//this seems to be intertwined with etl-job a bit, and may be unecessary at this point, not sure
+//yet
+//pub mod transform_store;
 pub mod sources;
+/// Traits that define non-streaming loading and saving of data
+pub mod simple;
 pub mod error;
 
 //pub type DataOutputItemResult = Result<String, Box<dyn std::error::Error + Send>>;
@@ -80,23 +84,6 @@ pub trait OutputTask: Sync + Send {
     fn create(self: Box<Self>) -> Result<DataOutputJoinHandle, DataStoreError>;
 }
 
-#[async_trait]
-/// This is a simple store that acts like a key-val storage.  It is not streamted
-/// so is not meant for big files.  Primarily created for the JobRunner to
-/// store the state of the running job somewhere
-pub trait SimpleStore<T: Debug + 'static + Send>: Sync + Send {
-    async fn read_file_str(&self, _: &str) -> Result<String, DataStoreError> {
-        panic!("This SimpleStore does not support load operation");
-    }
-
-    async fn load(&self, _: &str) -> Result<T, DataStoreError> {
-        panic!("This SimpleStore does not support load operation");
-    }
-
-    async fn write(&self, _: &str, _: T) -> Result<(), DataStoreError> {
-        panic!("This SimpleStore does not support write operation");
-    }
-}
 
 //use crate::job_manager::JobManagerRx;
 pub struct DynDataSource<T> {
@@ -180,32 +167,27 @@ where
 
 #[async_trait]
 pub trait DataOutput<T: Debug + 'static + Sync + Send>: Sync + Send {
-    async fn start_stream(self: Box<Self>, _: JobManagerTx) -> anyhow::Result<DataOutputTask<T>> {
-        unimplemented!();
-    }
-
-    async fn shutdown(self: Box<Self>, _: &JobRunner) {
-        println!("Called shutdown on self");
-    }
+    async fn start_stream(self: Box<Self>) -> anyhow::Result<DataOutputTask<T>>;
 
     async fn data_output_shutdown(
         self: Box<Self>,
         dot: DataOutputTask<T>,
-        jr: &JobRunner,
     ) -> anyhow::Result<DataOutputStats> {
         let (c, jh) = dot;
         drop(c);
         match jh.await {
             Ok(Ok(stats)) => Ok(stats),
             Ok(Err(e)) => {
-                let msg = format!("Waiting for task to finish resulted in an error: {}", e);
-                jr.log_err("JobManager", None, msg.clone()).await;
-                Err(anyhow::anyhow!(msg))
+                log::error!("Waiting for task to finish resulted in an error: {}", e);
+                Err(anyhow::anyhow!(e))
             }
-            Err(e) => Err(anyhow::anyhow!(
+            Err(e) => {
+                log::error!("FATAL waiting on JoinHandle for DbOutputTask due to: {}", e);
+                Err(anyhow::anyhow!(
                 "FATAL waiting on JoinHandle for DbOutputTask due to: {}",
                 e
-            )),
+            ))
+            },
         }
     }
 }
@@ -273,45 +255,6 @@ impl<T: Debug + 'static + Sync + Send> DataSource<T> for Receiver<DataSourceMess
     }
 }
 
-/*
-use serde_json::Value as JsonValue;
-#[async_trait]
-impl<T: Debug + 'static + Sync + Send> SimpleStore<JsonValue> for dyn SimpleStore<String> {
-    async fn load(&self, _: &str) -> Result<JsonValue, DataStoreError> {
-        panic!("This SimpleStore does not support load operation");
-    }
-}
-*/
-
-/// the purpose of this is to drop the sender, then wait on the receiver to finish.
-/// the drop signals that it should finish, and waiting on the JoinHandle is to allow
-/// it to finish its own work.  Of course if there are copies of the sender
-/// floating around somewhere, this may cause some issues.  This is only used in the
-/// job handler, so might be a good idea to just add it to the trait
-/// --
-/// Update: I am thinking this should not really fail, but still report the errors;
-/// possibly take a pointer to job manager?
-pub async fn data_output_shutdown<T>(
-    jr: &JobRunner,
-    (c, jh): DataOutputTask<T>,
-) -> anyhow::Result<DataOutputStats>
-where
-    T: Debug + Send + Sync,
-{
-    drop(c);
-    match jh.await {
-        Ok(Ok(stats)) => Ok(stats),
-        Ok(Err(e)) => {
-            let msg = format!("Waiting for task to finish resulted in an error: {}", e);
-            jr.log_err("JobManager", None, msg.clone()).await;
-            Err(anyhow::anyhow!(msg))
-        }
-        Err(e) => Err(anyhow::anyhow!(
-            "FATAL waiting on JoinHandle for DbOutputTask due to: {}",
-            e
-        )),
-    }
-}
 
 
 #[derive(Debug, Clone)]

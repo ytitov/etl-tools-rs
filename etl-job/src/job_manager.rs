@@ -1,19 +1,20 @@
 use crate::job::JobRunner;
-use serde::{Deserialize, Serialize};
-use tokio::sync::{
-    mpsc,
-    mpsc::{Receiver, Sender},
-    //broadcast,
-    //broadcast::{error::RecvError, Receiver, Sender},
-    oneshot,
+use etl_core::deps::{
+    anyhow,
+    serde::{self, Deserialize, Serialize},
+    tokio,
+    tokio::sync::{
+        mpsc,
+        mpsc::{Receiver, Sender, UnboundedSender},
+        oneshot,
+    },
+    tokio::task::JoinHandle,
 };
+use etl_core::utils::log::{log_err, log_info, tx_to_csv_output, tx_to_stdout_output, LogMessage};
+use std::collections::HashMap;
+
 pub type JobManagerTx = Sender<Message>;
 pub type JobManagerRx = Receiver<Message>;
-use crate::utils::log::{log_err, log_info, LogMessage};
-use crate::utils::*;
-use std::collections::HashMap;
-use tokio::sync::mpsc::UnboundedSender;
-use tokio::task::JoinHandle;
 
 #[derive(Debug)]
 pub enum NotifyJobRunner {
@@ -75,7 +76,9 @@ pub enum Message {
     ToJob(NotifyJob),
 }
 
+// Users the re-exported crate from etl-core
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(crate = "serde")]
 pub struct JobManagerConfig {
     /// When max_errors is reached, a shutdown message is sent, which stops all
     /// of the jobs currently running. There is no guarantee that this message will arrive at a
@@ -116,6 +119,7 @@ pub struct JobManagerChannel {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(crate = "serde")]
 /// the resulting stats about the job
 pub struct JobManagerOutput {
     pub num_errors: usize,
@@ -264,7 +268,10 @@ impl JobManager {
                                 ShutdownJobManager => {
                                     break;
                                 }
-                                JobStarted { sender_name, reply_rx } => {
+                                JobStarted {
+                                    sender_name,
+                                    reply_rx,
+                                } => {
                                     log_info(
                                         &self.logger_tx,
                                         format!("JobManager: starting {}", &sender_name),
@@ -316,7 +323,9 @@ impl JobManager {
                     tokio::time::sleep(Duration::from_millis(500)).await;
                 }
             }
-            let o = JobManagerOutput { num_errors: self.num_log_errors };
+            let o = JobManagerOutput {
+                num_errors: self.num_log_errors,
+            };
             log_info(&self.logger_tx, &format!("JobManager: {:?}", &o));
             Ok(o)
         });

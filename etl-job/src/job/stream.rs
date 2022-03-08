@@ -1,10 +1,10 @@
 use super::*;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use etl_core::deps::chrono::{DateTime, Utc};
+use etl_core::deps::serde::{self, Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "status")]
+#[serde(tag = "status", crate = "serde")]
 pub enum StepStreamStatus {
     New,
     Complete {
@@ -264,7 +264,7 @@ impl Default for StepStreamStatus {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "state")]
+#[serde(tag = "state", crate = "serde")]
 pub enum FileStatus {
     Info {
         started: DateTime<Utc>,

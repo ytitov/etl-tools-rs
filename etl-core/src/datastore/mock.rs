@@ -1,4 +1,5 @@
 use super::*;
+use simple::SimpleStore;
 use serde::{de::DeserializeOwned, Serialize};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -30,7 +31,6 @@ impl Default for MockJsonDataOutput {
 impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockJsonDataOutput {
     async fn start_stream(
         self: Box<Self>,
-        jm_tx: JobManagerTx,
     ) -> anyhow::Result<DataOutputTask<T>> {
         use tokio::sync::mpsc::channel;
         let (tx, mut rx): (DataOutputTx<T>, _) = channel(1);
@@ -52,8 +52,7 @@ impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockJsonDat
                                         lines_written += 1;
                                     }
                                     Err(e) => {
-                                        let m = format!("{} ERROR {}", &name, e);
-                                        jm_tx.send(Message::log_err(&name, m)).await?;
+                                        log::error!("{} ERROR {}", &name, e);
                                     }
                                 }
                             }

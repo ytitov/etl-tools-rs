@@ -430,6 +430,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "etl-job"
+version = "0.1.0"
+dependencies = [
+ "etl-core",
+ "serde_json",
+]
+
+[[package]]
 name = "etl-mysql"
 version = "0.1.0"
 dependencies = [

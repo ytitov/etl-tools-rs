@@ -39,12 +39,10 @@ pub struct EncodedOutput<I: Debug + 'static + Send + Sync> {
     pub output: Box<dyn DataOutput<Bytes>>,
 }
 
-use crate::job_manager::JobManagerTx;
 #[async_trait]
 impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutput<T> {
     async fn start_stream(
         self: Box<Self>,
-        jm_tx: JobManagerTx,
     ) -> anyhow::Result<DataOutputTask<T>> {
         // create a datasource for the encoder because it is needed to create the encoder
         // data sent to the data output will be forwarded here
@@ -58,7 +56,7 @@ impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutp
         // forward encoded elements to the output dataoutput
         let (mut encoded_datasource_rx, encoded_datasource_jh) =
             encoded_datasource.start_stream()?;
-        let (final_data_output_tx, final_data_output_jh) = self.output.start_stream(jm_tx).await?;
+        let (final_data_output_tx, final_data_output_jh) = self.output.start_stream().await?;
         let given_output_jh: JoinHandle<Result<DataOutputStats, DataStoreError>> =
             tokio::spawn(async move {
                 loop {
