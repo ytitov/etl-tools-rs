@@ -397,65 +397,6 @@
 <span id="396">396</span>
 <span id="397">397</span>
 <span id="398">398</span>
-<span id="399">399</span>
-<span id="400">400</span>
-<span id="401">401</span>
-<span id="402">402</span>
-<span id="403">403</span>
-<span id="404">404</span>
-<span id="405">405</span>
-<span id="406">406</span>
-<span id="407">407</span>
-<span id="408">408</span>
-<span id="409">409</span>
-<span id="410">410</span>
-<span id="411">411</span>
-<span id="412">412</span>
-<span id="413">413</span>
-<span id="414">414</span>
-<span id="415">415</span>
-<span id="416">416</span>
-<span id="417">417</span>
-<span id="418">418</span>
-<span id="419">419</span>
-<span id="420">420</span>
-<span id="421">421</span>
-<span id="422">422</span>
-<span id="423">423</span>
-<span id="424">424</span>
-<span id="425">425</span>
-<span id="426">426</span>
-<span id="427">427</span>
-<span id="428">428</span>
-<span id="429">429</span>
-<span id="430">430</span>
-<span id="431">431</span>
-<span id="432">432</span>
-<span id="433">433</span>
-<span id="434">434</span>
-<span id="435">435</span>
-<span id="436">436</span>
-<span id="437">437</span>
-<span id="438">438</span>
-<span id="439">439</span>
-<span id="440">440</span>
-<span id="441">441</span>
-<span id="442">442</span>
-<span id="443">443</span>
-<span id="444">444</span>
-<span id="445">445</span>
-<span id="446">446</span>
-<span id="447">447</span>
-<span id="448">448</span>
-<span id="449">449</span>
-<span id="450">450</span>
-<span id="451">451</span>
-<span id="452">452</span>
-<span id="453">453</span>
-<span id="454">454</span>
-<span id="455">455</span>
-<span id="456">456</span>
-<span id="457">457</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="self">self</span>::error</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::job_manager::JobManagerTx</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::preamble</span>::<span class="kw-2">*</span>;
@@ -475,6 +416,8 @@
 <span class="doccomment">/// various data stores used for testing</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">mock</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">transform_store</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">sources</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">error</span>;
 
 <span class="comment">//pub type DataOutputItemResult = Result&lt;String, Box&lt;dyn std::error::Error + Send&gt;&gt;;</span>
 
@@ -729,6 +672,16 @@
     }
 }
 
+<span class="comment">/*
+use serde_json::Value as JsonValue;
+#[async_trait]
+impl&lt;T: Debug + &#39;static + Sync + Send&gt; SimpleStore&lt;JsonValue&gt; for dyn SimpleStore&lt;String&gt; {
+    async fn load(&amp;self, _: &amp;str) -&gt; Result&lt;JsonValue, DataStoreError&gt; {
+        panic!(&quot;This SimpleStore does not support load operation&quot;);
+    }
+}
+*/</span>
+
 <span class="doccomment">/// the purpose of this is to drop the sender, then wait on the receiver to finish.</span>
 <span class="doccomment">/// the drop signals that it should finish, and waiting on the JoinHandle is to allow</span>
 <span class="doccomment">/// it to finish its own work.  Of course if there are copies of the sender</span>
@@ -759,77 +712,6 @@
     }
 }
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">error</span> {
-    <span class="kw">use</span> <span class="ident">thiserror::Error</span>;
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Error</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">DataStoreError</span> {
-        <span class="attribute">#[<span class="ident">error</span>(
-            <span class="string">&quot;There was a problem deserializing: `{message:?}`, The string: `{attempted_string:?}`&quot;</span>
-        )]</span>
-        <span class="ident">Deserialize</span> {
-            <span class="ident">message</span>: <span class="ident">String</span>,
-            <span class="ident">attempted_string</span>: <span class="ident">String</span>,
-        },
-        <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Could not decode utf8: `{0}`&quot;</span>)]</span>
-        <span class="ident">FatalUtf8</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">std::str::Utf8Error</span>),
-        <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;There was a fatal problem: `{0}`&quot;</span>)]</span>
-        <span class="comment">//FatalIO(#[from] std::io::Error),</span>
-        <span class="ident">FatalIO</span>(<span class="ident">String</span>),
-        <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Error: `{0}`&quot;</span>)]</span>
-        <span class="comment">//Generic(#[from] anyhow::Error),</span>
-        <span class="ident">Generic</span>(<span class="ident">String</span>),
-        <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;SendError from `{from:?}` to `{to:?}` reason: `{reason:?}`&quot;</span>)]</span>
-        <span class="ident">SendError</span> {
-            <span class="ident">from</span>: <span class="ident">String</span>,
-            <span class="ident">to</span>: <span class="ident">String</span>,
-            <span class="ident">reason</span>: <span class="ident">String</span>,
-        },
-        <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Error streaming lines from: `{key:?}`, error: `{error:?}`&quot;</span>)]</span>
-        <span class="ident">StreamingLines</span> { <span class="ident">key</span>: <span class="ident">String</span>, <span class="ident">error</span>: <span class="ident">String</span> },
-        <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Key or path `{key:?}` was not found.  Reason: `{error:?}`&quot;</span>)]</span>
-        <span class="ident">NotExist</span> { <span class="ident">key</span>: <span class="ident">String</span>, <span class="ident">error</span>: <span class="ident">String</span> },
-        <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Error returned from transform_item `{job_name:?}`.  Reason: `{error:?}`&quot;</span>)]</span>
-        <span class="ident">TransformerError</span> { <span class="ident">job_name</span>: <span class="ident">String</span>, <span class="ident">error</span>: <span class="ident">String</span> },
-        <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;JoinError: `{0}`&quot;</span>)]</span>
-        <span class="comment">//JoinError(#[from] tokio::task::JoinError),</span>
-        <span class="ident">JoinError</span>(<span class="ident">String</span>),
-        <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Shutting down.  JobManager sent a global TooManyErrors message.&quot;</span>)]</span>
-        <span class="ident">TooManyErrors</span>,
-    }
-
-    <span class="kw">impl</span> <span class="ident">DataStoreError</span> {
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">send_error</span><span class="op">&lt;</span><span class="ident">A</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>, <span class="ident">B</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>, <span class="ident">C</span>: <span class="ident">std::fmt::Display</span><span class="op">&gt;</span>(
-            <span class="ident">from</span>: <span class="ident">A</span>,
-            <span class="ident">to</span>: <span class="ident">B</span>,
-            <span class="ident">reason</span>: <span class="ident">C</span>,
-        ) -&gt; <span class="self">Self</span> {
-            <span class="ident">DataStoreError::SendError</span> {
-                <span class="ident">from</span>: <span class="ident">from</span>.<span class="ident">into</span>(),
-                <span class="ident">to</span>: <span class="ident">to</span>.<span class="ident">into</span>(),
-                <span class="ident">reason</span>: <span class="ident">reason</span>.<span class="ident">to_string</span>(),
-            }
-        }
-    }
-
-    <span class="kw">use</span> <span class="ident">tokio::task::JoinError</span>;
-    <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">JoinError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">DataStoreError</span> {
-        <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">er</span>: <span class="ident">JoinError</span>) -&gt; <span class="self">Self</span> {
-            <span class="ident">DataStoreError::JoinError</span>(<span class="ident">er</span>.<span class="ident">to_string</span>())
-        }
-    }
-
-    <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">std::io::Error</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">DataStoreError</span> {
-        <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">er</span>: <span class="ident">std::io::Error</span>) -&gt; <span class="self">Self</span> {
-            <span class="ident">DataStoreError::FatalIO</span>(<span class="ident">er</span>.<span class="ident">to_string</span>())
-        }
-    }
-
-    <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">anyhow::Error</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">DataStoreError</span> {
-        <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">er</span>: <span class="ident">anyhow::Error</span>) -&gt; <span class="self">Self</span> {
-            <span class="ident">DataStoreError::Generic</span>(<span class="ident">er</span>.<span class="ident">to_string</span>())
-        }
-    }
-}
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">LineType</span> {
