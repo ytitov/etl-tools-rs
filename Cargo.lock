@@ -397,6 +397,7 @@ dependencies = [
  "bytes",
  "csv",
  "etl-core",
+ "etl-job",
  "hex",
  "http",
  "md-5",

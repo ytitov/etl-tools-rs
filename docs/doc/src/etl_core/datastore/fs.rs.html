@@ -240,15 +240,12 @@
 <span id="239">239</span>
 <span id="240">240</span>
 <span id="241">241</span>
-<span id="242">242</span>
-<span id="243">243</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::error</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::datastore::SimpleStore</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::datastore::simple::SimpleStore</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::datastore</span>::{
     <span class="ident">DataSource</span>, <span class="ident">DataSourceStats</span>, <span class="ident">DataSourceTask</span>, <span class="ident">DataSourceMessage</span>,
     <span class="ident">DataOutput</span>, <span class="ident">DataOutputMessage</span>, <span class="ident">DataOutputStats</span>, <span class="ident">DataOutputTask</span>, <span class="ident">DataOutputTx</span>,
 };
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::job_manager::JobManagerTx</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::queue::QueueClient</span>;
 <span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
 <span class="kw">use</span> <span class="ident">bytes::Bytes</span>;
@@ -429,7 +426,6 @@
 <span class="kw">impl</span> <span class="ident">DataOutput</span><span class="op">&lt;</span><span class="ident">Bytes</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">LocalFs</span> {
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">start_stream</span>(
         <span class="self">self</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>,
-        <span class="kw">_</span>: <span class="ident">JobManagerTx</span>,
     ) -&gt; <span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">DataOutputTask</span><span class="op">&lt;</span><span class="ident">Bytes</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">use</span> <span class="ident">tokio::fs::OpenOptions</span>;
         <span class="kw">use</span> <span class="ident">tokio::io::AsyncWriteExt</span>;

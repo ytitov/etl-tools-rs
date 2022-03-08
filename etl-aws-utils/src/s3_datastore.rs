@@ -1,5 +1,5 @@
 use etl_core::datastore::error::*;
-use etl_core::datastore::*;
+use etl_core::datastore::{*, simple::SimpleStore};
 use etl_core::deps::{
     anyhow, async_trait,
     bytes::Bytes,
@@ -11,7 +11,6 @@ use etl_core::deps::{
     tokio::task::JoinHandle,
     log,
 };
-use etl_core::job_manager::JobManagerTx;
 use rusoto_core::HttpClient;
 pub use rusoto_core::Region;
 use rusoto_credential::ProfileProvider;
@@ -78,7 +77,6 @@ impl S3Storage {
 impl DataOutput<Bytes> for S3Storage {
     async fn start_stream(
         self: Box<Self>,
-        _: JobManagerTx,
     ) -> anyhow::Result<DataOutputTask<Bytes>> {
         let (tx, mut rx): (DataOutputTx<Bytes>, _) = channel(1);
         let name = self.name();

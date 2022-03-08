@@ -42,15 +42,6 @@
 <span id="41">41</span>
 <span id="42">42</span>
 <span id="43">43</span>
-<span id="44">44</span>
-<span id="45">45</span>
-<span id="46">46</span>
-<span id="47">47</span>
-<span id="48">48</span>
-<span id="49">49</span>
-<span id="50">50</span>
-<span id="51">51</span>
-<span id="52">52</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This library provides a foundation to construct pipelines using several basic principles.</span>
 <span class="doccomment">//! There are stream producers and consumers, which must implement the traits [crate::datastore::DataSource]</span>
 <span class="doccomment">//! and [crate::datastore::DataOutput].  [crate::job::JobRunner] is used to construct pipelines </span>
@@ -73,12 +64,7 @@
 <span class="doccomment">/// Adds facilities to implement queues</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">queue</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">preamble</span> {
-    <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::datastore::transform_store::TransformDataSource</span>;
-    <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::job::error</span>::<span class="kw-2">*</span>;
-    <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::job</span>::{<span class="ident">handler</span>::<span class="kw-2">*</span>, <span class="ident">JobRunner</span>, <span class="ident">JobRunnerConfig</span>};
-    <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::job_manager</span>::{
-        <span class="ident">JobManager</span>, <span class="ident">JobManagerChannel</span>, <span class="ident">JobManagerConfig</span>, <span class="ident">JobManagerHandle</span>, <span class="ident">Message</span>,
-    };
+    <span class="comment">//pub use crate::datastore::transform_store::TransformDataSource;</span>
 }
 <span class="doccomment">/// deps which are re-exported (and used in the core)</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">deps</span> {
@@ -90,12 +76,8 @@
     <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">log</span>;
     <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">bytes</span>;
     <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">futures_core</span>;
+    <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">chrono</span>;
 }
-<span class="doccomment">/// responsible for generating and running pipelines, including any run-time configurations</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">job</span>;
-<span class="doccomment">/// Create pipelines linking [crate::datastore::DataSource]s together; Provides state management based on a job id,</span>
-<span class="doccomment">/// and records each step.  A successful job with the same job id will not run more than once</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">job_manager</span>;
 <span class="doccomment">/// Perform joins between two [crate::datastore::DataSource]s</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">joins</span>;
 <span class="doccomment">/// for splitting streams into many identical DataSources</span>

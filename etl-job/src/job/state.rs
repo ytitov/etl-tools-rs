@@ -2,7 +2,6 @@ use super::stream::*;
 use crate::job::*;
 use anyhow;
 use etl_core::deps::chrono::Utc;
-use etl_core::deps::thiserror;
 use serde::{self, de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::HashMap;
 

@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["LogEntryType",""]],"fn":[["log_err",""],["log_info",""]],"struct":[["LogEntry",""]],"type":[["LogMessage",""]]});
+initSidebarItems({"enum":[["LogEntryType",""]],"fn":[["log_err",""],["log_info",""],["tx_to_csv_output",""],["tx_to_stdout_output",""]],"struct":[["CsvMessage",""],["LogEntry",""]],"type":[["LogMessage",""]]});
