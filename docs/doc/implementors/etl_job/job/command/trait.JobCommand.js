@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["etl_aws_utils"] = [{"text":"impl&lt;'a&gt; JobCommand for <a class=\"struct\" href=\"etl_aws_utils/athena/struct.AthenaQueryJobCommand.html\" title=\"struct etl_aws_utils::athena::AthenaQueryJobCommand\">AthenaQueryJobCommand</a>","synthetic":false,"types":["etl_aws_utils::athena::AthenaQueryJobCommand"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

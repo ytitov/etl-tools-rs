@@ -273,13 +273,9 @@
 <span id="272">272</span>
 <span id="273">273</span>
 <span id="274">274</span>
-<span id="275">275</span>
-<span id="276">276</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">etl_core::deps::anyhow</span>::{<span class="self">self</span>, <span class="ident">anyhow</span>};
 <span class="kw">use</span> <span class="ident">etl_core::deps::async_trait</span>;
-<span class="kw">use</span> <span class="ident">etl_core::job::command</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">etl_core::preamble</span>::<span class="kw-2">*</span>;
-<span class="comment">//use etl_s3::*;</span>
+<span class="kw">use</span> <span class="ident">etl_job::job</span>::{<span class="ident">JobRunner</span>, <span class="ident">command</span>::<span class="kw-2">*</span>};
 <span class="kw">use</span> <span class="ident">rusoto_athena</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">rusoto_core::region::Region</span>;
 <span class="kw">use</span> <span class="ident">rusoto_core::request::HttpClient</span>;

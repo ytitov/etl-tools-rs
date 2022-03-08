@@ -1,0 +1,1 @@
+initSidebarItems({"trait":[["SimpleStore","This is a simple store that acts like a key-val storage.  It is not streamted so is not meant for big files.  Primarily created for the JobRunner to store the state of the running job somewhere"]]});
