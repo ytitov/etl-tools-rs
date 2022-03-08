@@ -273,6 +273,16 @@ impl<T: Debug + 'static + Sync + Send> DataSource<T> for Receiver<DataSourceMess
     }
 }
 
+/*
+use serde_json::Value as JsonValue;
+#[async_trait]
+impl<T: Debug + 'static + Sync + Send> SimpleStore<JsonValue> for dyn SimpleStore<String> {
+    async fn load(&self, _: &str) -> Result<JsonValue, DataStoreError> {
+        panic!("This SimpleStore does not support load operation");
+    }
+}
+*/
+
 /// the purpose of this is to drop the sender, then wait on the receiver to finish.
 /// the drop signals that it should finish, and waiting on the JoinHandle is to allow
 /// it to finish its own work.  Of course if there are copies of the sender

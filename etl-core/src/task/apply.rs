@@ -27,6 +27,7 @@ impl<S: 'static + Send + Sync, I: 'static + Debug + Send> Apply<S, I> {
                             lines_written += 1;
                         }
                         Err(e) => {
+                            log::error!("Apply: {}", &e);
                             return Err(e);
                         }
                     }
