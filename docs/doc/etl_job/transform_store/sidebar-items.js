@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["TransformDataSource","Allows processing data using the TransformHandler trait to process and filter a stream, and output that as a new DataSource which can then be forwarded to a DataOutput, or continue as input for more transformations"]]});
