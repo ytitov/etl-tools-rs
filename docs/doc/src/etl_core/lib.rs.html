@@ -44,9 +44,9 @@
 <span id="43">43</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This library provides a foundation to construct pipelines using several basic principles.</span>
 <span class="doccomment">//! There are stream producers and consumers, which must implement the traits [crate::datastore::DataSource]</span>
-<span class="doccomment">//! and [crate::datastore::DataOutput].  [crate::job::JobRunner] is used to construct pipelines </span>
+<span class="doccomment">//! and [crate::datastore::DataOutput].  etl_job::job::JobRunner is used to construct pipelines </span>
 <span class="doccomment">//! using these elements.  It also provides some simple state management which is loaded and</span>
-<span class="doccomment">//! saved using the [crate::datastore::SimpleStore] trait which is designed for loading whole</span>
+<span class="doccomment">//! saved using the [crate::datastore::simple::SimpleStore] trait which is designed for loading whole</span>
 <span class="doccomment">//! files</span>
 <span class="doccomment">//! It is important to note that the purpose of this library is to provide a framework to manage</span>
 <span class="doccomment">//! and organize pipelines.  It is not meant to replace data anylitical tools or databases.  The</span>
