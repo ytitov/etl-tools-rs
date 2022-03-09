@@ -12,7 +12,10 @@ impl Default for StringDecoder {
 }
 
 impl StringDecoder {
-    pub fn as_datasource(self, source: Box<dyn DataSource<Bytes>>) -> Box<dyn DataSource<String>>
+    pub fn with_datasource_dyn(
+        self,
+        source: Box<dyn DataSource<Bytes>>,
+    ) -> Box<dyn DataSource<String>>
     where
         String: Debug + Send + Sync + 'static,
     {
@@ -27,13 +30,11 @@ impl StringDecoder {
     }
 }
 
-impl<T: Debug + 'static + Send + Sync> DecodeStream<T> for StringDecoder 
-    where DecodedSource<String>: DataSource<T>
+impl<T: Debug + 'static + Send + Sync> DecodeStream<T> for StringDecoder
+where
+    DecodedSource<String>: DataSource<T>,
 {
-    fn decode_source(
-        self,
-        source: Box<dyn DataSource<Bytes>>,
-    ) -> Box<dyn DataSource<T>> {
+    fn decode_source(self, source: Box<dyn DataSource<Bytes>>) -> Box<dyn DataSource<T>> {
         use tokio::sync::mpsc::channel;
         use tokio::task::JoinHandle;
         let (tx, rx) = channel(1);
