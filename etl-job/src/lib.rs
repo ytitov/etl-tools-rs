@@ -1,14 +1,13 @@
-/// Create pipelines linking [crate::datastore::DataSource]s together; Provides state management based on a job id,
+/// Create pipelines linking [etl_core::datastore::DataSource]s together; Provides state management based on a job id,
 /// responsible for generating and running pipelines, including any run-time configurations
 pub mod job;
 /// and records each step.  A successful job with the same job id will not run more than once
 pub mod job_manager;
 pub mod transform_store;
 
-
-use etl_core::deps::*;
-use etl_core::datastore::{DataOutputTask, DataOutputStats};
 use crate::job::JobRunner;
+use etl_core::datastore::{DataOutputStats, DataOutputTask};
+use etl_core::deps::*;
 use std::fmt::Debug;
 
 /// the purpose of this is to drop the sender, then wait on the receiver to finish.
