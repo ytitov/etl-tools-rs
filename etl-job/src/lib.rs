@@ -3,6 +3,7 @@
 pub mod job;
 /// and records each step.  A successful job with the same job id will not run more than once
 pub mod job_manager;
+pub mod transform_store;
 
 
 use etl_core::deps::*;

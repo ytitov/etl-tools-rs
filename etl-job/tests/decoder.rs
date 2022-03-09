@@ -1,14 +1,15 @@
-use bytes::Bytes;
+use etl_core::deps::bytes::Bytes;
 use enumerate::EnumerateStreamAsync;
 use etl_core::datastore::*;
-use etl_core::job::state::*;
-use etl_core::job::stream::*;
-use etl_core::job::*;
-use etl_core::job_manager::*;
-use serde::{Deserialize, Serialize};
+use etl_job::job::state::*;
+use etl_job::job::stream::*;
+use etl_job::job::*;
+use etl_job::job_manager::*;
+use etl_core::deps::serde::{Deserialize, Serialize};
+use etl_core::deps::*;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[serde(crate = "serde", rename_all = "camelCase")]
 struct TestCsv {
     index: String,
     words: String,

@@ -18,6 +18,13 @@ impl StringDecoder {
     {
         DecodeStream::decode_source(self, source)
     }
+    pub fn with_datasource<T>(self, source: T) -> Box<dyn DataSource<String>>
+    where
+        String: Debug + Send + Sync + 'static,
+        T: DataSource<Bytes> + 'static,
+    {
+        DecodeStream::decode_source(self, Box::new(source) as Box<dyn DataSource<Bytes>>)
+    }
 }
 
 impl<T: Debug + 'static + Send + Sync> DecodeStream<T> for StringDecoder 

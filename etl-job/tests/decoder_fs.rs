@@ -1,17 +1,17 @@
 use etl_core::datastore::*;
 use etl_core::decoder::csv::*;
 use etl_core::decoder::json::*;
-use etl_core::job::state::*;
-use etl_core::job::*;
-use etl_core::job_manager::*;
-use etl_core::preamble::*;
-use etl_core::job::stream::*;
+use etl_job::job::state::*;
+use etl_job::job::*;
+use etl_job::job_manager::*;
+use etl_job::job::stream::*;
 use fs::LocalFs;
-use serde::{Deserialize, Serialize};
+use etl_core::deps::serde::{Deserialize, Serialize};
 use command::*;
+use etl_core::deps::*;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[serde(crate = "serde", rename_all = "camelCase")]
 struct TestCsv {
     index: String,
     words: String,
@@ -115,7 +115,6 @@ async fn test_basic_fs_csv_decoder() {
         .complete()
         .await
         .expect("Fail completing");
-    use etl_core::job::state::*;
     if let Some(cmd_status) = job_state.step_history.get("basic csv fs") {
         if let JobStepDetails {
             step:

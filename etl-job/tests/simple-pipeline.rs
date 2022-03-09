@@ -1,10 +1,14 @@
+use etl_core::datastore::mock::*;
 use etl_core::datastore::*;
-use etl_core::job::stream::*;
-use etl_core::job::*;
-use etl_core::job_manager::*;
-use etl_core::preamble::*;
-use mock::*;
-use serde::{Deserialize, Serialize};
+use etl_core::deps::serde::{Deserialize, Serialize};
+use etl_core::deps::*;
+use etl_job::job::error::*;
+use etl_job::job::handler::TransformHandler;
+use etl_job::job::handler::TransformOutput;
+use etl_job::job::stream::*;
+use etl_job::job::*;
+use etl_job::job_manager::*;
+use etl_job::transform_store::TransformDataSource;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_simple_pipeline() {
@@ -126,7 +130,7 @@ impl TransformHandler<TestSourceData, TestOutputData> for TestTransformer {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[serde(crate = "serde", rename_all = "camelCase")]
 /// One of the outputs
 struct TestSourceData {
     name: Option<String>,
@@ -134,7 +138,7 @@ struct TestSourceData {
     id: String,
 }
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[serde(crate = "serde", rename_all = "camelCase")]
 /// One of the outputs
 struct TestOutputData {
     resource_type: Option<String>,

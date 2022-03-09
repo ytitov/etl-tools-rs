@@ -1,6 +1,8 @@
-use etl_core::job::*;
-use etl_core::job_manager::*;
-use etl_core::preamble::*;
+use etl_job::job::*;
+use etl_job::job::error::*;
+use etl_job::job_manager::*;
+use etl_core::deps::anyhow;
+use etl_core::deps::tokio;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 /// Runs three commands, with stop_on_error set to false and checks that the second command results

@@ -1,10 +1,17 @@
 use etl_core::datastore::*;
-use etl_core::preamble::*;
-use etl_core::job::stream::*;
+use etl_job::job::stream::*;
+use etl_job::job_manager::*;
+use etl_job::job::*;
+use etl_job::job::error::*;
+use etl_job::job::state::*;
 use mock::*;
-use serde::{Deserialize, Serialize};
+use etl_core::deps::serde::{Deserialize, Serialize};
+use etl_core::deps::tokio;
+use etl_core::deps::*;
 
-/// create the following tests
+/// This tests running two jobs in parallel.  I have not come up with a good use case for this
+/// because to run things in parallel you can simply use the DataOutputTask trait.  Leaving this
+/// for now, but if it is not used sometime soon, should plan to take this idea out
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn run_two_jobs_fail_one() {
     let job_manager = JobManager::new(JobManagerConfig {
@@ -39,7 +46,6 @@ async fn run_two_jobs_fail_one() {
         .unwrap_err();
     assert_eq!(JobRunnerError::TooManyErrors, jr_not_ok_err);
 
-    use etl_core::job::state::*;
     if let Some(cmd_status) = jr_ok_job_state.step_history.get("transformed-ds-1a") {
         if let JobStepDetails {
             step:
@@ -77,7 +83,7 @@ async fn create_jr(jm_handle: &JobManagerHandle, max_errors: usize) -> JobRunner
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[serde(crate = "serde", rename_all = "camelCase")]
 /// One of the outputs
 struct TestSourceData {
     name: Option<String>,

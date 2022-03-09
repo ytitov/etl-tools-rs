@@ -16,9 +16,6 @@ pub mod enumerate;
 pub mod fs;
 /// various data stores used for testing
 pub mod mock;
-//this seems to be intertwined with etl-job a bit, and may be unecessary at this point, not sure
-//yet
-//pub mod transform_store;
 pub mod sources;
 /// Traits that define non-streaming loading and saving of data
 pub mod simple;

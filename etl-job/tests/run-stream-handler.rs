@@ -1,15 +1,16 @@
-/// create the following tests
+/// create the following T: datastore::DataSource<bytes::Bytes>tests
 /// TODO: 1. test with errors inside the process element function itself
 /// TODO: 2. test max_errors
 use etl_core::datastore::*;
+use etl_core::deps::serde::{Deserialize, Serialize};
 use etl_core::deps::*;
-use etl_core::job::stream::*;
-use etl_core::job::*;
-use etl_core::job_manager::*;
 use etl_core::preamble::*;
+use etl_job::job::handler::StreamHandler;
+use etl_job::job::stream::*;
+use etl_job::job::*;
+use etl_job::job_manager::*;
 use mock::mock_csv::*;
 use mock::MockJsonDataOutput;
-use serde::{Deserialize, Serialize};
 use state::*;
 
 /// test when every single line generated a serialization error
@@ -23,7 +24,7 @@ async fn basic_stream_handler_all_errors() {
     let jm_handle = job_manager.start();
     let testjob = TestJob {
         output: Box::new(MockJsonDataOutput::default())
-            .start_stream(jm_handle.get_jm_tx())
+            .start_stream()
             .await
             .unwrap(),
     };
@@ -97,7 +98,7 @@ struct TestJob {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[serde(crate = "serde", rename_all = "camelCase")]
 /// One of the outputs
 struct TestSourceData {
     id: String,
@@ -108,7 +109,7 @@ struct TestSourceData {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[serde(crate = "serde", rename_all = "camelCase")]
 /// One of the outputs
 struct TestOutputData {
     id: String,
