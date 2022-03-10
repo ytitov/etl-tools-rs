@@ -27,16 +27,21 @@ impl<S: 'static + Send + Sync, I: 'static + Debug + Send> Apply<S, I> {
                             lines_written += 1;
                         }
                         Err(e) => {
-                            log::error!("Apply: {}", &e);
+                            log::error!("Apply apply_fn returned an error: {}", &e);
                             return Err(e);
                         }
                     }
                 }
-                _ => {
+                Some(Err(e)) => {
+                    log::error!("DataSource sent an error: {}", e);
+                }
+                None => {
+                    log::info!("got a none");
                     break;
                 }
             };
         }
+        drop(rx);
         jh.await??;
         Ok(DataOutputStats {name: source_name, lines_written})
     }
