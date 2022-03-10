@@ -8,3 +8,10 @@ edition = "2021"
 [dependencies]
 etl-core = { path = "../etl-core" }
 serde_json = { version = "1.0" }
+
+[dev-dependencies]
+tracing-subscriber = { version = "0.3.9", features = ["json"] }
+tracing-futures = "0.2.5"
+tracing-core = { version = "0.1.17", default-features = false }
+tracing = { version = "0.1.32", features = ["log"] }
+simple_logger = "2.1"

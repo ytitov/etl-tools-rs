@@ -21,6 +21,7 @@ impl DataSource<Bytes> for String {
                 .await
                 .map_err(|er| DataStoreError::send_error(&name, "", er))?;
             }
+            log::info!("{} finished", &name);
             Ok(DataSourceStats { lines_scanned })
         });
         Ok((rx, jh))
