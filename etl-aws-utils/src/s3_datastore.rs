@@ -72,6 +72,15 @@ impl S3Storage {
             None => ProfileProvider::new().map_err(|e| DataStoreError::FatalIO(e.to_string())),
         }
     }
+
+    pub fn create_chain_provider(&self) -> Result<ChainProvider, DataStoreError> {
+        match &self.credentials_path {
+            Some(credentials_path) => Ok(ChainProvider::with_profile_provider(ProfileProvider::with_default_configuration(
+                credentials_path,
+            ))),
+            None => Ok(ChainProvider::new()),
+        }
+    }
 }
 
 #[async_trait]
@@ -190,8 +199,8 @@ impl DataSource<Bytes> for S3Storage {
 impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStore<T> for S3Storage {
     async fn read_file_str(&self, s3_key: &str) -> Result<String, DataStoreError> {
         use tokio::io::AsyncReadExt;
-        let p = self.create_profile_provider()?;
-        let client = create_client(p, &self.region)?;
+        let p = self.create_chain_provider()?;
+        let client = create_client_2(p, &self.region)?;
         let request = GetObjectRequest {
             bucket: self.s3_bucket.to_owned(),
             key: s3_key.to_owned(),
@@ -215,7 +224,7 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
     }
 
     async fn write(&self, key: &str, item: T) -> Result<(), DataStoreError> {
-        let p = self.create_profile_provider()?;
+        let p = self.create_chain_provider()?;
         match serde_json::to_string_pretty(&item) {
             Ok(body) => {
                 s3_write_text_file(p, &self.s3_bucket, key, body).await?;
@@ -228,7 +237,7 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
     }
 
     async fn load(&self, key: &str) -> Result<T, DataStoreError> {
-        let p = self.create_profile_provider()?;
+        let p = self.create_chain_provider()?;
         let text = s3_load_text_file(&p, &self.s3_bucket, key, &self.region).await?;
         match serde_json::from_str::<T>(&text) {
             Ok::<T, _>(obj) => Ok(obj),
@@ -388,7 +397,7 @@ pub async fn s3_write_bytes_multipart(
 
 /// overwrites the file if it exists already, with built in retry
 pub async fn s3_write_text_file(
-    profile_provider: ProfileProvider,
+    profile_provider: ChainProvider,
     s3_bucket: &str,
     s3_key: &str,
     body: String,
@@ -445,13 +454,13 @@ pub async fn s3_write_text_file(
 }
 
 pub async fn s3_load_text_file(
-    profile_provider: &ProfileProvider,
+    profile_provider: &ChainProvider,
     s3_bucket: &str,
     s3_key: &str,
     region: &Region,
 ) -> Result<String, DataStoreError> {
     use tokio::io::AsyncReadExt;
-    let client = create_client(profile_provider.to_owned(), region)?;
+    let client = create_client_2(profile_provider.to_owned(), region)?;
     let request = GetObjectRequest {
         bucket: s3_bucket.to_owned(),
         key: s3_key.to_owned(),
