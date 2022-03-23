@@ -14,6 +14,7 @@ use etl_core::deps::{
 use rusoto_core::HttpClient;
 pub use rusoto_core::Region;
 use rusoto_credential::ProfileProvider;
+use rusoto_credential::ChainProvider;
 use rusoto_s3::{self, *};
 use std::fmt::Debug;
 
@@ -44,10 +45,10 @@ impl Default for S3Storage {
 impl S3Storage {
     pub async fn get_object_head(&self, key: &str) -> Result<HeadObjectOutput, DataStoreError> {
         let p = match &self.credentials_path {
-            Some(credentials_path) => ProfileProvider::with_default_configuration(credentials_path),
-            None => ProfileProvider::new().map_err(|e| DataStoreError::FatalIO(e.to_string()))?,
+            Some(credentials_path) => ChainProvider::with_profile_provider(ProfileProvider::with_default_configuration(credentials_path)),
+            None => ChainProvider::new(), //.map_err(|e| DataStoreError::FatalIO(e.to_string()))?,
         };
-        let client: S3Client = create_client(p, &self.region)?;
+        let client: S3Client = create_client_2(p, &self.region)?;
         Ok(client
             .head_object(HeadObjectRequest {
                 bucket: self.s3_bucket.clone(),
@@ -241,6 +242,17 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
 
 pub fn create_client(
     profile_provider: ProfileProvider,
+    region: &Region,
+) -> anyhow::Result<S3Client> {
+    Ok(S3Client::new_with(
+        HttpClient::new()?,
+        profile_provider,
+        region.clone(),
+    ))
+}
+
+fn create_client_2(
+    profile_provider: ChainProvider,
     region: &Region,
 ) -> anyhow::Result<S3Client> {
     Ok(S3Client::new_with(
