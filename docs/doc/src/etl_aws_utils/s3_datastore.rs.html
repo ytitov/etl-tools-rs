@@ -474,6 +474,15 @@
 <span id="473">473</span>
 <span id="474">474</span>
 <span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">etl_core::datastore::error</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">etl_core::datastore</span>::{<span class="kw-2">*</span>, <span class="ident">simple::SimpleStore</span>};
 <span class="kw">use</span> <span class="ident">etl_core::deps</span>::{
@@ -546,6 +555,15 @@
                 <span class="ident">credentials_path</span>,
             )),
             <span class="prelude-val">None</span> =&gt; <span class="ident">ProfileProvider::new</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">DataStoreError::FatalIO</span>(<span class="ident">e</span>.<span class="ident">to_string</span>())),
+        }
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_chain_provider</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ChainProvider</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span> {
+        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">credentials_path</span> {
+            <span class="prelude-val">Some</span>(<span class="ident">credentials_path</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">ChainProvider::with_profile_provider</span>(<span class="ident">ProfileProvider::with_default_configuration</span>(
+                <span class="ident">credentials_path</span>,
+            ))),
+            <span class="prelude-val">None</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">ChainProvider::new</span>()),
         }
     }
 }
@@ -666,8 +684,8 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Serialize</span> <span class="op">+</span> <span class="ident">DeserializeOwned</span> <span class="op">+</span> <span class="ident">Debug</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">SimpleStore</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">S3Storage</span> {
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_file_str</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">s3_key</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span> {
         <span class="kw">use</span> <span class="ident">tokio::io::AsyncReadExt</span>;
-        <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">create_profile_provider</span>()<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">create_client</span>(<span class="ident">p</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">region</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">create_chain_provider</span>()<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">create_client_2</span>(<span class="ident">p</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">region</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">request</span> <span class="op">=</span> <span class="ident">GetObjectRequest</span> {
             <span class="ident">bucket</span>: <span class="self">self</span>.<span class="ident">s3_bucket</span>.<span class="ident">to_owned</span>(),
             <span class="ident">key</span>: <span class="ident">s3_key</span>.<span class="ident">to_owned</span>(),
@@ -691,7 +709,7 @@
     }
 
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">item</span>: <span class="ident">T</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">DataStoreError</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">create_profile_provider</span>()<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">create_chain_provider</span>()<span class="question-mark">?</span>;
         <span class="kw">match</span> <span class="ident">serde_json::to_string_pretty</span>(<span class="kw-2">&amp;</span><span class="ident">item</span>) {
             <span class="prelude-val">Ok</span>(<span class="ident">body</span>) =&gt; {
                 <span class="ident">s3_write_text_file</span>(<span class="ident">p</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">s3_bucket</span>, <span class="ident">key</span>, <span class="ident">body</span>).<span class="kw">await</span><span class="question-mark">?</span>;
@@ -704,7 +722,7 @@
     }
 
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">create_profile_provider</span>()<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">create_chain_provider</span>()<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">text</span> <span class="op">=</span> <span class="ident">s3_load_text_file</span>(<span class="kw-2">&amp;</span><span class="ident">p</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">s3_bucket</span>, <span class="ident">key</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">region</span>).<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">match</span> <span class="ident">serde_json::from_str</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">text</span>) {
             <span class="prelude-val">Ok</span>::<span class="op">&lt;</span><span class="ident">T</span>, <span class="kw">_</span><span class="op">&gt;</span>(<span class="ident">obj</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">obj</span>),
@@ -864,7 +882,7 @@
 
 <span class="doccomment">/// overwrites the file if it exists already, with built in retry</span>
 <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">s3_write_text_file</span>(
-    <span class="ident">profile_provider</span>: <span class="ident">ProfileProvider</span>,
+    <span class="ident">profile_provider</span>: <span class="ident">ChainProvider</span>,
     <span class="ident">s3_bucket</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
     <span class="ident">s3_key</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
     <span class="ident">body</span>: <span class="ident">String</span>,
@@ -921,13 +939,13 @@
 }
 
 <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">s3_load_text_file</span>(
-    <span class="ident">profile_provider</span>: <span class="kw-2">&amp;</span><span class="ident">ProfileProvider</span>,
+    <span class="ident">profile_provider</span>: <span class="kw-2">&amp;</span><span class="ident">ChainProvider</span>,
     <span class="ident">s3_bucket</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
     <span class="ident">s3_key</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
     <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>,
 ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span> {
     <span class="kw">use</span> <span class="ident">tokio::io::AsyncReadExt</span>;
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">create_client</span>(<span class="ident">profile_provider</span>.<span class="ident">to_owned</span>(), <span class="ident">region</span>)<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">create_client_2</span>(<span class="ident">profile_provider</span>.<span class="ident">to_owned</span>(), <span class="ident">region</span>)<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="ident">request</span> <span class="op">=</span> <span class="ident">GetObjectRequest</span> {
         <span class="ident">bucket</span>: <span class="ident">s3_bucket</span>.<span class="ident">to_owned</span>(),
         <span class="ident">key</span>: <span class="ident">s3_key</span>.<span class="ident">to_owned</span>(),

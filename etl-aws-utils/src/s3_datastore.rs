@@ -65,6 +65,7 @@ impl S3Storage {
     }
 
     pub fn create_profile_provider(&self) -> Result<ProfileProvider, DataStoreError> {
+        log::info!("creating a profile provider");
         match &self.credentials_path {
             Some(credentials_path) => Ok(ProfileProvider::with_default_configuration(
                 credentials_path,
@@ -74,6 +75,7 @@ impl S3Storage {
     }
 
     pub fn create_chain_provider(&self) -> Result<ChainProvider, DataStoreError> {
+        log::info!("creating a chain provider");
         match &self.credentials_path {
             Some(credentials_path) => Ok(ChainProvider::with_profile_provider(ProfileProvider::with_default_configuration(
                 credentials_path,
@@ -90,10 +92,7 @@ impl DataOutput<Bytes> for S3Storage {
     ) -> anyhow::Result<DataOutputTask<Bytes>> {
         let (tx, mut rx): (DataOutputTx<Bytes>, _) = channel(1);
         let name = self.name();
-        let p = match &self.credentials_path {
-            Some(credentials_path) => ProfileProvider::with_default_configuration(credentials_path),
-            None => ProfileProvider::new().map_err(|e| DataStoreError::FatalIO(e.to_string()))?,
-        };
+        let p = self.create_chain_provider()?;
         let (s3_tx, s3_rx) = channel(1);
         let s3_output_key = self.s3_output_key.ok_or_else(|| {
             DataStoreError::FatalIO(
@@ -136,11 +135,8 @@ impl DataSource<Bytes> for S3Storage {
 
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<Bytes>, DataStoreError> {
         use rusoto_core::RusotoError;
-        let p = match &self.credentials_path {
-            Some(credentials_path) => ProfileProvider::with_default_configuration(credentials_path),
-            None => ProfileProvider::new().map_err(|e| DataStoreError::FatalIO(e.to_string()))?,
-        };
-        let client: S3Client = create_client(p, &self.region)?;
+        let p = self.create_chain_provider()?;
+        let client: S3Client = create_client_2(p, &self.region)?;
         let (tx, rx) = channel(1);
         let files = self.s3_keys.clone();
         let s3_bucket = self.s3_bucket.clone();
@@ -249,6 +245,7 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
     }
 }
 
+/*
 pub fn create_client(
     profile_provider: ProfileProvider,
     region: &Region,
@@ -259,6 +256,7 @@ pub fn create_client(
         region.clone(),
     ))
 }
+*/
 
 fn create_client_2(
     profile_provider: ChainProvider,
@@ -273,7 +271,7 @@ fn create_client_2(
 
 /// Upload to S3 with 30 mb size increments
 pub async fn s3_write_bytes_multipart(
-    profile_provider: ProfileProvider,
+    profile_provider: ChainProvider,
     s3_bucket: &str,
     s3_key: &str,
     mut body_stream: Receiver<Bytes>,
