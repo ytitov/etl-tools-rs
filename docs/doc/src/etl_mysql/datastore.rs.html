@@ -543,7 +543,129 @@
 <span id="542">542</span>
 <span id="543">543</span>
 <span id="544">544</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">etl_core::datastore</span>::<span class="kw-2">*</span>;
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
+<span id="589">589</span>
+<span id="590">590</span>
+<span id="591">591</span>
+<span id="592">592</span>
+<span id="593">593</span>
+<span id="594">594</span>
+<span id="595">595</span>
+<span id="596">596</span>
+<span id="597">597</span>
+<span id="598">598</span>
+<span id="599">599</span>
+<span id="600">600</span>
+<span id="601">601</span>
+<span id="602">602</span>
+<span id="603">603</span>
+<span id="604">604</span>
+<span id="605">605</span>
+<span id="606">606</span>
+<span id="607">607</span>
+<span id="608">608</span>
+<span id="609">609</span>
+<span id="610">610</span>
+<span id="611">611</span>
+<span id="612">612</span>
+<span id="613">613</span>
+<span id="614">614</span>
+<span id="615">615</span>
+<span id="616">616</span>
+<span id="617">617</span>
+<span id="618">618</span>
+<span id="619">619</span>
+<span id="620">620</span>
+<span id="621">621</span>
+<span id="622">622</span>
+<span id="623">623</span>
+<span id="624">624</span>
+<span id="625">625</span>
+<span id="626">626</span>
+<span id="627">627</span>
+<span id="628">628</span>
+<span id="629">629</span>
+<span id="630">630</span>
+<span id="631">631</span>
+<span id="632">632</span>
+<span id="633">633</span>
+<span id="634">634</span>
+<span id="635">635</span>
+<span id="636">636</span>
+<span id="637">637</span>
+<span id="638">638</span>
+<span id="639">639</span>
+<span id="640">640</span>
+<span id="641">641</span>
+<span id="642">642</span>
+<span id="643">643</span>
+<span id="644">644</span>
+<span id="645">645</span>
+<span id="646">646</span>
+<span id="647">647</span>
+<span id="648">648</span>
+<span id="649">649</span>
+<span id="650">650</span>
+<span id="651">651</span>
+<span id="652">652</span>
+<span id="653">653</span>
+<span id="654">654</span>
+<span id="655">655</span>
+<span id="656">656</span>
+<span id="657">657</span>
+<span id="658">658</span>
+<span id="659">659</span>
+<span id="660">660</span>
+<span id="661">661</span>
+<span id="662">662</span>
+<span id="663">663</span>
+<span id="664">664</span>
+<span id="665">665</span>
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">error::DataStoreError</span>;
+<span class="kw">use</span> <span class="ident">etl_core::datastore</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">etl_core::deps::anyhow</span>;
 <span class="kw">use</span> <span class="ident">etl_core::deps::async_trait</span>;
 <span class="kw">use</span> <span class="ident">etl_core::deps::futures_core::future::BoxFuture</span>;
@@ -558,7 +680,8 @@
 <span class="kw">use</span> <span class="ident">serde::Serialize</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">sqlx</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">sqlx::mysql::MySqlPoolOptions</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">sqlx::MySqlPool</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">sqlx::query::QueryAs</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">sqlx</span>::{<span class="ident">database::HasArguments</span>, <span class="ident">query::Query</span>, <span class="ident">IntoArguments</span>, <span class="ident">MySql</span>, <span class="ident">MySqlPool</span>};
 <span class="kw">use</span> <span class="ident">std::fmt::Debug</span>;
 <span class="kw">use</span> <span class="ident">std::time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
 
@@ -584,6 +707,26 @@
     <span class="kw">pub</span> <span class="ident">failed_query_tx</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DataSourceTx</span><span class="op">&lt;</span><span class="ident">FailedQuery</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MySqlSelect</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="ident">db_name</span>: <span class="ident">String</span>,
+    <span class="kw">pub</span> <span class="ident">table_name</span>: <span class="ident">String</span>,
+    <span class="kw">pub</span> <span class="ident">pool</span>: <span class="ident">MySqlDataOutputPool</span>,
+    <span class="doccomment">/// The SQL query.  See query_as function for binding values for secure execution</span>
+    <span class="kw">pub</span> <span class="ident">query</span>: <span class="ident">String</span>,
+    <span class="doccomment">/// Sole reason is for giving ability to run bind so the query is handled correctly.  If set to</span>
+    <span class="doccomment">/// None the given query is ran as-is</span>
+    <span class="kw">pub</span> <span class="ident">query_as</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>
+        <span class="ident">Box</span><span class="op">&lt;</span>
+            <span class="kw">dyn</span> <span class="kw">for</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">Fn</span>(
+                    <span class="ident">QueryAs</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">MySql</span>, <span class="ident">T</span>, <span class="op">&lt;</span><span class="ident">MySql</span> <span class="kw">as</span> <span class="ident">HasArguments</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::Arguments</span><span class="op">&gt;</span>,
+                ) -&gt; <span class="ident">anyhow::Result</span><span class="op">&lt;</span>
+                    <span class="ident">QueryAs</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">MySql</span>, <span class="ident">T</span>, <span class="op">&lt;</span><span class="ident">MySql</span> <span class="kw">as</span> <span class="ident">HasArguments</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::Arguments</span><span class="op">&gt;</span>,
+                <span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Sync</span>
+                <span class="op">+</span> <span class="ident">Send</span>,
+        <span class="op">&gt;</span>,
+    <span class="op">&gt;</span>,
+}
+
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
 <span class="doccomment">/// can either pass the pool or ask for one to be created</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">MySqlDataOutputPool</span> {
@@ -595,6 +738,58 @@
         <span class="ident">host</span>: <span class="ident">String</span>,
         <span class="ident">port</span>: <span class="ident">String</span>,
     },
+}
+
+<span class="kw">impl</span> <span class="ident">MySqlDataOutputPool</span> {
+    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">create_pool</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">db_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">MySqlPool</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">std::error::Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">pool</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span> {
+            <span class="ident">MySqlDataOutputPool::Pool</span>(<span class="ident">p</span>) =&gt; <span class="ident">p</span>.<span class="ident">clone</span>(),
+            <span class="ident">MySqlDataOutputPool::CreatePool</span> {
+                <span class="ident">max_connections</span>,
+                <span class="ident">user</span>,
+                <span class="ident">pw</span>,
+                <span class="ident">host</span>,
+                <span class="ident">port</span>,
+            } =&gt; {
+                <span class="ident">MySqlPoolOptions::new</span>()
+                    <span class="comment">// TODO: pass these params into config</span>
+                    .<span class="ident">max_connections</span>(<span class="kw-2">*</span><span class="ident">max_connections</span> <span class="kw">as</span> <span class="ident">u32</span>)
+                    <span class="comment">// 3 hours timeout</span>
+                    <span class="comment">//.connect_timeout(std::time::Duration::from_secs(60))</span>
+                    <span class="comment">//.min_connections(1)</span>
+                    <span class="comment">//.idle_timeout(Some(std::time::Duration::from_secs(60 * 10)))</span>
+                    <span class="comment">//.max_lifetime(Some(std::time::Duration::from_secs(60 * 60 * 2)))</span>
+                    .<span class="ident">after_connect</span>(<span class="op">|</span><span class="ident">_conn</span><span class="op">|</span> {
+                        <span class="ident">Box::pin</span>(<span class="kw">async</span> <span class="kw">move</span> {
+                            <span class="macro">log::info!</span>(<span class="string">&quot;MySql connection established&quot;</span>);
+                            <span class="prelude-val">Ok</span>(())
+                        })
+                    })
+                    <span class="comment">/*
+                    // connect lazy appears to be massively slowing things down
+                    .connect_lazy(&amp;format!(
+                        &quot;mysql://{}:{}@{}:{}/{}&quot;,
+                        user, pw, host, port, &amp;db_name
+                    ))?,
+                    */</span>
+                    .<span class="ident">connect</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+                        <span class="string">&quot;mysql://{}:{}@{}:{}/{}&quot;</span>,
+                        <span class="ident">user</span>, <span class="ident">pw</span>, <span class="ident">host</span>, <span class="ident">port</span>, <span class="kw-2">&amp;</span><span class="ident">db_name</span>
+                    ))
+                    .<span class="kw">await</span><span class="question-mark">?</span>
+            }
+        };
+        <span class="prelude-val">Ok</span>(<span class="ident">pool</span>)
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">MySqlPool</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">MySqlDataOutputPool</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">p</span>: <span class="ident">MySqlPool</span>) -&gt; <span class="self">Self</span> {
+        <span class="ident">MySqlDataOutputPool::Pool</span>(<span class="ident">p</span>)
+    }
 }
 
 <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">MySqlDataOutputPool</span> {
@@ -1086,6 +1281,53 @@
             .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>()
             .<span class="ident">join</span>(<span class="string">&quot;,&quot;</span>)
     ))
+}
+
+<span class="kw">use</span> <span class="ident">sqlx::mysql::MySqlRow</span>;
+<span class="kw">use</span> <span class="ident">sqlx::FromRow</span>;
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Debug</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Unpin</span><span class="op">&gt;</span> <span class="ident">DataSource</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">MySqlSelect</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="kw">for</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">T</span>: <span class="ident">FromRow</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">MySqlRow</span><span class="op">&gt;</span>,
+{
+    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
+        <span class="macro">format!</span>(<span class="string">&quot;MySqlSelect:{}&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">table_name</span>)
+    }
+
+    <span class="kw">fn</span> <span class="ident">start_stream</span>(<span class="self">self</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataSourceTask</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span> {
+        <span class="kw">use</span> <span class="ident">futures::TryStreamExt</span>;
+
+        <span class="comment">//let ds_name = self.name(); // TODO: not seeing why the compiler complains about this</span>
+        <span class="kw">let</span> <span class="ident">ds_name</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;MySqlSelect:{}&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">table_name</span>);
+
+        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">channel</span>(<span class="number">1</span>);
+        <span class="kw">let</span> <span class="ident">pool_params</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pool</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">source_name</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;{}.{}&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">table_name</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">db_name</span>);
+        <span class="kw">let</span> <span class="ident">db_name</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">db_name</span>;
+        <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">query</span>;
+        <span class="kw">let</span> <span class="ident">gen_query</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">query_as</span>;
+        <span class="kw">let</span> <span class="ident">jh</span>: <span class="ident">JoinHandle</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataSourceStats</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">tokio::spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+            <span class="kw">let</span> <span class="ident">pool</span> <span class="op">=</span> <span class="ident">pool_params</span>.<span class="ident">create_pool</span>(<span class="kw-2">&amp;</span><span class="ident">db_name</span>).<span class="kw">await</span>.<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+                <span class="ident">DataStoreError::FatalIO</span>(<span class="macro">format!</span>(<span class="string">&quot;Couldn&#39;t create a pool due to: {}&quot;</span>, <span class="ident">e</span>))
+            })<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lines_scanned</span> <span class="op">=</span> <span class="number">0_usize</span>;
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rows</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">gen_query</span> {
+                <span class="prelude-val">Some</span>(<span class="ident">gen_query</span>) =&gt; (<span class="ident">gen_query</span>)(<span class="ident">sqlx::query_as</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">T</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">query</span>))<span class="question-mark">?</span>.<span class="ident">fetch</span>(<span class="kw-2">&amp;</span><span class="ident">pool</span>),
+                <span class="prelude-val">None</span> =&gt; <span class="ident">sqlx::query_as</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">T</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">query</span>).<span class="ident">fetch</span>(<span class="kw-2">&amp;</span><span class="ident">pool</span>),
+            };
+            <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">row</span>) <span class="op">=</span> <span class="ident">rows</span>.<span class="ident">try_next</span>().<span class="kw">await</span>.<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+                <span class="ident">DataStoreError::FatalIO</span>(<span class="macro">format!</span>(<span class="string">&quot;Could not fetch a row due to: {}&quot;</span>, <span class="ident">e</span>))
+            })<span class="question-mark">?</span> {
+                <span class="ident">tx</span>.<span class="ident">send</span>(<span class="prelude-val">Ok</span>(<span class="ident">DataSourceMessage::new</span>(<span class="kw-2">&amp;</span><span class="ident">ds_name</span>, <span class="ident">row</span>)))
+                    .<span class="kw">await</span>
+                    .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">er</span><span class="op">|</span> <span class="ident">DataStoreError::send_error</span>(<span class="kw-2">&amp;</span><span class="ident">ds_name</span>, <span class="kw-2">&amp;</span><span class="ident">source_name</span>, <span class="ident">er</span>))<span class="question-mark">?</span>;
+                <span class="ident">lines_scanned</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+            }
+
+            <span class="prelude-val">Ok</span>(<span class="ident">DataSourceStats</span> { <span class="ident">lines_scanned</span> })
+        });
+        <span class="prelude-val">Ok</span>((<span class="ident">rx</span>, <span class="ident">jh</span>))
+    }
 }
 </code></pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="etl_mysql" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
