@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 etl-core = { path = "../etl-core" }
 sqlx = { version = "0.5", features = [ "mysql", "runtime-tokio-native-tls", "bigdecimal" ] }
+futures = { version = "0.3" }
 #csv = "1.1"
 #aws stuff
 #bytes = "1"

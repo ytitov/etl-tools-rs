@@ -443,6 +443,7 @@ name = "etl-mysql"
 version = "0.1.0"
 dependencies = [
  "etl-core",
+ "futures",
  "serde",
  "sqlx",
 ]

@@ -1,3 +1,4 @@
+use error::DataStoreError;
 use etl_core::datastore::*;
 use etl_core::deps::anyhow;
 use etl_core::deps::async_trait;
@@ -13,7 +14,8 @@ use serde::Deserialize;
 use serde::Serialize;
 pub use sqlx;
 pub use sqlx::mysql::MySqlPoolOptions;
-pub use sqlx::MySqlPool;
+pub use sqlx::query::QueryAs;
+pub use sqlx::{database::HasArguments, query::Query, IntoArguments, MySql, MySqlPool};
 use std::fmt::Debug;
 use std::time::{Duration, Instant};
 
@@ -39,6 +41,26 @@ pub struct MySqlDataOutput {
     pub failed_query_tx: Option<DataSourceTx<FailedQuery>>,
 }
 
+pub struct MySqlSelect<T> {
+    pub db_name: String,
+    pub table_name: String,
+    pub pool: MySqlDataOutputPool,
+    /// The SQL query.  See query_as function for binding values for secure execution
+    pub query: String,
+    /// Sole reason is for giving ability to run bind so the query is handled correctly.  If set to
+    /// None the given query is ran as-is
+    pub query_as: Option<
+        Box<
+            dyn for<'a> Fn(
+                    QueryAs<'a, MySql, T, <MySql as HasArguments<'a>>::Arguments>,
+                ) -> anyhow::Result<
+                    QueryAs<'a, MySql, T, <MySql as HasArguments<'a>>::Arguments>,
+                > + Sync
+                + Send,
+        >,
+    >,
+}
+
 #[derive(Clone)]
 /// can either pass the pool or ask for one to be created
 pub enum MySqlDataOutputPool {
@@ -50,6 +72,58 @@ pub enum MySqlDataOutputPool {
         host: String,
         port: String,
     },
+}
+
+impl MySqlDataOutputPool {
+    pub async fn create_pool(
+        &self,
+        db_name: &str,
+    ) -> Result<MySqlPool, Box<dyn std::error::Error>> {
+        let pool = match &self {
+            MySqlDataOutputPool::Pool(p) => p.clone(),
+            MySqlDataOutputPool::CreatePool {
+                max_connections,
+                user,
+                pw,
+                host,
+                port,
+            } => {
+                MySqlPoolOptions::new()
+                    // TODO: pass these params into config
+                    .max_connections(*max_connections as u32)
+                    // 3 hours timeout
+                    //.connect_timeout(std::time::Duration::from_secs(60))
+                    //.min_connections(1)
+                    //.idle_timeout(Some(std::time::Duration::from_secs(60 * 10)))
+                    //.max_lifetime(Some(std::time::Duration::from_secs(60 * 60 * 2)))
+                    .after_connect(|_conn| {
+                        Box::pin(async move {
+                            log::info!("MySql connection established");
+                            Ok(())
+                        })
+                    })
+                    /*
+                    // connect lazy appears to be massively slowing things down
+                    .connect_lazy(&format!(
+                        "mysql://{}:{}@{}:{}/{}",
+                        user, pw, host, port, &db_name
+                    ))?,
+                    */
+                    .connect(&format!(
+                        "mysql://{}:{}@{}:{}/{}",
+                        user, pw, host, port, &db_name
+                    ))
+                    .await?
+            }
+        };
+        Ok(pool)
+    }
+}
+
+impl From<MySqlPool> for MySqlDataOutputPool {
+    fn from(p: MySqlPool) -> Self {
+        MySqlDataOutputPool::Pool(p)
+    }
 }
 
 impl Default for MySqlDataOutputPool {
@@ -541,4 +615,51 @@ where
             .collect::<Vec<String>>()
             .join(",")
     ))
+}
+
+use sqlx::mysql::MySqlRow;
+use sqlx::FromRow;
+
+impl<T: Debug + 'static + Send + Sync + Unpin> DataSource<T> for MySqlSelect<T>
+where
+    for<'a> T: FromRow<'a, MySqlRow>,
+{
+    fn name(&self) -> String {
+        format!("MySqlSelect:{}", &self.table_name)
+    }
+
+    fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
+        use futures::TryStreamExt;
+
+        //let ds_name = self.name(); // TODO: not seeing why the compiler complains about this
+        let ds_name = format!("MySqlSelect:{}", &self.table_name);
+
+        let (tx, rx) = channel(1);
+        let pool_params = self.pool.clone();
+        let source_name = format!("{}.{}", &self.table_name, &self.db_name);
+        let db_name = self.db_name;
+        let query = self.query;
+        let gen_query = self.query_as;
+        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
+            let pool = pool_params.create_pool(&db_name).await.map_err(|e| {
+                DataStoreError::FatalIO(format!("Couldn't create a pool due to: {}", e))
+            })?;
+            let mut lines_scanned = 0_usize;
+            let mut rows = match gen_query {
+                Some(gen_query) => (gen_query)(sqlx::query_as::<_, T>(&query))?.fetch(&pool),
+                None => sqlx::query_as::<_, T>(&query).fetch(&pool),
+            };
+            while let Some(row) = rows.try_next().await.map_err(|e| {
+                DataStoreError::FatalIO(format!("Could not fetch a row due to: {}", e))
+            })? {
+                tx.send(Ok(DataSourceMessage::new(&ds_name, row)))
+                    .await
+                    .map_err(|er| DataStoreError::send_error(&ds_name, &source_name, er))?;
+                lines_scanned += 1;
+            }
+
+            Ok(DataSourceStats { lines_scanned })
+        });
+        Ok((rx, jh))
+    }
 }

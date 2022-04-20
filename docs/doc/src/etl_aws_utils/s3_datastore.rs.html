@@ -481,8 +481,6 @@
 <span id="480">480</span>
 <span id="481">481</span>
 <span id="482">482</span>
-<span id="483">483</span>
-<span id="484">484</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">etl_core::datastore::error</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">etl_core::datastore</span>::{<span class="kw-2">*</span>, <span class="ident">simple::SimpleStore</span>};
 <span class="kw">use</span> <span class="ident">etl_core::deps</span>::{
@@ -550,6 +548,7 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_profile_provider</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ProfileProvider</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span> {
+        <span class="macro">log::info!</span>(<span class="string">&quot;creating a profile provider&quot;</span>);
         <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">credentials_path</span> {
             <span class="prelude-val">Some</span>(<span class="ident">credentials_path</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">ProfileProvider::with_default_configuration</span>(
                 <span class="ident">credentials_path</span>,
@@ -559,6 +558,7 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_chain_provider</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ChainProvider</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span> {
+        <span class="macro">log::info!</span>(<span class="string">&quot;creating a chain provider&quot;</span>);
         <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">credentials_path</span> {
             <span class="prelude-val">Some</span>(<span class="ident">credentials_path</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">ChainProvider::with_profile_provider</span>(<span class="ident">ProfileProvider::with_default_configuration</span>(
                 <span class="ident">credentials_path</span>,
@@ -575,10 +575,7 @@
     ) -&gt; <span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">DataOutputTask</span><span class="op">&lt;</span><span class="ident">Bytes</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="kw-2">mut</span> <span class="ident">rx</span>): (<span class="ident">DataOutputTx</span><span class="op">&lt;</span><span class="ident">Bytes</span><span class="op">&gt;</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="ident">channel</span>(<span class="number">1</span>);
         <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">name</span>();
-        <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">credentials_path</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">credentials_path</span>) =&gt; <span class="ident">ProfileProvider::with_default_configuration</span>(<span class="ident">credentials_path</span>),
-            <span class="prelude-val">None</span> =&gt; <span class="ident">ProfileProvider::new</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">DataStoreError::FatalIO</span>(<span class="ident">e</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>,
-        };
+        <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">create_chain_provider</span>()<span class="question-mark">?</span>;
         <span class="kw">let</span> (<span class="ident">s3_tx</span>, <span class="ident">s3_rx</span>) <span class="op">=</span> <span class="ident">channel</span>(<span class="number">1</span>);
         <span class="kw">let</span> <span class="ident">s3_output_key</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">s3_output_key</span>.<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
             <span class="ident">DataStoreError::FatalIO</span>(
@@ -621,11 +618,8 @@
 
     <span class="kw">fn</span> <span class="ident">start_stream</span>(<span class="self">self</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataSourceTask</span><span class="op">&lt;</span><span class="ident">Bytes</span><span class="op">&gt;</span>, <span class="ident">DataStoreError</span><span class="op">&gt;</span> {
         <span class="kw">use</span> <span class="ident">rusoto_core::RusotoError</span>;
-        <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">credentials_path</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">credentials_path</span>) =&gt; <span class="ident">ProfileProvider::with_default_configuration</span>(<span class="ident">credentials_path</span>),
-            <span class="prelude-val">None</span> =&gt; <span class="ident">ProfileProvider::new</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">DataStoreError::FatalIO</span>(<span class="ident">e</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>,
-        };
-        <span class="kw">let</span> <span class="ident">client</span>: <span class="ident">S3Client</span> <span class="op">=</span> <span class="ident">create_client</span>(<span class="ident">p</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">region</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">create_chain_provider</span>()<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">client</span>: <span class="ident">S3Client</span> <span class="op">=</span> <span class="ident">create_client_2</span>(<span class="ident">p</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">region</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">channel</span>(<span class="number">1</span>);
         <span class="kw">let</span> <span class="ident">files</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">s3_keys</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">s3_bucket</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">s3_bucket</span>.<span class="ident">clone</span>();
@@ -734,16 +728,18 @@
     }
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_client</span>(
-    <span class="ident">profile_provider</span>: <span class="ident">ProfileProvider</span>,
-    <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>,
-) -&gt; <span class="ident">anyhow::Result</span><span class="op">&lt;</span><span class="ident">S3Client</span><span class="op">&gt;</span> {
-    <span class="prelude-val">Ok</span>(<span class="ident">S3Client::new_with</span>(
-        <span class="ident">HttpClient::new</span>()<span class="question-mark">?</span>,
-        <span class="ident">profile_provider</span>,
-        <span class="ident">region</span>.<span class="ident">clone</span>(),
+<span class="comment">/*
+pub fn create_client(
+    profile_provider: ProfileProvider,
+    region: &amp;Region,
+) -&gt; anyhow::Result&lt;S3Client&gt; {
+    Ok(S3Client::new_with(
+        HttpClient::new()?,
+        profile_provider,
+        region.clone(),
     ))
 }
+*/</span>
 
 <span class="kw">fn</span> <span class="ident">create_client_2</span>(
     <span class="ident">profile_provider</span>: <span class="ident">ChainProvider</span>,
@@ -758,7 +754,7 @@
 
 <span class="doccomment">/// Upload to S3 with 30 mb size increments</span>
 <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">s3_write_bytes_multipart</span>(
-    <span class="ident">profile_provider</span>: <span class="ident">ProfileProvider</span>,
+    <span class="ident">profile_provider</span>: <span class="ident">ChainProvider</span>,
     <span class="ident">s3_bucket</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
     <span class="ident">s3_key</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
     <span class="kw-2">mut</span> <span class="ident">body_stream</span>: <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">Bytes</span><span class="op">&gt;</span>,
