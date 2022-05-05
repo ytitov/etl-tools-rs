@@ -1,0 +1,35 @@
+syntax = "proto3";
+package datasource;
+
+message DataSourceBytesMessage {
+  bytes content = 1;
+}
+
+message DataSourceStringMessage {
+  string content = 1;
+}
+
+message DataSourceMessage {
+  optional string string_content = 1;
+  optional bytes bytes_content = 2;
+}
+
+message DataSourceResponse {
+  enum DataStoreErrorKind {
+    NO_ERROR = 0;
+    FATAL_IO = 1;
+    DESERIALIZE = 2;
+  }
+  DataStoreErrorKind error = 1;
+  // if no error this should be blank
+  optional string content = 2;
+}
+
+message StartDataSource {
+  string request = 1;
+}
+
+service DataSource {
+  //rpc StringDataOutput(stream DataOutputStringMessage) returns (stream DataOutputResponse) {}
+  rpc StartStringDataSource(StartDataSource) returns (stream DataSourceStringMessage) {}
+}

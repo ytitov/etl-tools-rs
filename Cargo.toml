@@ -6,5 +6,6 @@ members = [
 		"etl-sftp",
 		"etl-aws-utils",
     "etl-job",
+    "etl-grpc",
 		#"etl-examples",
 ]
