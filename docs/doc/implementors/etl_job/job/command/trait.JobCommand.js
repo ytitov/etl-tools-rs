@@ -1,4 +1,3 @@
 (function() {var implementors = {};
-implementors["etl_aws_utils"] = [{"text":"impl&lt;'a&gt; <a class=\"trait\" href=\"etl_job/job/command/trait.JobCommand.html\" title=\"trait etl_job::job::command::JobCommand\">JobCommand</a> for <a class=\"struct\" href=\"etl_aws_utils/athena/struct.AthenaQueryJobCommand.html\" title=\"struct etl_aws_utils::athena::AthenaQueryJobCommand\">AthenaQueryJobCommand</a>","synthetic":false,"types":["etl_aws_utils::athena::AthenaQueryJobCommand"]}];
-implementors["etl_job"] = [];
+implementors["etl_aws_utils"] = [{"text":"impl&lt;'a&gt; JobCommand for <a class=\"struct\" href=\"etl_aws_utils/athena/struct.AthenaQueryJobCommand.html\" title=\"struct etl_aws_utils::athena::AthenaQueryJobCommand\">AthenaQueryJobCommand</a>","synthetic":false,"types":["etl_aws_utils::athena::AthenaQueryJobCommand"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
