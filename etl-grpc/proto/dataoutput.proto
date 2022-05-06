@@ -15,14 +15,19 @@ message DataOutputMessage {
 }
 
 message DataOutputResponse {
+  DataOutputStats stats = 1;
   enum DataStoreErrorKind {
     NO_ERROR = 0;
     FATAL_IO = 1;
     DESERIALIZE = 2;
   }
-  DataStoreErrorKind error = 1;
-  // if no error this should be blank
-  optional string content = 2;
+  optional DataStoreErrorKind error = 2;
+  optional string error_message = 3;
+}
+
+message DataOutputStats {
+  string name = 1;
+  uint64 lines_written = 2;
 }
 
 message DataStoreError {
@@ -30,6 +35,6 @@ message DataStoreError {
 
 service DataOutput {
   //rpc StringDataOutput(stream DataOutputStringMessage) returns (stream DataOutputResponse) {}
-  rpc StringDataOutput(stream DataOutputStringMessage) returns (DataOutputResponse) {}
+  rpc SendTextLines(stream DataOutputStringMessage) returns (DataOutputResponse) {}
 }
 

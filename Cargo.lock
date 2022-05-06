@@ -509,6 +509,7 @@ version = "0.1.0"
 dependencies = [
  "async-stream",
  "bytes",
+ "etl-core",
  "futures",
  "prost",
  "prost-types",

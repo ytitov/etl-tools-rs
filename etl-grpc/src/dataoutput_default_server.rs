@@ -1,37 +1,73 @@
-use dataoutput::data_output_server::DataOutput;
-use dataoutput::{DataOutputResponse, DataOutputStringMessage};
+use etl_core::datastore::error::DataStoreError;
+use etl_core::datastore::*;
+use etl_core::deps::bytes::Bytes;
+use etl_core::joins::CreateDataOutputFn;
 
-use futures::Stream;
-use std::{error::Error, io::ErrorKind, net::ToSocketAddrs, pin::Pin, time::Duration};
-use tokio_stream::{wrappers::ReceiverStream, StreamExt};
-use tonic::{transport::Server, Request, Response, Status, Streaming};
+use super::dataoutput::data_output_server::DataOutput as GrpcDataOutput;
+use super::dataoutput::{
+    DataOutputResponse, DataOutputStats as GrpcDataOutputStats, DataOutputStringMessage,
+};
 
-pub mod dataoutput {
-    tonic::include_proto!("dataoutput");
+use tokio_stream::StreamExt;
+use tonic::{Code, Request, Response, Status, Streaming};
+
+pub struct DefaultDataOutputServer {
+    create_output: CreateDataOutputFn<'static, Bytes>,
 }
 
-#[derive(Debug, Default)]
-pub struct DefaultDataOutputServer {}
+impl<'a> DefaultDataOutputServer {
+    pub fn new(create_output: CreateDataOutputFn<'static, Bytes>) -> Self {
+        DefaultDataOutputServer { create_output }
+    }
+}
 
 type DataOutputResult<T> = Result<Response<T>, Status>;
 //type ResponseStream = Pin<Box<dyn Stream<Item = Result<DataOutputResponse, Status>> + Send>>;
 
 #[tonic::async_trait]
-impl DataOutput for DefaultDataOutputServer {
-    /*
-     * for returning a stream, this is what is needed for a data source
-    type StringDataOutputStream = ResponseStream;
-    async fn string_data_output(
-        &self,
-        req_stream: Request<Streaming<DataOutputStringMessage>>,
-    ) -> DataOutputResult<Self::StringDataOutputStream> {
-        unimplemented!("todo")
-    }
-    */
-    async fn string_data_output(
+impl GrpcDataOutput for DefaultDataOutputServer {
+    async fn send_text_lines(
         &self,
         req_stream: Request<Streaming<DataOutputStringMessage>>,
     ) -> DataOutputResult<DataOutputResponse> {
-        unimplemented!("todo")
+        let mut in_stream = req_stream.into_inner();
+        let output = (self.create_output)().await.map_err(|e| {
+            Status::new(
+                Code::Internal,
+                format!("Creating a DataOutput failed: {}", e),
+            )
+        })?;
+        let stats = tokio::spawn(async move {
+            match DataOutput::start_stream(output).await {
+                Ok((out_tx, out_jh)) => {
+                    let mut lines_written = 0_u64;
+                    while let Some(incoming_msg) = in_stream.next().await {
+                        match incoming_msg {
+                            Ok(DataOutputStringMessage { content }) => {
+                                lines_written += 1;
+                                out_tx
+                                    .send(DataOutputMessage::new(Bytes::from(content)))
+                                    .await
+                                    .map_err(|e| DataStoreError::FatalIO(e.to_string()))?;
+                            }
+                            _ => panic!("not handled"),
+                        }
+                    }
+                    drop(out_tx);
+                    out_jh.await??;
+                    Ok::<_, DataStoreError>(GrpcDataOutputStats {
+                        name: String::from("grpc-test"),
+                        lines_written,
+                    })
+                }
+                Err(er) => Err(DataStoreError::from(er)),
+            }
+        })
+        .await;
+        Ok(Response::new(DataOutputResponse {
+            stats: Some(stats.expect("could not join").expect("got error")),
+            error: None,
+            error_message: None,
+        }))
     }
 }

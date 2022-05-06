@@ -5,9 +5,10 @@ edition = "2021"
 
 [[bin]] # Bin to run the HelloWorld gRPC server
 name = "dataoutput-server"
-path = "src/dataoutput-server.rs"
+path = "src/bin/dataoutput-string-test-server.rs"
 
 [dependencies]
+etl-core = { path = "../etl-core" }
 async-stream = "0.3"
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
 tonic = "0.7"

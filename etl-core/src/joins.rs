@@ -6,9 +6,13 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use tokio::sync::mpsc::Sender;
 
+// move these into datastore module
 pub type BoxedDataSourceResult<T> = anyhow::Result<Box<dyn DataSource<T>>>;
 pub type CreateDataSourceFn<'a, R> =
     Box<dyn Fn() -> BoxFuture<'a, BoxedDataSourceResult<R>> + 'static + Send + Sync>;
+pub type BoxedDataOutputResult<T> = anyhow::Result<Box<dyn DataOutput<T>>>;
+pub type CreateDataOutputFn<'a, R> =
+    Box<dyn Fn() -> BoxFuture<'a, BoxedDataOutputResult<R>> + 'static + Send + Sync>;
 
 //NOTE: caching could be added here, though wrapping this with a DataOutput inside
 //JobRunner would accomplish this.
