@@ -3,11 +3,14 @@ use etl_core::datastore::DataOutput;
 use etl_core::deps::bytes::Bytes;
 use etl_grpc::dataoutput::data_output_server::DataOutputServer;
 use etl_grpc::dataoutput_default_server::DefaultDataOutputServer;
-use std::{net::ToSocketAddrs};
-use tonic::{transport::Server};
+use std::net::ToSocketAddrs;
+use tonic::transport::Server;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+
+    etl_grpc::log_util::new_info();
+
     let server = DefaultDataOutputServer::new(Box::new(|| {
         Box::pin(async {
             Ok(Box::new(MockJsonDataOutput::default()) as Box<dyn DataOutput<Bytes>>)

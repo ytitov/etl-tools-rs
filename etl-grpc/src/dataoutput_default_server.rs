@@ -50,7 +50,10 @@ impl GrpcDataOutput for DefaultDataOutputServer {
                                     .await
                                     .map_err(|e| DataStoreError::FatalIO(e.to_string()))?;
                             }
-                            _ => panic!("not handled"),
+                            Err(er) => {
+                                println!(" ERROR: {}", er.to_string());
+                            }
+                            //_ => panic!("not handled"),
                         }
                     }
                     drop(out_tx);

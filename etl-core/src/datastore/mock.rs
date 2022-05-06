@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use super::*;
 use simple::SimpleStore;
 use serde::{de::DeserializeOwned, Serialize};
@@ -27,8 +28,22 @@ impl Default for MockJsonDataOutput {
     }
 }
 
+pub struct MockDataOutput {
+    pub name: String,
+    pub sleep_duration: Duration,
+}
+
+impl Default for MockDataOutput {
+    fn default() -> Self {
+        MockDataOutput {
+            name: String::from("MockDataOutput"),
+            sleep_duration: Duration::from_millis(0),
+        }
+    }
+}
+
 #[async_trait]
-impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockJsonDataOutput {
+impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockDataOutput {
     async fn start_stream(
         self: Box<Self>,
     ) -> anyhow::Result<DataOutputTask<T>> {
@@ -46,13 +61,62 @@ impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockJsonDat
                         match m {
                             DataOutputMessage::Data(data) => {
                                 // serialize
-                                match serde_json::to_string(&data) {
+                                match serde_json::to_value(&data) {
                                     Ok(line) => {
-                                        log::debug!("{} received: {}", &name, line);
+                                        //println!("{} received: {}", &name, &line);
+                                        log::info!("{} received: {:?}", &name, line);
                                         lines_written += 1;
                                     }
                                     Err(e) => {
                                         log::error!("{} ERROR {}", &name, e);
+                                    }
+                                }
+                            }
+                            DataOutputMessage::NoMoreData => {
+                                log::debug!("received DataOutputMessage::NoMoreData");
+                                break;
+                            }
+                        };
+                    }
+                    None => break,
+                };
+            }
+            Ok(DataOutputStats {
+                name,
+                lines_written,
+            })
+        });
+        Ok((tx, jh))
+    }
+}
+
+#[async_trait]
+impl DataOutput<Bytes> for MockJsonDataOutput {
+    async fn start_stream(
+        self: Box<Self>,
+    ) -> anyhow::Result<DataOutputTask<Bytes>> {
+        use tokio::sync::mpsc::channel;
+        use serde_json::Value as JsonValue;
+        let (tx, mut rx): (DataOutputTx<Bytes>, _) = channel(1);
+        let sleep_duration = self.sleep_duration;
+        let name = self.name.clone();
+        let jh: JoinHandle<anyhow::Result<DataOutputStats>> = tokio::spawn(async move {
+            let name = name;
+            let mut lines_written = 0;
+            loop {
+                tokio::time::sleep(sleep_duration).await;
+                match rx.recv().await {
+                    Some(m) => {
+                        match m {
+                            DataOutputMessage::Data(data) => {
+                                // serialize
+                                match serde_json::from_slice(&data) {
+                                    Ok::<JsonValue,_>(line) => {
+                                        log::info!("{} received: {}", &name, line);
+                                        lines_written += 1;
+                                    }
+                                    Err(e) => {
+                                        log::error!("{} Could not convert to json value due to: {}", &name, e);
                                     }
                                 }
                             }
