@@ -1,5 +1,5 @@
 syntax = "proto3";
-package dataoutput;
+package datastore;
 
 message DataOutputBytesMessage {
   bytes content = 1;
@@ -33,7 +33,7 @@ message DataOutputStats {
 message DataStoreError {
 }
 
-service DataOutput {
+service DataStore {
   //rpc StringDataOutput(stream DataOutputStringMessage) returns (stream DataOutputResponse) {}
   rpc SendTextLines(stream DataOutputStringMessage) returns (DataOutputResponse) {}
 }

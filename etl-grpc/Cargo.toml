@@ -3,9 +3,13 @@ name = "etl-grpc"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]] # Bin to run the HelloWorld gRPC server
+[[bin]]
 name = "dataoutput-server"
 path = "src/bin/dataoutput-string-test-server.rs"
+
+[[bin]]
+name = "datasource-test-server"
+path = "src/bin/datasource-string-test-server.rs"
 
 [dependencies]
 etl-core = { path = "../etl-core" }

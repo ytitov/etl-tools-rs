@@ -3,8 +3,9 @@ use etl_core::datastore::*;
 use etl_core::deps::bytes::Bytes;
 use etl_core::joins::CreateDataOutputFn;
 
-use super::dataoutput::data_output_server::DataOutput as GrpcDataOutput;
-use super::dataoutput::{
+use super::datastore::data_store_server::DataStore as GrpcDataStore;
+use super::datastore::{
+    DataOutputResult,
     DataOutputResponse, DataOutputStats as GrpcDataOutputStats, DataOutputStringMessage,
 };
 
@@ -15,17 +16,16 @@ pub struct DefaultDataOutputServer {
     create_output: CreateDataOutputFn<'static, Bytes>,
 }
 
-impl<'a> DefaultDataOutputServer {
+impl DefaultDataOutputServer {
     pub fn new(create_output: CreateDataOutputFn<'static, Bytes>) -> Self {
         DefaultDataOutputServer { create_output }
     }
 }
 
-type DataOutputResult<T> = Result<Response<T>, Status>;
 //type ResponseStream = Pin<Box<dyn Stream<Item = Result<DataOutputResponse, Status>> + Send>>;
 
 #[tonic::async_trait]
-impl GrpcDataOutput for DefaultDataOutputServer {
+impl GrpcDataStore for DefaultDataOutputServer {
     async fn send_text_lines(
         &self,
         req_stream: Request<Streaming<DataOutputStringMessage>>,
