@@ -1,8 +1,8 @@
 use etl_core::datastore::mock::MockJsonDataOutput;
 use etl_core::datastore::DataOutput;
 use etl_core::deps::bytes::Bytes;
-use etl_grpc::datastore::data_store_server::DataStoreServer;
-use etl_grpc::dataoutput_default_server::DefaultDataOutputServer;
+use etl_grpc::dataoutput::data_output_string_server::DataOutputStringServer;
+use etl_grpc::dataoutput::server::string::as_dataoutput_bytes::DefaultDataOutputServer;
 use std::net::ToSocketAddrs;
 use tonic::transport::Server;
 
@@ -17,7 +17,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
     }));
     Server::builder()
-        .add_service(DataStoreServer::new(server))
+        .add_service(DataOutputStringServer::new(server))
         .serve("[::1]:50051".to_socket_addrs().unwrap().next().unwrap())
         .await
         .unwrap();

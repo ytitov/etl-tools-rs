@@ -1,10 +1,12 @@
+/// Creates a server which accepts DataOutput messages and allows to specify the DataOutput to
+/// write to by specifying a function which creates a DataOutput for each stream
 use etl_core::datastore::error::DataStoreError;
 use etl_core::datastore::*;
 use etl_core::deps::bytes::Bytes;
 use etl_core::joins::CreateDataOutputFn;
 
-use super::datastore::data_store_server::DataStore as GrpcDataStore;
-use super::datastore::{
+use crate::dataoutput::data_output_string_server::DataOutputString as GrpcDataStore;
+use crate::dataoutput::{
     DataOutputResult,
     DataOutputResponse, DataOutputStats as GrpcDataOutputStats, DataOutputStringMessage,
 };

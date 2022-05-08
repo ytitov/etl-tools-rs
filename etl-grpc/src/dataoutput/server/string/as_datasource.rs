@@ -4,16 +4,18 @@ use etl_core::datastore::*;
 use etl_core::deps::bytes::Bytes;
 use etl_core::joins::CreateDataOutputFn;
 
-use super::datastore::data_store_server::{DataStore as GrpcDataStore, DataStoreServer};
-use super::datastore::{
+use crate::dataoutput::{
     DataOutputResponse, DataOutputResult, DataOutputStats as GrpcDataOutputStats,
     DataOutputStringMessage, ServerJoinHandle,
 };
+use crate::dataoutput::data_output_string_server::{
+    DataOutputString as GrpcDataStore, DataOutputStringServer,
+};
 
-use tokio_stream::StreamExt;
-use tonic::{Code, Request, Response, Status, Streaming};
 use std::sync::Arc;
 use std::sync::Mutex;
+use tokio_stream::StreamExt;
+use tonic::{Code, Request, Response, Status, Streaming};
 
 /// Provides a DataSource
 pub struct DataSourceServer {
@@ -43,8 +45,8 @@ impl DataSourceServerBuilder {
         let ip_addr_str = self.ip_addr.clone();
         let jh: ServerJoinHandle = tokio::spawn(async move {
             Server::builder()
-                .add_service(DataStoreServer::new(DataSourceServer {
-                    server_name: "GrpcDataSource".to_string(),
+                .add_service(DataOutputStringServer::new(DataSourceServer {
+                    server_name: "DataOutputString".to_string(),
                     //ds_tx: Arc::new(Mutex::new(ds_tx)),
                     ds_tx,
                 }))
@@ -75,14 +77,12 @@ impl GrpcDataStore for DataSourceServer {
             while let Some(result) = in_stream.next().await {
                 match result {
                     Ok(DataOutputStringMessage { content }) => {
-
                         ds_tx
                             .send(DataSourceMessage::new(&name, Bytes::from(content)))
                             .await
                             .expect("Failure Sending");
 
                         //drop(ds_tx);
-
                     }
                     Err(er) => {}
                 };

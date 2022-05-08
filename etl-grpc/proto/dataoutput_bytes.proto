@@ -1,0 +1,12 @@
+syntax = "proto3";
+package bytes_dataoutput;
+
+import "./dataoutput.proto"
+
+message DataOutputBytesMessage {
+  bytes content = 1;
+}
+
+service BytesDataOutput {
+  rpc SendMessages(stream DataOutputBytesMessage) returns (DataOutputResponse) {}
+}

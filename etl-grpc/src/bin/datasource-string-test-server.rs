@@ -1,9 +1,6 @@
-use etl_core::datastore::mock::MockJsonDataOutput;
-use etl_core::datastore::DataOutput;
-use etl_core::deps::bytes::Bytes;
 use etl_core::task::apply::Apply;
 
-use etl_grpc::datasource_server::DataSourceServerBuilder;
+use etl_grpc::dataoutput::server::string::as_datasource::DataSourceServerBuilder;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

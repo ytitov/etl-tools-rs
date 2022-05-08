@@ -1,15 +1,4 @@
-pub mod datastore {
-    use tonic::{Response, Status};
-    use tokio::task::JoinHandle;
-
-    pub type DataOutputResult<T> = Result<Response<T>, Status>;
-    pub type DataSourceResult<T> = Result<Response<T>, Status>;
-    pub type ServerJoinHandle = JoinHandle<Result<(), Box<dyn std::error::Error + Send>>>;
-    tonic::include_proto!("datastore");
-}
-
-pub mod dataoutput_default_server;
-pub mod datasource_server;
+pub mod dataoutput;
 
 pub mod log_util {
     use simple_logger::SimpleLogger;

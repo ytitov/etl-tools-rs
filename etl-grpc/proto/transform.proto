@@ -1,0 +1,24 @@
+syntax = "proto3";
+package transform;
+
+message TransformPayload {
+  optional string string_content = 1;
+  optional bytes bytes_content = 2;
+  optional string json_string_content = 3;
+}
+
+message TransformResponse {
+  TransformPayload result = 1;
+  enum TransformErrorKind {
+    NO_ERROR = 0;
+    FATAL_IO = 1;
+    DESERIALIZE = 2;
+    INTERNAL = 3;
+  }
+  TransformErrorKind error = 2;
+  optional string error_message = 3;
+}
+
+service Transformer {
+  rpc Transform(TransformPayload) returns (TransformResponse) {}
+}

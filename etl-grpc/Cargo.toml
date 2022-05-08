@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "dataoutput-server"
+name = "etl-grpc-ex1"
 path = "src/bin/dataoutput-string-test-server.rs"
 
 [[bin]]
-name = "datasource-test-server"
+name = "etl-grpc-ex2"
 path = "src/bin/datasource-string-test-server.rs"
 
 [dependencies]

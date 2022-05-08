@@ -1,0 +1,11 @@
+syntax = "proto3";
+package dataoutput;
+import "dataoutput.proto";
+
+message DataOutputStringMessage {
+  string content = 1;
+}
+
+service DataOutputString {
+  rpc SendTextLines(stream DataOutputStringMessage) returns (DataOutputResponse) {}
+}
