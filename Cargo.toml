@@ -7,5 +7,6 @@ members = [
 		"etl-aws-utils",
     "etl-job",
     "etl-grpc",
+    "etl-dev-client-viewer",
 		#"etl-examples",
 ]

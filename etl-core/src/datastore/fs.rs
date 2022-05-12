@@ -1,8 +1,8 @@
 use super::error::*;
 use crate::datastore::simple::SimpleStore;
 use crate::datastore::{
-    DataSource, DataSourceStats, DataSourceTask, DataSourceMessage,
-    DataOutput, DataOutputMessage, DataOutputStats, DataOutputTask, DataOutputTx,
+    DataOutput, DataOutputMessage, DataOutputStats, DataOutputTask, DataOutputTx, DataSource,
+    DataSourceMessage, DataSourceStats, DataSourceTask,
 };
 use crate::queue::QueueClient;
 use async_trait::async_trait;
@@ -71,10 +71,8 @@ impl DataSource<Bytes> for LocalFs {
 }
 
 #[async_trait]
-impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static> SimpleStore<T>
-    for LocalFs
-{
-    async fn load(&self, path: &str) -> Result<T, DataStoreError> {
+impl SimpleStore<String> for LocalFs {
+    async fn load(&self, path: &str) -> Result<String, DataStoreError> {
         use std::path::Path;
         use tokio::fs::File;
         use tokio::io::AsyncReadExt;
@@ -89,18 +87,10 @@ impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static> 
         let mut contents = vec![];
         file.read_to_end(&mut contents).await?;
         let s = std::string::String::from_utf8_lossy(&contents);
-        match serde_json::from_str::<T>(&s) {
-            Ok::<T, _>(obj) => Ok(obj),
-            Err(e) => Err(DataStoreError::Deserialize {
-                attempted_string: format!("Could not deserialize {}", path),
-                message: e.to_string(),
-            }),
-        }
+        Ok((*s).to_string())
     }
 
-    /// TODO: no real indication to external user this will end up being JSON, need to rework this
-    /// somehow
-    async fn write(&self, path: &str, item: T) -> Result<(), DataStoreError> {
+    async fn write(&self, path: &str, item: String) -> Result<(), DataStoreError> {
         use std::path::Path;
         use tokio::fs::OpenOptions;
         use tokio::io::AsyncWriteExt;
@@ -119,11 +109,8 @@ impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static> 
             .create(true)
             .open(Path::new(&self.home).join(path))
             .await?;
-        match serde_json::to_string_pretty(&item) {
-            Ok(content) => match file.write_all(content.as_bytes()).await {
-                Ok(()) => Ok(()),
-                Err(err) => Err(DataStoreError::FatalIO(err.to_string())),
-            },
+        match file.write_all(item.as_bytes()).await {
+            Ok(()) => Ok(()),
             Err(err) => Err(DataStoreError::FatalIO(err.to_string())),
         }
     }
@@ -142,7 +129,7 @@ impl<T: Hash + Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 's
         let mut hasher = DefaultHasher::new();
         m.hash(&mut hasher);
         let name = format!("{}.push.json", hasher.finish());
-        self.write(&name, m).await?;
+        self.write(&name, serde_json::to_string(&m)?).await?;
         Ok(())
     }
 }
@@ -182,9 +169,7 @@ impl LocalFs {
 
 #[async_trait]
 impl DataOutput<Bytes> for LocalFs {
-    async fn start_stream(
-        self: Box<Self>,
-    ) -> anyhow::Result<DataOutputTask<Bytes>> {
+    async fn start_stream(self: Box<Self>) -> anyhow::Result<DataOutputTask<Bytes>> {
         use tokio::fs::OpenOptions;
         use tokio::io::AsyncWriteExt;
         use tokio::sync::mpsc::channel;

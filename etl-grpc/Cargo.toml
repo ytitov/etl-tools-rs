@@ -16,6 +16,7 @@ etl-core = { path = "../etl-core" }
 async-stream = "0.3"
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
 tonic = "0.7"
+tonic-reflection = { version = "0.4" }
 prost = "0.10"
 prost-types = "0.10" # for well known types
 bytes = "1"

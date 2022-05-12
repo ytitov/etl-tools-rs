@@ -1,5 +1,6 @@
 syntax = "proto3";
 package datasource;
+import "datastore.proto";
 
 message DataSourceBytesMessage {
   bytes content = 1;
@@ -15,14 +16,9 @@ message DataSourceMessage {
 }
 
 message DataSourceResponse {
-  enum DataStoreErrorKind {
-    NO_ERROR = 0;
-    FATAL_IO = 1;
-    DESERIALIZE = 2;
-  }
-  DataStoreErrorKind error = 1;
+  //DataStoreErrorKind error = 1;
   // if no error this should be blank
-  optional string content = 2;
+  optional datastore.DataStoreError content = 1;
 }
 
 message StartDataSource {

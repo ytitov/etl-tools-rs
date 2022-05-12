@@ -1,0 +1,33 @@
+syntax = "proto3";
+package datastore;
+
+message SendError {
+    string from_name = 1;
+    string to_name = 2;
+}
+
+message DeserializeError {
+    string attempted_string = 1;
+}
+
+message NotExistError {
+    string key = 1;
+}
+
+message TooManyErrorsError {}
+
+message FatalIOError {}
+
+message DecodeError {
+  string attempted_string = 1;
+}
+
+message DataStoreError {
+  string error = 1;
+  optional FatalIOError fatal_io = 2;
+  optional DeserializeError deserialize = 3;
+  optional NotExistError not_exist = 4;
+  optional TooManyErrorsError too_many_errors = 5;
+  optional SendError send = 6;
+  optional DecodeError decode = 7;
+}

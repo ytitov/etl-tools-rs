@@ -9,31 +9,32 @@ pub enum DataStoreError {
         message: String,
         attempted_string: String,
     },
+    //TODO: this should be DecodeError
     #[error("Could not decode utf8: `{0}`")]
     FatalUtf8(#[from] std::str::Utf8Error),
     #[error("There was a fatal problem: `{0}`")]
-    //FatalIO(#[from] std::io::Error),
     FatalIO(String),
-    #[error("Error: `{0}`")]
-    //Generic(#[from] anyhow::Error),
-    Generic(String),
     #[error("SendError from `{from:?}` to `{to:?}` reason: `{reason:?}`")]
     SendError {
         from: String,
         to: String,
         reason: String,
     },
+    //TODO; also IO error
     #[error("Error streaming lines from: `{key:?}`, error: `{error:?}`")]
     StreamingLines { key: String, error: String },
     #[error("Key or path `{key:?}` was not found.  Reason: `{error:?}`")]
     NotExist { key: String, error: String },
+    // TODO: should be removed since this has nothing to do with data storage
     #[error("Error returned from transform_item `{job_name:?}`.  Reason: `{error:?}`")]
     TransformerError { job_name: String, error: String },
+    // TODO: id say this is more of an FatalIO
     #[error("JoinError: `{0}`")]
-    //JoinError(#[from] tokio::task::JoinError),
     JoinError(String),
     #[error("Shutting down.  JobManager sent a global TooManyErrors message.")]
     TooManyErrors,
+    #[error("Error: `{0}`")]
+    Generic(String),
 }
 
 impl DataStoreError {

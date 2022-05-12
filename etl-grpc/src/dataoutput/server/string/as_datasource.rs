@@ -1,21 +1,19 @@
 // example: https://github.com/hyperium/tonic/blob/master/examples/src/streaming/server.rs
-use etl_core::datastore::error::DataStoreError;
 use etl_core::datastore::*;
 use etl_core::deps::bytes::Bytes;
-use etl_core::joins::CreateDataOutputFn;
 
 use crate::dataoutput::{
-    DataOutputResponse, DataOutputResult, DataOutputStats as GrpcDataOutputStats,
+    DataOutputResponse, DataOutputResult,
     DataOutputStringMessage, ServerJoinHandle,
 };
 use crate::dataoutput::data_output_string_server::{
     DataOutputString as GrpcDataStore, DataOutputStringServer,
 };
 
-use std::sync::Arc;
-use std::sync::Mutex;
+use crate::dataoutput::FILE_DESCRIPTOR_SET;
+
 use tokio_stream::StreamExt;
-use tonic::{Code, Request, Response, Status, Streaming};
+use tonic::{Request, Streaming};
 
 /// Provides a DataSource
 pub struct DataSourceServer {
@@ -44,7 +42,13 @@ impl DataSourceServerBuilder {
 
         let ip_addr_str = self.ip_addr.clone();
         let jh: ServerJoinHandle = tokio::spawn(async move {
+            let reflection_svc = tonic_reflection::server::Builder::configure()
+                .register_encoded_file_descriptor_set(FILE_DESCRIPTOR_SET)
+                .build()
+                .unwrap();
+
             Server::builder()
+                .add_service(reflection_svc)
                 .add_service(DataOutputStringServer::new(DataSourceServer {
                     server_name: "DataOutputString".to_string(),
                     //ds_tx: Arc::new(Mutex::new(ds_tx)),
@@ -84,7 +88,7 @@ impl GrpcDataStore for DataSourceServer {
 
                         //drop(ds_tx);
                     }
-                    Err(er) => {}
+                    Err(_er) => {}
                 };
             }
             ()
