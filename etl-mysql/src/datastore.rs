@@ -308,7 +308,8 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
             //let m = format!("{} inserted {} entries", table_name, total_inserted);
             //jm_tx.send(Message::log_info("mysql-datastore", m)).await?;
             Ok(DataOutputStats {
-                name: format!("{}.{}", db_name, table_name),
+                name: "MySqlDataOutput".to_string(),
+                key: Some(format!("{}.{}", db_name, table_name)),
                 lines_written: total_inserted,
             })
         });

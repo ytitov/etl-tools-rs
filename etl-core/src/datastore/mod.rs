@@ -42,9 +42,10 @@ pub struct DataSourceStats {
     pub lines_scanned: usize,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct DataOutputStats {
     pub name: String,
+    pub key: Option<String>,
     pub lines_written: usize,
 }
 

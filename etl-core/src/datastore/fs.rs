@@ -192,7 +192,7 @@ impl DataOutput<Bytes> for LocalFs {
             Some(n) => n,
             None => "output".to_string(),
         };
-        //let filepath = format!("{}/{}", &self.home, &filename);
+        let full_path_str = format!("{}/{}", &self.home, &filename);
         let full_path = Path::new(&self.home).join(&filename);
         log::info!("Writing to file {:?}", &full_path);
         if let Some(parent_folder) = full_path.parent() {
@@ -233,6 +233,7 @@ impl DataOutput<Bytes> for LocalFs {
             }
             Ok(DataOutputStats {
                 name: filename,
+                key: Some(full_path_str),
                 lines_written: num_lines_sent,
             })
         });

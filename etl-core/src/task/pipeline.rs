@@ -12,11 +12,11 @@ impl<I: 'static + Debug + Send + Sync> Pipeline<I> {
             input,
             output,
         } = self;
-        let source_name = format!("Pipeline-{}", input.name());
+        //let source_name = format!("Pipeline-{}", input.name());
         let (mut input_rx, input_jh) = input.start_stream()?;
         let (output_tx, output_jh) = output.start_stream().await?;
         //let mut lines_scanned = 0_usize;
-        let mut lines_written = 0_usize;
+        //let mut lines_written = 0_usize;
         //let mut num_errors = 0_usize;
         loop {
             match input_rx.recv().await {
@@ -26,7 +26,7 @@ impl<I: 'static + Debug + Send + Sync> Pipeline<I> {
                 })) => {
                     //lines_scanned += 1;
                     output_tx.send(DataOutputMessage::new(input_item)).await?;
-                    lines_written += 1;
+                    //lines_written += 1;
                 }
                 Some(Err(val)) => {
                     //lines_scanned += 1;
@@ -39,8 +39,7 @@ impl<I: 'static + Debug + Send + Sync> Pipeline<I> {
         drop(input_rx);
         input_jh.await??;
         drop(output_tx);
-        output_jh.await??;
-        Ok(DataOutputStats {name: source_name, lines_written})
+        Ok(output_jh.await??)
     }
 }
 

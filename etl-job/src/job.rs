@@ -1,15 +1,10 @@
-use etl_core::datastore::error::*;
-use etl_core::deps::{
-    tokio,
-    serde,
-    serde::de::DeserializeOwned,
-    serde::Serialize,
-    async_trait,
-    anyhow,
-};
-use etl_core::datastore::*;
-use etl_core::datastore::simple::SimpleStore;
 use crate::job_manager::*;
+use etl_core::datastore::error::*;
+use etl_core::datastore::simple::SimpleStore;
+use etl_core::datastore::*;
+use etl_core::deps::{
+    anyhow, async_trait, serde, serde::de::DeserializeOwned, serde::Serialize, tokio,
+};
 use mock::*;
 use state::*;
 use std::fmt;
@@ -35,7 +30,7 @@ pub struct JobRunner {
     num_process_item_errors: usize,
     num_processed_items: usize,
     /// helps to await on DataOutput instances to complete writing
-    data_output_handles: Vec<DataOutputJoinHandle>,
+    data_output_handles: Vec<(String, DataOutputJoinHandle)>,
     job_state: JobState,
     /// has the job started yet
     is_running: bool,
@@ -159,8 +154,8 @@ impl JobRunner {
     }
 
     /// convenience method to await on any handles useful inside the StreamHandler
-    pub fn await_data_output(&mut self, d: DataOutputJoinHandle) {
-        self.data_output_handles.push(d);
+    pub fn await_data_output<N: ToString>(&mut self, name: N, d: DataOutputJoinHandle) {
+        self.data_output_handles.push((name.to_string(), d));
     }
 
     pub async fn log_info<A, B>(&self, name: A, msg: B)
@@ -286,7 +281,7 @@ impl JobRunner {
         let outputhandles = self.data_output_handles;
         self.data_output_handles = Vec::new();
         let mut output_stats = Vec::new();
-        for join_handle in outputhandles {
+        for (name, join_handle) in outputhandles {
             match join_handle.await {
                 Err(join_handle_err) => {
                     self.job_state.caught_errors.push(join_handle_err.into());
@@ -295,11 +290,14 @@ impl JobRunner {
                     self.job_state.caught_errors.push(task_err.into());
                 }
                 Ok(Ok(data_output_stats)) => {
-                    output_stats.push(data_output_stats);
+                    output_stats.push((name, data_output_stats));
                 }
             }
         }
         //println!("OUTPUT STATS: {:#?}", output_stats);
+        for (name, stats) in output_stats {
+            self.job_state.stream_ok(name, &self.config, vec![stats])?;
+        }
         if self.job_state.caught_errors.len() == 0 {
             self.job_state.set_run_status_complete()?;
         }
@@ -317,8 +315,6 @@ impl JobRunner {
 
     /// Same as run except this takes a DataSource and a DataOutput and
     /// moves the data from one to the other.
-    /// TODO: remove serialize and deserialize trait requirements, these should be determined by
-    /// specific trait implementations
     pub async fn run_stream<T>(
         mut self,
         stream_name: &str,
@@ -326,7 +322,7 @@ impl JobRunner {
         output: Box<dyn DataOutput<T>>,
     ) -> Result<Self, JobRunnerError>
     where
-        T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static,
+        T: Debug + Send + Sync + 'static,
     {
         self.job_state = self.load_job_state().await?;
         let name = stream_name.to_string();
@@ -348,9 +344,7 @@ impl JobRunner {
                 let input_name = input.name().to_string();
                 // no need to wait on input JoinHandle
                 let (mut input_rx, _) = input.start_stream()?;
-                let (output_tx, output_jh) = output
-                    .start_stream()
-                    .await?;
+                let (output_tx, output_jh) = output.start_stream().await?;
                 self.save_job_state().await?;
                 let mut lines_scanned = 0_usize;
                 loop {
@@ -424,7 +418,7 @@ impl JobRunner {
         create_sh: CreateStreamHandlerFn<'static, I>,
     ) -> Result<Self, JobRunnerError>
     where
-        I: DeserializeOwned + Serialize + Debug + Send + Sync + 'static,
+        I: Debug + Send + Sync + 'static,
     {
         use stream::StepStreamStatus;
         if let Some((_i, StepStreamStatus::Complete { .. })) = self.job_state.get_stream(name) {
@@ -441,11 +435,13 @@ impl JobRunner {
         name: N,
         t: Box<dyn OutputTask>,
     ) -> Result<Self, JobRunnerError> {
+        let n = name.to_string();
+        self.job_state.start_new_stream(&n, &self.config)?;
         match t.create() {
             Ok(jh) => {
                 // ensure that the job continues but in the end this task finishes
                 self.cur_step_index += 1;
-                self.await_data_output(jh);
+                self.await_data_output(&n, jh);
                 Ok(self)
             }
             Err(e) => Err(JobRunnerError::GenericError {
@@ -465,7 +461,7 @@ impl JobRunner {
         mut job_handler: Box<dyn StreamHandler<I>>,
     ) -> Result<Self, JobRunnerError>
     where
-        I: DeserializeOwned + Serialize + Debug + Send + Sync + 'static,
+        I: Debug + Send + Sync + 'static,
     {
         use stream::StepStreamStatus;
         let (mut rx, source_stream_jh) = ds.start_stream()?;
@@ -592,7 +588,7 @@ impl JobRunner {
                 // only wait if everything is okay
                 source_stream_jh.await??;
                 let mut output_stats = Vec::new();
-                for join_handle in self.data_output_handles {
+                for (_name, join_handle) in self.data_output_handles {
                     let s = join_handle.await??;
                     output_stats.push(s);
                 }

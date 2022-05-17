@@ -8,12 +8,8 @@ pub type CreateStreamHandlerFn<'a, R> = Box<
         + Send
         + Sync,
 >;
-pub type CreateStreamHandlerForEachFn<'a, T> = Box<
-    dyn Fn(T) -> BoxFuture<'a, anyhow::Result<()>>
-        + 'static
-        + Send
-        + Sync,
->;
+pub type CreateStreamHandlerForEachFn<'a, T> =
+    Box<dyn Fn(T) -> BoxFuture<'a, anyhow::Result<()>> + 'static + Send + Sync>;
 
 #[async_trait]
 /// Meant to be used for a variety situations like calling external apis, or
@@ -21,7 +17,7 @@ pub type CreateStreamHandlerForEachFn<'a, T> = Box<
 /// a single element does not make sense
 pub trait StreamHandler<T>: Sync + Send
 where
-    T: DeserializeOwned + Serialize + Debug + Send + Sync,
+    T: Debug + Send + Sync,
 {
     /// Optionally let the job handler decide if it needs to be skipped or resume.
     /// By default it will always start
@@ -36,7 +32,7 @@ where
 
 pub enum TransformOutput<T>
 where
-    T: Serialize + Debug + Send + Sync,
+    T: Debug + Send + Sync,
 {
     Item(T),
     /// if there are any sort of expanding

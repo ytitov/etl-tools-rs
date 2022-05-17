@@ -43,7 +43,7 @@ impl<S: 'static + Send + Sync, I: 'static + Debug + Send> Apply<S, I> {
         }
         drop(rx);
         jh.await??;
-        Ok(DataOutputStats {name: source_name, lines_written})
+        Ok(DataOutputStats {name: source_name, lines_written, key: None })
     }
 }
 impl<S: 'static + Send + Sync, I: 'static + Debug + Send> OutputTask for Apply<S, I> {
