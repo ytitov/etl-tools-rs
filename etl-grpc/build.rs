@@ -8,15 +8,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Shared data types by datasources and dataoutputs
     tonic_build::compile_protos("proto/datastore.proto")?;
 
+    /*
     tonic_build::configure()
         .file_descriptor_set_path(out_dir.join("dataoutput_descriptor.bin"))
         .compile(&["proto/dataoutput.proto"], &["proto"])
         .unwrap();
-    tonic_build::compile_protos("proto/dataoutput_string.proto")?;
+    */
+    //tonic_build::compile_protos("proto/dataoutput_string.proto")?;
 
 
     // DataSource code
-    tonic_build::compile_protos("proto/datasource.proto")?;
+    //tonic_build::compile_protos("proto/datasource.proto")?;
 
 
     // for the transform

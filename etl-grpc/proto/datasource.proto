@@ -18,7 +18,7 @@ message DataSourceMessage {
 message DataSourceResponse {
   //DataStoreErrorKind error = 1;
   // if no error this should be blank
-  optional datastore.DataStoreError content = 1;
+  optional grpc.datastore.GrpcDataStoreError content = 1;
 }
 
 message StartDataSource {

@@ -42,11 +42,10 @@ impl Default for MockDataOutput {
     }
 }
 
-#[async_trait]
 impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockDataOutput {
-    async fn start_stream(
+    fn start_stream(
         self: Box<Self>,
-    ) -> anyhow::Result<DataOutputTask<T>> {
+    ) -> Result<DataOutputTask<T>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         let (tx, mut rx): (DataOutputTx<T>, _) = channel(1);
         let sleep_duration = self.sleep_duration;
@@ -90,11 +89,10 @@ impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockDataOut
     }
 }
 
-#[async_trait]
 impl DataOutput<Bytes> for MockJsonDataOutput {
-    async fn start_stream(
+    fn start_stream(
         self: Box<Self>,
-    ) -> anyhow::Result<DataOutputTask<Bytes>> {
+    ) -> Result<DataOutputTask<Bytes>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         use serde_json::Value as JsonValue;
         let (tx, mut rx): (DataOutputTx<Bytes>, _) = channel(1);

@@ -39,26 +39,24 @@ pub struct EncodedOutput<I: Debug + 'static + Send + Sync> {
     pub output: Box<dyn DataOutput<Bytes>>,
 }
 
-#[async_trait]
 impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutput<T> {
-    async fn start_stream(
-        self: Box<Self>,
-    ) -> anyhow::Result<DataOutputTask<T>> {
+    fn start_stream(self: Box<Self>) -> Result<DataOutputTask<T>, DataStoreError> {
         // create a datasource for the encoder because it is needed to create the encoder
         // data sent to the data output will be forwarded here
         let (data_source_tx, data_source_rx): (_, DataSourceRx<T>) = channel(1);
 
-        let encoded_datasource = self
-            .encoder
-            .encode_source(Box::new(data_source_rx) as Box<dyn DataSource<T>>)
-            .await;
-
-        // forward encoded elements to the output dataoutput
-        let (mut encoded_datasource_rx, encoded_datasource_jh) =
-            encoded_datasource.start_stream()?;
-        let (final_data_output_tx, final_data_output_jh) = self.output.start_stream().await?;
         let given_output_jh: JoinHandle<Result<DataOutputStats, DataStoreError>> =
             tokio::spawn(async move {
+                let encoded_datasource = self
+                    .encoder
+                    .encode_source(Box::new(data_source_rx) as Box<dyn DataSource<T>>)
+                    .await;
+
+                // forward encoded elements to the output dataoutput
+                let (mut encoded_datasource_rx, encoded_datasource_jh) =
+                    encoded_datasource.start_stream()?;
+                let (final_data_output_tx, final_data_output_jh) =
+                    self.output.start_stream()?;
                 loop {
                     match encoded_datasource_rx.recv().await {
                         Some(Ok(DataSourceMessage::Data { source, content })) => {
@@ -80,6 +78,7 @@ impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutp
                     }
                 }
                 drop(final_data_output_tx);
+                encoded_datasource_jh.await??;
                 Ok(final_data_output_jh.await?.map_err(|er| {
                     DataStoreError::FatalIO(format!(
                         "Error inside the DataOutput: {}",
@@ -110,7 +109,7 @@ impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutp
                 }
             }
             drop(data_source_tx);
-            encoded_datasource_jh.await??;
+            //encoded_datasource_jh.await??;
             // return the output stats from the passed in output as opposed to creating them in this task, because ultimately we likely care about the passed in output and not this one
             Ok(given_output_jh.await??)
         });

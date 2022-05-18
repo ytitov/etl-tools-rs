@@ -1,5 +1,6 @@
 syntax = "proto3";
 package transform;
+import "datastore.proto";
 
 message TransformPayload {
   optional string string_content = 1;
@@ -9,14 +10,7 @@ message TransformPayload {
 
 message TransformResponse {
   TransformPayload result = 1;
-  enum TransformErrorKind {
-    NO_ERROR = 0;
-    FATAL_IO = 1;
-    DESERIALIZE = 2;
-    INTERNAL = 3;
-  }
-  TransformErrorKind error = 2;
-  optional string error_message = 3;
+  optional grpc.datastore.GrpcDataStoreError error = 2;
 }
 
 service Transformer {

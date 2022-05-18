@@ -40,7 +40,7 @@ impl GrpcDataStore for DefaultDataOutputServer {
             )
         })?;
         let stats = tokio::spawn(async move {
-            match DataOutput::start_stream(output).await {
+            match DataOutput::start_stream(output) {
                 Ok((out_tx, out_jh)) => {
                     let mut lines_written = 0_u64;
                     while let Some(incoming_msg) = in_stream.next().await {

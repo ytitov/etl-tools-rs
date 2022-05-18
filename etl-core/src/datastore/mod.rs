@@ -12,14 +12,14 @@ use tokio::task::JoinHandle;
 //pub mod bytes_source;
 /// creates generated data sources
 pub mod enumerate;
+pub mod error;
 /// Local file system data stores
 pub mod fs;
 /// various data stores used for testing
 pub mod mock;
-pub mod sources;
 /// Traits that define non-streaming loading and saving of data
 pub mod simple;
-pub mod error;
+pub mod sources;
 
 //pub type DataOutputItemResult = Result<String, Box<dyn std::error::Error + Send>>;
 
@@ -37,6 +37,7 @@ pub type DataOutputTask<T> = (DataOutputTx<T>, JoinHandle<anyhow::Result<DataOut
 
 pub type DataOutputJoinHandle = JoinHandle<anyhow::Result<DataOutputStats>>;
 pub type DataSourceJoinHandle = JoinHandle<Result<DataSourceStats, DataStoreError>>;
+pub type BoxedDataSource<T> = Box<dyn DataSource<T>>;
 
 pub struct DataSourceStats {
     pub lines_scanned: usize,
@@ -81,7 +82,6 @@ pub trait OutputTask: Sync + Send {
     fn create(self: Box<Self>) -> Result<DataOutputJoinHandle, DataStoreError>;
 }
 
-
 //use crate::job_manager::JobManagerRx;
 pub struct DynDataSource<T> {
     pub ds: Box<dyn DataSource<T>>,
@@ -97,6 +97,12 @@ pub trait DataSource<T: Debug + 'static + Send>: Sync + Send {
     fn name(&self) -> String;
 
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError>;
+
+    /*
+    fn as_reply<O>(self: Box<Self>) -> Result<DataSourceTask<(T, OneShotTx<O>)>, DataStoreError> {
+
+    }
+    */
 
     /*
     /// TODO: this is not integrated yet because this doesn't get the JobManagerChannel because I'm
@@ -162,10 +168,10 @@ where
     async fn create_data_source(_: C) -> anyhow::Result<Box<dyn DataSource<T>>>;
 }
 
-#[async_trait]
 pub trait DataOutput<T: Debug + 'static + Sync + Send>: Sync + Send {
-    async fn start_stream(self: Box<Self>) -> anyhow::Result<DataOutputTask<T>>;
+    fn start_stream(self: Box<Self>) -> Result<DataOutputTask<T>, DataStoreError>;
 
+    /*
     async fn data_output_shutdown(
         self: Box<Self>,
         dot: DataOutputTask<T>,
@@ -187,6 +193,7 @@ pub trait DataOutput<T: Debug + 'static + Sync + Send>: Sync + Send {
             },
         }
     }
+    */
 }
 
 #[async_trait]
@@ -204,7 +211,7 @@ impl<T: Debug + 'static + Sync + Send> DataSource<T> for DataSourceRx<T> {
             let mut lines_scanned = 0_usize;
             loop {
                 match self.recv().await {
-                    Some(Ok(DataSourceMessage::Data {source, content})) => {
+                    Some(Ok(DataSourceMessage::Data { source, content })) => {
                         lines_scanned += 1;
                         tx.send(Ok(DataSourceMessage::new(&name, content)))
                             .await
@@ -237,7 +244,7 @@ impl<T: Debug + 'static + Sync + Send> DataSource<T> for Receiver<DataSourceMess
             let mut lines_scanned = 0_usize;
             loop {
                 match self.recv().await {
-                    Some(DataSourceMessage::Data {source, content}) => {
+                    Some(DataSourceMessage::Data { source, content }) => {
                         lines_scanned += 1;
                         tx.send(Ok(DataSourceMessage::new(&name, content)))
                             .await
@@ -251,8 +258,6 @@ impl<T: Debug + 'static + Sync + Send> DataSource<T> for Receiver<DataSourceMess
         Ok((rx, jh))
     }
 }
-
-
 
 #[derive(Debug, Clone)]
 pub enum LineType {

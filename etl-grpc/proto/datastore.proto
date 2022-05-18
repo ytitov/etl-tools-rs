@@ -1,5 +1,5 @@
 syntax = "proto3";
-package datastore;
+package grpc.datastore;
 
 message SendError {
     string from_name = 1;
@@ -22,7 +22,7 @@ message DecodeError {
   string attempted_string = 1;
 }
 
-message DataStoreError {
+message GrpcDataStoreError {
   string error = 1;
   optional FatalIOError fatal_io = 2;
   optional DeserializeError deserialize = 3;

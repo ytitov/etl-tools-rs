@@ -4,10 +4,11 @@ pub mod proto {
 }
 
 pub mod error {
-    use super::*;
-    impl From<proto::DataStoreError> for DataStoreError {
-        fn from(p_err: proto::DataStoreError) -> DataStoreError {
-            use proto::DataStoreError as ProtoErr;
+    //use super::*;
+    use etl_core::datastore::error::DataStoreError;
+    impl From<proto::GrpcDataStoreError> for DataStoreError {
+        fn from(p_err: proto::GrpcDataStoreError) -> DataStoreError {
+            use proto::GrpcDataStoreError as ProtoErr;
             use proto::DeserializeError;
             use proto::FatalIoError;
             use proto::NotExistError;
@@ -49,9 +50,9 @@ pub mod error {
             }
         }
     }
-    impl From<DataStoreError> for proto::DataStoreError {
+    impl From<DataStoreError> for proto::GrpcDataStoreError {
         fn from(err: DataStoreError) -> Self {
-            use proto::DataStoreError as PErr;
+            use proto::GrpcDataStoreError as PErr;
             use proto::DecodeError as DecodeE;
             use proto::DeserializeError as DE;
             use proto::FatalIoError as FIO;
