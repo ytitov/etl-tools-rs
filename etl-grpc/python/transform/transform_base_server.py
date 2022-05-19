@@ -27,14 +27,12 @@ class TransformerServicer(transform_grpc.TransformerServicer):
         self.enable_reflection = en
 
     def Transform(self, r: TransformPayload, ctx) -> TransformResponse:
-        logging.info("Calling Transform")
         try:
             if r.string_content is not None:
-                logging.info("Handling content_string")
                 result_str = asyncio.run(self.string_transform.transform(r.string_content, ctx))
                 return TransformResponse(result=TransformPayload(string_content=result_str))
         except NotImplementedError as ni:
-            logging.error("Got NotImplementedError")
+            logging.error("NotImplementedError")
             raise ni
         except Exception as e:
             # should be returning a server error
@@ -43,7 +41,6 @@ class TransformerServicer(transform_grpc.TransformerServicer):
 
     async def start_server(self, insecure_port: str, secure_port: str = None) -> None:
         server = grpc.aio.server()
-        logging.info("-------- starting -------------")
 
         transform_grpc.add_TransformerServicer_to_server( \
                 self, server)
@@ -74,6 +71,8 @@ class TransformerServicer(transform_grpc.TransformerServicer):
         await server.start()
         await server.wait_for_termination()
 
-    def run(self, insecure_port: str, secure_port: str = None ) -> None:
-        logging.basicConfig(level=logging.INFO)
+    def run(self, insecure_port: str, \
+            secure_port: str = None, \
+            logging_level = logging.INFO ) -> None:
+        logging.basicConfig(level=logging_level)
         asyncio.get_event_loop().run_until_complete(self.start_server(insecure_port, secure_port))
