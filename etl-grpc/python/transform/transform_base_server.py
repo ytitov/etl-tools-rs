@@ -27,13 +27,13 @@ class TransformerServicer(transform_grpc.TransformerServicer):
         self.enable_reflection = en
 
     async def Transform(self, r: TransformPayload, ctx) -> TransformResponse:
-        return await self.transform_payload(r)
+        return await self.transform_payload(r, ctx)
 
-    async def transform_payload(self, req: TransformPayload, context):
+    async def transform_payload(self, req: TransformPayload, ctx):
         try:
-            if r.string_content is not None:
+            if req.string_content is not None:
                 #result_str = asyncio.run(self.string_transform.transform(r.string_content, ctx))
-                result_str = await self.string_transform.transform(r.string_content, ctx)
+                result_str = await self.string_transform.transform(req.string_content, ctx)
                 return TransformResponse(result=TransformPayload(string_content=result_str))
         except NotImplementedError as ni:
             logging.error("NotImplementedError")
@@ -45,7 +45,7 @@ class TransformerServicer(transform_grpc.TransformerServicer):
 
     async def TransformStream(self, request_iterator: AsyncIterable[TransformPayload], context):
         async for req in request_iterator:
-            res = await self.transform_payload(req)
+            res = await self.transform_payload(req, context)
             context.write(res)
 
     async def start_server(self, insecure_port: str, secure_port: str = None) -> None:
