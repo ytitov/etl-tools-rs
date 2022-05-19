@@ -13,14 +13,14 @@ TransformPayload = transform_proto.TransformPayload
 TransformResponse = transform_proto.TransformResponse
 
 # see https://github.com/grpc/grpc/blob/master/examples/python/route_guide/asyncio_route_guide_server.py
-class StringHandler:
+class StringTransform:
     async def transform(self, payload: str, ctx) -> str:
         raise NotImplementedError("Default StringHandler")
 
 class TransformerServicer(transform_grpc.TransformerServicer):
     enable_reflection = False
 
-    def __init__(self, string_transform = StringHandler()) -> None:
+    def __init__(self, string_transform = StringTransform()) -> None:
         self.string_transform = string_transform
 
     def set_enable_reflection(self, en: bool):
