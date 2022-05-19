@@ -1,6 +1,6 @@
 syntax = "proto3";
-package datasource;
-import "datastore.proto";
+package etl_grpc.datasource.stringsource;
+import "etl_grpc/basetypes/ds_error.proto";
 
 message DataSourceBytesMessage {
   bytes content = 1;
@@ -18,14 +18,14 @@ message DataSourceMessage {
 message DataSourceResponse {
   //DataStoreErrorKind error = 1;
   // if no error this should be blank
-  optional grpc.datastore.GrpcDataStoreError content = 1;
+  optional basetypes.ds_error.GrpcDataStoreError error = 2;
 }
 
 message StartDataSource {
   string request = 1;
 }
 
-service DataSource {
+service StringDataSource {
   //rpc StringDataOutput(stream DataOutputStringMessage) returns (stream DataOutputResponse) {}
   rpc StartStringDataSource(StartDataSource) returns (stream DataSourceStringMessage) {}
 }

@@ -1,0 +1,3 @@
+syntax = "proto3";
+package etl_grpc.datasource.basetypes;
+import "etl_grpc/basetypes/ds_error.proto";

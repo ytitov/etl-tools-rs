@@ -1,8 +1,9 @@
 pub mod client;
-tonic::include_proto!("transform");
-use crate::transformer::transformer_client::TransformerClient;
+//use crate::proto::etl_grpc::basetypes::ds_error::GrpcDataStoreError;
+use crate::proto::etl_grpc::transformers::transform::{
+    transformer_client::TransformerClient, TransformPayload, TransformResponse,
+};
 use etl_core::datastore::error::DataStoreError;
-use crate::datastore::proto::GrpcDataStoreError;
 //use etl_core::datastore::BoxedDataSource;
 //use etl_core::datastore::DataOutputStats;
 use etl_core::datastore::DataSource;
@@ -94,18 +95,38 @@ where
                                                         )
                                                     })?;
                                             }
-                                        }
+                                        };
                                     }
                                     TransformResponse {
                                         result: None,
                                         error: Some(grpc_ds_err),
                                     } => {
-                                        reply_tx.send(Err(grpc_ds_err.into()))
+                                        reply_tx.send(Err(grpc_ds_err.into())).map_err(|_| {
+                                            DataStoreError::FatalIO(
+                                                "Could not reply to datasource".into(),
+                                            )
+                                        })?;
                                     }
-                                    other => {}
+                                    _other => {
+                                        reply_tx
+                                            .send(Err("Got a response that I can't handle".into()))
+                                            .map_err(|_| {
+                                                DataStoreError::FatalIO(
+                                                    "Could not reply to datasource".into(),
+                                                )
+                                            })?;
+                                    }
                                 };
                             }
-                            Err(er) => {}
+                            Err(status) => {
+                                // TODO
+                                /*
+                                use tonic::Status;
+                                let Status {
+                                    code, message, details, metadata
+                                } = status;
+                                */
+                            }
                         };
                     }
                     Some(Err(err)) => {}

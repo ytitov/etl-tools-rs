@@ -3,23 +3,23 @@ name = "etl-grpc"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "etl-grpc-ex1"
-path = "src/bin/dataoutput-string-test-server.rs"
-
-[[bin]]
-name = "etl-grpc-ex2"
-path = "src/bin/datasource-string-test-server.rs"
-
-[[bin]]
-name = "etl-grpc-transform-client"
-path = "src/bin/transformer-client.rs"
+#[[bin]]
+#name = "etl-grpc-ex1"
+#path = "src/bin/dataoutput-string-test-server.rs"
+#
+#[[bin]]
+#name = "etl-grpc-ex2"
+#path = "src/bin/datasource-string-test-server.rs"
+#
+#[[bin]]
+#name = "etl-grpc-transform-client"
+#path = "src/bin/transformer-client.rs"
 
 [dependencies]
 etl-core = { path = "../etl-core" }
 async-stream = "0.3"
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
-tonic = "0.7"
+tonic = { version = "0.7", features = ["tls", "compression"] }
 tonic-reflection = { version = "0.4" }
 prost = "0.10"
 prost-types = "0.10" # for well known types
@@ -31,4 +31,4 @@ log = "0.4"
 simple_logger = "2.1.0"
 
 [build-dependencies]
-tonic-build = "0.7"
+tonic-build = { version = "0.7", features = ["prost", "compression"] }

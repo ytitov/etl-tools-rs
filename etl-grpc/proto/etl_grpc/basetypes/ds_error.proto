@@ -1,5 +1,5 @@
 syntax = "proto3";
-package grpc.datastore;
+package etl_grpc.basetypes.ds_error;
 
 message SendError {
     string from_name = 1;

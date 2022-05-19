@@ -1,11 +1,9 @@
 use etl_core::datastore::error::DataStoreError;
-pub mod proto {
-    tonic::include_proto!("datastore");
-}
 
 pub mod error {
-    //use super::*;
-    use etl_core::datastore::error::DataStoreError;
+    use super::*;
+    use crate::proto::etl_grpc::basetypes::ds_error as proto;
+    //use etl_core::datastore::error::DataStoreError;
     impl From<proto::GrpcDataStoreError> for DataStoreError {
         fn from(p_err: proto::GrpcDataStoreError) -> DataStoreError {
             use proto::GrpcDataStoreError as ProtoErr;

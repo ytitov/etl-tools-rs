@@ -6,7 +6,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     // Shared data types by datasources and dataoutputs
-    tonic_build::compile_protos("proto/datastore.proto")?;
+    //tonic_build::compile_protos("proto/etl_grpc/basetypes/ds_error.proto")?;
+
+    tonic_build::configure()
+        .file_descriptor_set_path(out_dir.join("dataoutput_descriptor.bin"))
+        .compile(
+            &[
+                "proto/etl_grpc/basetypes/ds_error.proto",
+                "proto/etl_grpc/transformers/transform.proto",
+            ],
+            &["proto/"],
+        )
+        .expect("Failed in build.rs on proto files");
 
     /*
     tonic_build::configure()
@@ -16,13 +27,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     */
     //tonic_build::compile_protos("proto/dataoutput_string.proto")?;
 
-
     // DataSource code
     //tonic_build::compile_protos("proto/datasource.proto")?;
 
-
     // for the transform
-    tonic_build::compile_protos("proto/transform.proto")?;
+    //tonic_build::compile_protos("proto/etl_grpc/transformers/transform.proto")?;
 
     //build_json_codec_service();
     Ok(())

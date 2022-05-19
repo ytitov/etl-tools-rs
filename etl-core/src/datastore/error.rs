@@ -69,3 +69,9 @@ impl From<anyhow::Error> for DataStoreError {
         DataStoreError::Generic(er.to_string())
     }
 }
+
+impl From<&str> for DataStoreError {
+    fn from(er: &str) -> Self {
+        DataStoreError::Generic(er.to_string())
+    }
+}

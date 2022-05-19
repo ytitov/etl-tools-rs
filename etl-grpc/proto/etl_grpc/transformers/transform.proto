@@ -1,6 +1,6 @@
 syntax = "proto3";
-package transform;
-import "datastore.proto";
+package etl_grpc.transformers.transform;
+import "etl_grpc/basetypes/ds_error.proto";
 
 message TransformPayload {
   optional string string_content = 1;
@@ -10,7 +10,7 @@ message TransformPayload {
 
 message TransformResponse {
   TransformPayload result = 1;
-  optional grpc.datastore.GrpcDataStoreError error = 2;
+  optional basetypes.ds_error.GrpcDataStoreError error = 2;
 }
 
 service Transformer {
