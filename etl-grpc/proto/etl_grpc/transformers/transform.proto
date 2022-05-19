@@ -15,4 +15,5 @@ message TransformResponse {
 
 service Transformer {
   rpc Transform(TransformPayload) returns (TransformResponse) {}
+  rpc TransformStream(stream TransformPayload) returns (stream TransformResponse) {}
 }

@@ -26,10 +26,14 @@ class TransformerServicer(transform_grpc.TransformerServicer):
     def set_enable_reflection(self, en: bool):
         self.enable_reflection = en
 
-    def Transform(self, r: TransformPayload, ctx) -> TransformResponse:
+    async def Transform(self, r: TransformPayload, ctx) -> TransformResponse:
+        return await self.transform_payload(r)
+
+    async def transform_payload(self, req: TransformPayload, context):
         try:
             if r.string_content is not None:
-                result_str = asyncio.run(self.string_transform.transform(r.string_content, ctx))
+                #result_str = asyncio.run(self.string_transform.transform(r.string_content, ctx))
+                result_str = await self.string_transform.transform(r.string_content, ctx)
                 return TransformResponse(result=TransformPayload(string_content=result_str))
         except NotImplementedError as ni:
             logging.error("NotImplementedError")
@@ -38,6 +42,11 @@ class TransformerServicer(transform_grpc.TransformerServicer):
             # should be returning a server error
             print("Got an unexpected error: ")
             print(e)
+
+    async def TransformStream(self, request_iterator: AsyncIterable[TransformPayload], context):
+        async for req in request_iterator:
+            res = await self.transform_payload(req)
+            context.write(res)
 
     async def start_server(self, insecure_port: str, secure_port: str = None) -> None:
         server = grpc.aio.server()
