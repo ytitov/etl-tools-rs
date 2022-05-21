@@ -1,4 +1,7 @@
 use crate::job::JobRunner;
+use etl_core::datastore::error::DataStoreError;
+use etl_core::datastore::simple::QueryableStore;
+use etl_core::deps::bytes::Bytes;
 use etl_core::deps::{
     anyhow,
     serde::{self, Deserialize, Serialize},
@@ -48,6 +51,33 @@ pub enum NotifyJobManager {
     ShutdownJobManager,
 }
 
+#[derive(Debug)]
+pub enum ToStateManager {
+    FromJobRunner {
+        sender: SenderDetails,
+        operation: ManageState,
+    },
+}
+
+#[derive(Debug)]
+pub enum ManageState {
+    ReadJson {
+        job: JobDetails,
+        reply_tx: oneshot::Sender<Result<Bytes, DataStoreError>>,
+    },
+    WriteJson {
+        job: JobDetails,
+        payload: Bytes,
+        reply_tx: oneshot::Sender<Result<(), DataStoreError>>,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct JobDetails {
+    pub id: String,
+    pub name: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct SenderDetails {
     pub id: String,
@@ -71,14 +101,16 @@ pub enum NotifyDataSource {
 #[derive(Debug)]
 pub enum Message {
     ToJobManager(NotifyJobManager),
+    /// read/write state using SimpleStore + QueryStore
+    ToStateManager(ManageState),
     ToJobRunner(NotifyJobRunner),
     ToDataSource(NotifyDataSource),
     ToJob(NotifyJob),
 }
 
 // Users the re-exported crate from etl-core
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(crate = "serde")]
+//#[derive(Serialize, Deserialize, Debug, Clone)]
+//#[serde(crate = "serde")]
 pub struct JobManagerConfig {
     /// When max_errors is reached, a shutdown message is sent, which stops all
     /// of the jobs currently running. There is no guarantee that this message will arrive at a
@@ -87,14 +119,17 @@ pub struct JobManagerConfig {
     /// If set to None, the output will go to stdout
     pub log_path: Option<String>,
     pub log_name_prefix: String,
+    pub state_storage: Box<dyn QueryableStore<Bytes>>,
 }
 
 impl Default for JobManagerConfig {
     fn default() -> Self {
+        use etl_core::datastore::mock::MockJsonDataSource;
         JobManagerConfig {
             max_errors: 1000,
             log_path: None,
             log_name_prefix: "job_manager".to_string(),
+            state_storage: Box::new(MockJsonDataSource::default()),
         }
     }
 }
@@ -199,10 +234,14 @@ impl JobManager {
     pub fn start(mut self) -> JobManagerHandle {
         let (job_manager_tx, job_manager_rx) = mpsc::channel(16);
         self.from_job_runner_channel = Some(job_manager_rx);
+        let state_datastore = self.config.state_storage;
         let jh: JoinHandle<anyhow::Result<JobManagerOutput>> = tokio::spawn(async move {
             loop {
                 if let Some(from_jobs_rx) = &mut self.from_job_runner_channel {
                     match from_jobs_rx.recv().await {
+                        Some(Message::ToStateManager(m)) => {
+                            process_state_manager(&state_datastore, m).await?;
+                        }
                         Some(Message::ToJobManager(m)) => {
                             use NotifyJobManager::*;
                             match m {
@@ -337,6 +376,42 @@ impl JobManager {
 }
 
 impl Message {
+    pub fn load_job_state(
+        id: &str,
+        name: &str,
+    ) -> (Self, oneshot::Receiver<Result<Bytes, DataStoreError>>) {
+        let (reply_tx, reply_rx) = oneshot::channel();
+        (
+            Message::ToStateManager(ManageState::ReadJson {
+                job: JobDetails {
+                    id: id.into(),
+                    name: name.into(),
+                },
+                reply_tx,
+            }),
+            reply_rx,
+        )
+    }
+
+    pub fn save_job_state(
+        id: &str,
+        name: &str,
+        payload: Bytes,
+    ) -> (Self, oneshot::Receiver<Result<(), DataStoreError>>) {
+        let (reply_tx, reply_rx) = oneshot::channel();
+        (
+            Message::ToStateManager(ManageState::WriteJson {
+                payload,
+                job: JobDetails {
+                    id: id.into(),
+                    name: name.into(),
+                },
+                reply_tx,
+            }),
+            reply_rx,
+        )
+    }
+
     pub fn log_info<A, B>(sender: A, message: B) -> Self
     where
         A: Into<String>,
@@ -395,4 +470,33 @@ impl Message {
             },
         })
     }
+}
+
+async fn process_state_manager(
+    state_ds: &Box<dyn QueryableStore<Bytes>>,
+    message: ManageState,
+) -> Result<(), DataStoreError> {
+    let sep = state_ds.path_sep();
+    println!("process_state_manager");
+    match message {
+        ManageState::ReadJson { job, reply_tx } => {
+            let job_path = format!("{}{}{}{}", sep, &job.name, sep, &job.id);
+            let b = state_ds.load(&job_path).await;
+            reply_tx
+                .send(b)
+                .map_err(|_e| DataStoreError::FatalIO("Failed to load state".into()))?;
+        }
+        ManageState::WriteJson {
+            job,
+            payload,
+            reply_tx,
+        } => {
+            let job_path = format!("{}{}{}{}", sep, &job.name, sep, &job.id);
+            let w = state_ds.write(&job_path, payload).await;
+            reply_tx
+                .send(w)
+                .map_err(|_e| DataStoreError::FatalIO("Failed to save state".into()))?;
+        }
+    }
+    Ok(())
 }

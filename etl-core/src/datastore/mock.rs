@@ -1,7 +1,8 @@
-use bytes::Bytes;
 use super::*;
-use simple::SimpleStore;
+use ::log;
+use bytes::Bytes;
 use serde::{de::DeserializeOwned, Serialize};
+use simple::{QueryableStore, SimpleStore};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -9,7 +10,6 @@ use std::hash::Hash;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
-use ::log;
 
 pub mod mock_csv;
 
@@ -43,14 +43,12 @@ impl Default for MockDataOutput {
 }
 
 impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockDataOutput {
-    fn start_stream(
-        self: Box<Self>,
-    ) -> Result<DataOutputTask<T>, DataStoreError> {
+    fn start_stream(self: Box<Self>) -> Result<DataOutputTask<T>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         let (tx, mut rx): (DataOutputTx<T>, _) = channel(1);
         let sleep_duration = self.sleep_duration;
         let name = self.name.clone();
-        let jh: JoinHandle<anyhow::Result<DataOutputStats>> = tokio::spawn(async move {
+        let jh: JoinHandle<Result<DataOutputStats, DataStoreError>> = tokio::spawn(async move {
             let name = name;
             let mut lines_written = 0;
             loop {
@@ -90,15 +88,13 @@ impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockDataOut
 }
 
 impl DataOutput<Bytes> for MockJsonDataOutput {
-    fn start_stream(
-        self: Box<Self>,
-    ) -> Result<DataOutputTask<Bytes>, DataStoreError> {
-        use tokio::sync::mpsc::channel;
+    fn start_stream(self: Box<Self>) -> Result<DataOutputTask<Bytes>, DataStoreError> {
         use serde_json::Value as JsonValue;
+        use tokio::sync::mpsc::channel;
         let (tx, mut rx): (DataOutputTx<Bytes>, _) = channel(1);
         let sleep_duration = self.sleep_duration;
         let name = self.name.clone();
-        let jh: JoinHandle<anyhow::Result<DataOutputStats>> = tokio::spawn(async move {
+        let jh: JoinHandle<Result<DataOutputStats, DataStoreError>> = tokio::spawn(async move {
             let name = name;
             let mut lines_written = 0;
             loop {
@@ -109,12 +105,16 @@ impl DataOutput<Bytes> for MockJsonDataOutput {
                             DataOutputMessage::Data(data) => {
                                 // serialize
                                 match serde_json::from_slice(&data) {
-                                    Ok::<JsonValue,_>(line) => {
+                                    Ok::<JsonValue, _>(line) => {
                                         log::info!("{} received: {}", &name, line);
                                         lines_written += 1;
                                     }
                                     Err(e) => {
-                                        log::error!("{} Could not convert to json value due to: {}", &name, e);
+                                        log::error!(
+                                            "{} Could not convert to json value due to: {}",
+                                            &name,
+                                            e
+                                        );
                                     }
                                 }
                             }
@@ -141,7 +141,7 @@ impl DataOutput<Bytes> for MockJsonDataOutput {
 pub struct MockJsonDataSource {
     pub lines: Vec<String>,
     //pub files: HashMap<String, String>,
-    pub files: Arc<Mutex<RefCell<HashMap<String, String>>>>,
+    pub files: Arc<Mutex<RefCell<HashMap<String, Bytes>>>>,
 }
 
 impl Default for MockJsonDataSource {
@@ -201,7 +201,111 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource
         Ok((rx, jh))
     }
 }
+/*
+#[async_trait]
+impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> QueryableStore<T>
+    for MockJsonDataSource
+{
+    async fn list_keys(&self, prefix: Option<&str>) -> Result<Vec<String>, DataStoreError> {
+        match self.files.lock() {
+            Ok(files) => {
+                //return Ok(files.borrow().keys().map(|(key,_)| String::from(key)))
+                let mut v = Vec::<String>::new();
+                for key in files.borrow().keys() {
+                    match &prefix {
+                        Some(p) => {
+                            if key.starts_with(p) {
+                                v.push(key.into());
+                            }
+                        }
+                        None => {
+                            v.push(key.into());
+                        }
+                    }
+                }
+                return Ok(v);
+            }
+            Err(er) => {
+                return Err(DataStoreError::FatalIO(format!(
+                    "Could not obtain lock on files due to: {}",
+                    er.to_string()
+                )));
+            }
+        }
+    }
+}
+*/
+#[async_trait]
+impl QueryableStore<Bytes> for MockJsonDataSource {
+    async fn list_keys(&self, prefix: Option<&str>) -> Result<Vec<String>, DataStoreError> {
+        match self.files.lock() {
+            Ok(files) => {
+                //return Ok(files.borrow().keys().map(|(key,_)| String::from(key)))
+                let mut v = Vec::<String>::new();
+                for key in files.borrow().keys() {
+                    match &prefix {
+                        Some(p) => {
+                            if key.starts_with(p) {
+                                v.push(key.into());
+                            }
+                        }
+                        None => {
+                            v.push(key.into());
+                        }
+                    }
+                }
+                return Ok(v);
+            }
+            Err(er) => {
+                return Err(DataStoreError::FatalIO(format!(
+                    "Could not obtain lock on files due to: {}",
+                    er.to_string()
+                )));
+            }
+        }
+    }
+}
 
+#[async_trait]
+impl SimpleStore<Bytes> for MockJsonDataSource {
+    async fn load(&self, path: &str) -> Result<Bytes, DataStoreError> {
+        match self.files.lock() {
+            Ok(files) => {
+                let files_hs = files.borrow();
+                if let Some(content) = files_hs.get(path) {
+                    return Ok(content.clone());
+                } else {
+                    log::info!("{} does not exist", path);
+                    return Err(DataStoreError::NotExist {
+                        key: path.to_owned(),
+                        error: format!("{} does not exist", path),
+                    });
+                }
+            }
+            Err(er) => {
+                return Err(DataStoreError::FatalIO(format!(
+                    "Failed locking files: {}",
+                    er
+                )));
+            }
+        }
+    }
+
+    async fn write(&self, path: &str, item: Bytes) -> Result<(), DataStoreError> {
+        match self.files.lock() {
+            Ok(files) => {
+                files.borrow_mut().insert(path.to_string(), item);
+            }
+            Err(er) => {
+                //TODO: this should return a DataStoreError
+                panic!("Got error calling files.lock(): {}", er);
+            }
+        };
+        Ok(())
+    }
+}
+
+/*
 #[async_trait]
 impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStore<T>
     for MockJsonDataSource
@@ -211,7 +315,7 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
             Ok(files) => {
                 let files_hs = files.borrow();
                 if let Some(content) = files_hs.get(path) {
-                    match serde_json::from_str::<T>(content) {
+                    match serde_json::from_slice::<T>(content) {
                         Ok(result) => {
                             log::debug!(
                                 "MockJsonDataOutput::load: {} ===>\n{}",
@@ -222,23 +326,24 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
                         }
                         Err(er) => {
                             return Err(DataStoreError::Deserialize {
-                                attempted_string: content.to_owned(),
+                                attempted_string: "Bytes".into(),
                                 message: er.to_string(),
                             });
                         }
                     }
                 } else {
-                    log::info!("Loading from MockJsonDataSource will result as not found");
+                    log::info!("{} does not exist", path);
                     return Err(DataStoreError::NotExist {
                         key: path.to_owned(),
-                        error: "Loading from MockJsonDataSource will always result in not found"
-                            .to_string(),
+                        error: format!("{} does not exist", path),
                     });
                 }
             }
             Err(er) => {
-                //TODO: this should return a DataStoreError
-                panic!("Got error calling files.lock(): {}", er);
+                return Err(DataStoreError::FatalIO(format!(
+                    "Failed locking files: {}",
+                    er
+                )));
             }
         }
     }
@@ -246,12 +351,12 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
     async fn write(&self, path: &str, item: T) -> Result<(), DataStoreError> {
         match serde_json::to_string_pretty(&item) {
             Ok(content) => {
+                log::info!("MockJsonDataOutput::write: {} ===>\n{}", path, &content);
                 match self.files.lock() {
                     Ok(files) => {
-                        files.borrow_mut().insert(path.to_string(), content);
-                        for (_, f) in files.borrow().iter() {
-                            log::debug!("MockJsonDataOutput::write: {} ===>\n{}", path, f);
-                        }
+                        files
+                            .borrow_mut()
+                            .insert(path.to_string(), Bytes::from(content));
                     }
                     Err(er) => {
                         //TODO: this should return a DataStoreError
@@ -264,6 +369,7 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> SimpleStor
         }
     }
 }
+*/
 
 use crate::queue::QueueClient;
 #[async_trait]
@@ -274,11 +380,11 @@ impl<T: Hash + Serialize + DeserializeOwned + Debug + Send + Sync + 'static> Que
         use std::cell::RefMut;
         if let Ok(inner) = self.files.lock() {
             match inner.try_borrow_mut() {
-                Ok::<RefMut<'_, HashMap<String, String>>, _>(mut hs) => {
+                Ok::<RefMut<'_, HashMap<String, Bytes>>, _>(mut hs) => {
                     let maybe_key: Option<String> = hs.keys().next().cloned();
                     if let Some(key) = maybe_key {
                         if let Some(item) = hs.remove(&key) {
-                            return Ok(serde_json::from_str(&item)?);
+                            return Ok(serde_json::from_slice(&item)?);
                         }
                     }
                 }
@@ -299,10 +405,10 @@ impl<T: Hash + Serialize + DeserializeOwned + Debug + Send + Sync + 'static> Que
             m.hash(&mut hasher);
             let name = format!("{}", hasher.finish());
             match inner.try_borrow_mut() {
-                Ok::<RefMut<'_, HashMap<String, String>>, _>(mut hs) => {
+                Ok::<RefMut<'_, HashMap<String, Bytes>>, _>(mut hs) => {
                     let c = serde_json::to_string_pretty(&m)?;
                     log::info!("Pushed into MockJsonDataSource: {}", &c);
-                    hs.insert(name, c);
+                    hs.insert(name, Bytes::from(c));
                 }
                 Err(e) => {
                     return Err(anyhow::anyhow!(e));

@@ -1,16 +1,10 @@
-use etl_core::datastore::error::*;
-use etl_core::deps::{
-    tokio,
-    serde,
-    serde::de::DeserializeOwned,
-    serde::Serialize,
-    async_trait,
-    anyhow,
-};
-use etl_core::datastore::*;
-use etl_core::datastore::simple::SimpleStore;
 use crate::job_manager::*;
-use mock::*;
+use etl_core::datastore::error::*;
+use etl_core::datastore::*;
+use etl_core::deps::bytes::Bytes;
+use etl_core::deps::{
+    anyhow, async_trait, serde, serde::de::DeserializeOwned, serde::Serialize, tokio,
+};
 use state::*;
 use std::fmt;
 use std::fmt::Debug;
@@ -53,9 +47,11 @@ pub struct JobRunnerConfig {
     /// serialization/deserialization errors which happen when processing individual data
     /// elements
     pub stop_on_error: bool,
+    /*
     /// The SimpleStore used by JobRunner to store state.  The default setting uses the
     /// MockJsonDataSource which does not persist, thus all pipelines will run every time.
-    pub ds: Box<dyn SimpleStore<serde_json::Value>>,
+    //pub ds: Box<dyn SimpleStore<serde_json::Value>>,
+     */
 }
 
 impl Default for JobRunnerConfig {
@@ -63,7 +59,7 @@ impl Default for JobRunnerConfig {
         JobRunnerConfig {
             max_errors: 1000,
             stop_on_error: true,
-            ds: Box::new(MockJsonDataSource::default()),
+            //ds: Box::new(MockJsonDataSource::default()),
         }
     }
 }
@@ -114,13 +110,41 @@ impl JobRunner {
         self.job_state.id()
     }
 
+    async fn load_js_new(&mut self) -> Result<Bytes, DataStoreError> {
+        let (message, result_rx) =
+            Message::load_job_state(self.job_state.id(), self.job_state.name());
+        self.job_manager_channel
+            .tx
+            .send(message)
+            .await
+            .map_err(|e| DataStoreError::FatalIO(format!("Could not load job state: {}", e)))?;
+        let b: Result<Bytes, DataStoreError> = result_rx
+            .await
+            .map_err(|e| DataStoreError::FatalIO(format!("Could not load job state {}", e)))?;
+        b
+    }
+
     async fn load_job_state(&mut self) -> Result<JobState, DataStoreError> {
         if self.job_state_updated {
             self.save_job_state().await?;
             self.job_state_updated = false;
         }
-        let path = JobState::gen_name(self.job_state.id(), self.job_state.name());
+        //let path = JobState::gen_name(self.job_state.id(), self.job_state.name());
         let old_step_index = self.job_state.get_cur_step_index();
+        let mut job_state = match self.load_js_new().await {
+            Ok(bytes) => match serde_json::from_slice(&bytes) {
+                Ok(job_state) => Ok(job_state),
+                Err(e) => Err(DataStoreError::Deserialize {
+                    attempted_string: self.job_state.name().to_owned(),
+                    message: e.to_string(),
+                }),
+            },
+            Err(DataStoreError::NotExist { .. }) => {
+                Ok(JobState::new(self.job_state.name(), self.job_state.id()))
+            }
+            Err(others) => Err(others),
+        }?;
+        /*
         let mut job_state = match self.config.ds.load(&path).await {
             Ok(json) => match serde_json::from_value(json) {
                 Ok(job_state) => Ok(job_state),
@@ -142,19 +166,39 @@ impl JobRunner {
             }
             Err(others) => Err(others),
         }?;
+        */
         if !self.is_running {
             self.is_running = true;
         }
         job_state.set_cur_step_index(old_step_index);
+        println!("loaded job state: {:?}", &job_state);
         Ok(job_state)
     }
 
-    async fn save_job_state(&self) -> anyhow::Result<()> {
-        let path = JobState::gen_name(self.job_state.id(), self.job_state.name());
+    async fn save_job_state(&self) -> Result<(), DataStoreError> {
+        println!("save_job_state: {:?}", &self.job_state);
+        let (message, result_rx) = Message::save_job_state(
+            self.job_state.id(),
+            self.job_state.name(),
+            Bytes::from(serde_json::to_string(&self.job_state).map_err(|e| {
+                DataStoreError::FatalIO(format!("Could not save the job state due to: {}", e))
+            })?),
+        );
+        self.job_manager_channel
+            .tx
+            .send(message)
+            .await
+            .map_err(|e| DataStoreError::FatalIO(format!("Could not save state: {}", e)))?;
+        result_rx.await.map_err(|_| {
+            DataStoreError::FatalIO("Had a problem waiting for saving job state result".into())
+        })??;
+        //let path = JobState::gen_name(self.job_state.id(), self.job_state.name());
+        /*
         self.config
             .ds
             .write(&path, serde_json::to_value(self.job_state.clone()).unwrap())
             .await?;
+        */
         Ok(())
     }
 
@@ -348,9 +392,7 @@ impl JobRunner {
                 let input_name = input.name().to_string();
                 // no need to wait on input JoinHandle
                 let (mut input_rx, _) = input.start_stream()?;
-                let (output_tx, output_jh) = output
-                    .start_stream()
-                    .await?;
+                let (output_tx, output_jh) = output.start_stream()?;
                 self.save_job_state().await?;
                 let mut lines_scanned = 0_usize;
                 loop {

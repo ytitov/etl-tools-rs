@@ -75,3 +75,25 @@ impl From<&str> for DataStoreError {
         DataStoreError::Generic(er.to_string())
     }
 }
+
+/*
+ * this might be a bad idea
+impl From<serde_json::Error> for DataStoreError {
+    fn from(er: serde_json::Error) -> Self {
+        DataStoreError::FatalIO(er.to_string())
+    }
+}
+*/
+
+type DataOutputMessageSendError<T> = tokio::sync::mpsc::error::SendError<DataOutputMessage<T>>;
+impl<T> From<DataOutputMessageSendError<T>> for DataStoreError 
+where T: Debug + Sync + Send
+{
+    fn from(er: DataOutputMessageSendError<T>) -> Self {
+        DataStoreError::SendError {
+            from: "Unknown".into(),
+            to: "mpsc::Sender".into(),
+            reason: format!("SendError.  Content: {:?}", er.0)
+        }
+    }
+}

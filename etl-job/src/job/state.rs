@@ -246,7 +246,7 @@ impl JobState {
                 }
             },
         }
- let s = self
+        let s = self
             .get_stream(&n.into())
             .expect("Getting stream failed inside start_new_stream");
         self.cur_step_index += 1;

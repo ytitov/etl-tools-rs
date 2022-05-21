@@ -17,6 +17,7 @@ edition = "2021"
 
 [dependencies]
 etl-core = { path = "../etl-core" }
+etl-job = { path = "../etl-job" }
 async-stream = "0.3"
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
 tonic = { version = "0.7", features = ["tls", "compression"] }

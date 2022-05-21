@@ -33,7 +33,10 @@ pub type DataSourceTask<T> = (
 );
 pub type DataOutputTx<T> = Sender<DataOutputMessage<T>>;
 pub type DataOutputRx<T> = Receiver<DataOutputMessage<T>>;
-pub type DataOutputTask<T> = (DataOutputTx<T>, JoinHandle<anyhow::Result<DataOutputStats>>);
+pub type DataOutputTask<T> = (
+    DataOutputTx<T>,
+    JoinHandle<Result<DataOutputStats, DataStoreError>>,
+);
 
 pub type DataOutputJoinHandle = JoinHandle<anyhow::Result<DataOutputStats>>;
 pub type DataSourceJoinHandle = JoinHandle<Result<DataSourceStats, DataStoreError>>;
@@ -98,45 +101,11 @@ pub trait DataSource<T: Debug + 'static + Send>: Sync + Send {
 
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError>;
 
-    /*
-    fn as_reply<O>(self: Box<Self>) -> Result<DataSourceTask<(T, OneShotTx<O>)>, DataStoreError> {
-
+    fn boxed(self: Box<Self>) -> Box<dyn DataSource<T> + Send + Sync> 
+        where Self: 'static + Sized
+    {
+        Box::new(*self)
     }
-    */
-
-    /*
-    /// TODO: this is not integrated yet because this doesn't get the JobManagerChannel because I'm
-    /// not completely convinced this is necessary.  After all, JobRunner can close the rx end of
-    /// the channel provided by the data source
-    fn process_job_manager_rx(
-        &self,
-        rx: &mut JobManagerRx,
-    ) -> Result<(), DataStoreError> {
-        loop {
-            if let Ok(message) = rx.try_recv() {
-                use crate::job_manager::Message::*;
-                use crate::job_manager::NotifyDataSource;
-                match message {
-                    // this is a global message which means need to shutdown and stop
-                    // what we are doing
-                    ToDataSource(NotifyDataSource::TooManyErrors) => {
-                        return Err(DataStoreError::TooManyErrors);
-                    }
-                    _ => {}
-                }
-            } else {
-                // end of available messages
-                break;
-            }
-        }
-        Ok(())
-    }
-    */
-    /*
-    fn boxed(self: Box<Self>) -> Box<dyn DataSource<T> + Send + Sync> {
-        Box::new(self)
-    }
-    */
 }
 
 impl<T: 'static + Debug + Send> DataSource<T> for DataSourceTask<T> {

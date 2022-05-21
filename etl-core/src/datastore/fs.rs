@@ -181,7 +181,7 @@ impl DataOutput<Bytes> for LocalFs {
         log::info!("Writing to file {:?}", &full_path);
         let (tx, mut rx): (DataOutputTx<Bytes>, _) = channel(1);
         let self_home = self.home;
-        let jh: JoinHandle<anyhow::Result<DataOutputStats>> = tokio::spawn(async move {
+        let jh: JoinHandle<Result<DataOutputStats, DataStoreError>> = tokio::spawn(async move {
             if let Some(parent_folder) = full_path.parent() {
                 tokio::fs::create_dir_all(parent_folder).await?;
                 log::info!("Writing to folder {:?}", &parent_folder);

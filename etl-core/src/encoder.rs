@@ -93,7 +93,7 @@ impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutp
         // pass the input_rx stream into the encoder
         let (input_tx, mut input_rx) = channel(1);
         let output_name = String::from("EncodedOutput");
-        let jh: JoinHandle<anyhow::Result<DataOutputStats>> = tokio::spawn(async move {
+        let jh: JoinHandle<Result<DataOutputStats, DataStoreError>> = tokio::spawn(async move {
             loop {
                 match input_rx.recv().await {
                     Some(DataOutputMessage::Data(data)) => {

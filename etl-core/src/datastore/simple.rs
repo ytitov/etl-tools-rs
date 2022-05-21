@@ -4,7 +4,23 @@ use super::*;
 /// This is a simple store that acts like a key-val storage.  It is not streamted
 /// so is not meant for big files.  Primarily created for the JobRunner to
 /// store the state of the running job somewhere
-pub trait SimpleStore<T: Debug + 'static + Send>: Sync + Send {
+pub trait SimpleStore<T: 'static + Send>: Sync + Send {
+
+    fn path_sep(&self) -> &'static str {
+        "/"
+    }
+
+    /// given a key, return the parent folder based on the path separator.  Default path separator
+    /// is "/"
+    fn parent_folder<'a>(&self, key: &'a str) -> &'a str {
+        let sep = self.path_sep();
+        if let Some(num) = key.rfind(sep) {
+            key.split_at(num + 1).0
+        } else {
+            ""
+        }
+    }
+
     async fn read_file_str(&self, _: &str) -> Result<String, DataStoreError> {
         panic!("This SimpleStore does not support load operation");
     }
@@ -16,6 +32,14 @@ pub trait SimpleStore<T: Debug + 'static + Send>: Sync + Send {
     async fn write(&self, _: &str, _: T) -> Result<(), DataStoreError> {
         panic!("This SimpleStore does not support write operation");
     }
+}
+
+#[async_trait]
+pub trait QueryableStore<T>: SimpleStore<T> + Sync + Send 
+where
+    T: 'static + Send,
+{
+    async fn list_keys(&self, prefix: Option<&str>) -> Result<Vec<String>, DataStoreError>;
 }
 
 #[derive(Debug)]
@@ -34,7 +58,7 @@ impl<L: 'static + Send + Debug, R: 'static + Send + Debug> PairedDataStore<L, R>
     pub fn box_simplestore<S, D>(s: S) -> Box<dyn SimpleStore<D>>
     where
         S: 'static + SimpleStore<D>,
-        D: 'static + Send + Debug
+        D: 'static + Send + Debug,
     {
         Box::new(s)
     }

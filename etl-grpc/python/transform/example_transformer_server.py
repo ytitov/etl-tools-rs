@@ -8,9 +8,12 @@ TransformPayload = transform_proto.TransformPayload
 TransformResponse = transform_proto.TransformResponse
 
 class MyStringHandler(t_server.StringTransform):
+    counter = 0
     async def transform(self, content: str, ctx) -> str:
-        logging.error("RUNNING INSIDE THINGY")
-        return "just mapped it"
+        # this value will keep growing as long as the server lives
+        self.counter += 1
+        logging.info(f"Got {content}")
+        return f"Gotcha: {self.counter} {content}" 
 
 if __name__ == '__main__':
     #logging.basicConfig(level=logging.INFO)

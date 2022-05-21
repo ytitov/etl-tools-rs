@@ -46,7 +46,7 @@ class TransformerServicer(transform_grpc.TransformerServicer):
     async def TransformStream(self, request_iterator: AsyncIterable[TransformPayload], context):
         async for req in request_iterator:
             res = await self.transform_payload(req, context)
-            context.write(res)
+            await context.write(res)
 
     async def start_server(self, insecure_port: str, secure_port: str = None) -> None:
         server = grpc.aio.server()
