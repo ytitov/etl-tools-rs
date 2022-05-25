@@ -12,8 +12,15 @@ pub enum DataStoreError {
     //TODO: this should be DecodeError
     #[error("Could not decode utf8: `{0}`")]
     FatalUtf8(#[from] std::str::Utf8Error),
-    #[error("There was a fatal problem: `{0}`")]
+    #[error("Connection/Transport problem due to: `{0}`")]
     FatalIO(String),
+    #[error("Transport failed due to `{message}` caused by: `{caused_by:?}`")]
+    Transport {
+        message: String,
+        //can't use this because of clone
+        //caused_by: Box<dyn std::error::Error + Send + Sync + 'static>,
+        caused_by: String,
+    },
     #[error("SendError from `{from:?}` to `{to:?}` reason: `{reason:?}`")]
     SendError {
         from: String,
@@ -48,6 +55,14 @@ impl DataStoreError {
             to: to.into(),
             reason: reason.to_string(),
         }
+    }
+
+    pub fn transport<M,E>(m: M, e: E) -> Self
+        where
+            M: ToString,
+            E: std::error::Error
+    {
+        DataStoreError::Transport { message: m.to_string(), caused_by: e.to_string() }
     }
 }
 

@@ -12,8 +12,8 @@ class MyStringHandler(t_server.StringTransform):
     async def transform(self, content: str, ctx) -> str:
         # this value will keep growing as long as the server lives
         self.counter += 1
-        logging.info(f"Got {content}")
-        return f"Gotcha: {self.counter} {content}" 
+        logging.info(f"INCOMING: {content}")
+        return f"{self.counter} {content}" 
 
 if __name__ == '__main__':
     #logging.basicConfig(level=logging.INFO)

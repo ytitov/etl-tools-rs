@@ -61,7 +61,7 @@ impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockDataOut
                                 match serde_json::to_value(&data) {
                                     Ok(line) => {
                                         //println!("{} received: {}", &name, &line);
-                                        log::info!("{} received: {:?}", &name, line);
+                                        log::info!("{} received: {:#?}", &name, line);
                                         lines_written += 1;
                                     }
                                     Err(e) => {

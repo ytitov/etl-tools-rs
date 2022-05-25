@@ -5,9 +5,11 @@ use etl_core::deps::bytes::Bytes;
 use etl_core::deps::{
     anyhow, async_trait, serde, serde::de::DeserializeOwned, serde::Serialize, tokio,
 };
+use etl_core::transformer::Transformer;
 use state::*;
 use std::fmt;
 use std::fmt::Debug;
+use std::future::Future;
 
 pub mod command;
 pub mod handler;
@@ -80,7 +82,7 @@ impl JobRunner {
         let name = name.into();
         let id = id.into();
         let mut jr = JobRunner {
-            job_manager_channel: job_manager_handle.connect(id.clone()).await?,
+            job_manager_channel: job_manager_handle.connect(id.clone(), name.clone()).await?,
             num_process_item_errors: 0,
             num_processed_items: 0,
             config,
@@ -112,7 +114,7 @@ impl JobRunner {
 
     async fn load_js_new(&mut self) -> Result<Bytes, DataStoreError> {
         let (message, result_rx) =
-            Message::load_job_state(self.job_state.id(), self.job_state.name());
+            Message::load_job_state(self);
         self.job_manager_channel
             .tx
             .send(message)
@@ -178,8 +180,7 @@ impl JobRunner {
     async fn save_job_state(&self) -> Result<(), DataStoreError> {
         println!("save_job_state: {:?}", &self.job_state);
         let (message, result_rx) = Message::save_job_state(
-            self.job_state.id(),
-            self.job_state.name(),
+            self,
             Bytes::from(serde_json::to_string(&self.job_state).map_err(|e| {
                 DataStoreError::FatalIO(format!("Could not save the job state due to: {}", e))
             })?),
@@ -361,8 +362,6 @@ impl JobRunner {
 
     /// Same as run except this takes a DataSource and a DataOutput and
     /// moves the data from one to the other.
-    /// TODO: remove serialize and deserialize trait requirements, these should be determined by
-    /// specific trait implementations
     pub async fn run_stream<T>(
         mut self,
         stream_name: &str,
@@ -370,7 +369,7 @@ impl JobRunner {
         output: Box<dyn DataOutput<T>>,
     ) -> Result<Self, JobRunnerError>
     where
-        T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static,
+        T: Debug + Send + Sync + 'static,
     {
         self.job_state = self.load_job_state().await?;
         let name = stream_name.to_string();
@@ -457,6 +456,116 @@ impl JobRunner {
             }
         }
         Ok(self)
+    }
+
+    // using impl Future because the compiler could not infer that the lifetime must be 
+    // attached to the future
+    pub fn run_transform_stream<'a, I, O>(
+        mut self,
+        stream_name: String,
+        mut transformer: Box<dyn Transformer<'a, I, O>>,
+        input: Box<dyn DataSource<I>>,
+        output: Box<dyn DataOutput<O>>,
+        //) -> Result<Self, JobRunnerError>
+    ) -> impl Future<Output = Result<Self, JobRunnerError>> + 'a
+    where
+        I: Debug + Send + Sync + 'static,
+        O: Debug + Send + Sync + 'static,
+    {
+        async move {
+            self.job_state = self.load_job_state().await?;
+            let name = stream_name.to_string();
+            use stream::StepStreamStatus;
+
+            match self.job_state.start_new_stream(&name, &self.config) {
+                Ok((_, StepStreamStatus::Complete { .. })) => {
+                    self.log_info(
+                        self.job_state.name(),
+                        format!("{} stream previously ran, skipping", &name),
+                    )
+                    .await;
+                }
+                Err(e) => {
+                    self.complete().await?;
+                    return Err(e);
+                }
+                Ok(_) => {
+                    let input_name = input.name().to_string();
+                    // no need to wait on input JoinHandle
+                    let (mut input_rx, _) = input.start_stream()?;
+                    let (output_tx, output_jh) = output.start_stream()?;
+                    self.save_job_state().await?;
+                    let mut lines_scanned = 0_usize;
+                    loop {
+                        let info = JobItemInfo::new((lines_scanned, self.job_state.name()));
+                        match input_rx.recv().await {
+                            Some(Ok(DataSourceMessage::Data {
+                                source,
+                                content: input_item,
+                            })) => {
+                                lines_scanned += 1;
+                                self.job_state
+                                    .stream_incr_count_ok(stream_name.clone(), &source)?;
+                                let transformed_item = transformer.transform(input_item).await?;
+                                output_tx
+                                    .send(DataOutputMessage::new(transformed_item))
+                                    .await?;
+                            }
+                            Some(Err(val)) => {
+                                lines_scanned += 1;
+                                self.job_state.stream_incr_count_err(stream_name.clone())?;
+                                self.log_err(&input_name, Some(&info), val.to_string())
+                                    .await;
+                                self.num_process_item_errors += 1;
+                            }
+                            None => break,
+                        };
+                        match self.process_job_manager_rx().await {
+                            Err(JobRunnerError::TooManyErrors) => {
+                                self.job_state.stream_not_ok(
+                                    name,
+                                    String::from("Reached too many errors"),
+                                    lines_scanned,
+                                )?;
+                                self.save_job_state().await?;
+                                drop(input_rx);
+                                drop(output_tx);
+                                // not using the number in error yet..
+                                let _ = output_jh.await??;
+                                return Err(JobRunnerError::TooManyErrors);
+                            }
+                            Err(e) => {
+                                //panic!("Received an unforseen error {}", e);
+                                self.job_state.stream_not_ok(
+                                    name,
+                                    format!(
+                                        "While processing job manager messages ran into {}",
+                                        &e
+                                    ),
+                                    lines_scanned,
+                                )?;
+                                self.save_job_state().await?;
+                                drop(input_rx);
+                                drop(output_tx);
+                                output_jh.await??;
+                                return Err(JobRunnerError::GenericError {
+                                    message: e.to_string(),
+                                });
+                            }
+                            Ok(()) => {}
+                        };
+                    }
+                    self.cur_step_index += 1;
+                    drop(input_rx);
+                    drop(output_tx);
+                    let output_stats = output_jh.await??;
+                    self.job_state
+                        .stream_ok(name, &self.config, vec![output_stats])?;
+                    self.save_job_state().await?;
+                }
+            }
+            Ok(self)
+        }
     }
 
     pub async fn run_stream_handler_fn<I>(

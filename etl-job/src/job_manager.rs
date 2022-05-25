@@ -26,7 +26,42 @@ pub enum NotifyJobRunner {
 }
 
 #[derive(Debug)]
+pub struct JobRunnerDetails {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Debug)]
+pub enum JobRunnerOperation {
+    JobStart {
+        reply_rx: oneshot::Sender<JobManagerRx>,
+    },
+    JobFinish,
+    TaskStart,
+    TaskFinish,
+}
+
+#[derive(Debug)]
+pub enum JobRunnerRequest {
+    LoadState {
+        reply_tx: oneshot::Sender<Result<Bytes, DataStoreError>>,
+    },
+    SaveState {
+        payload: Bytes,
+        reply_tx: oneshot::Sender<Result<(), DataStoreError>>,
+    },
+}
+
+#[derive(Debug)]
 pub enum NotifyJobManager {
+    JobOperation {
+        details: JobRunnerDetails,
+        operation: JobRunnerOperation,
+    },
+    JobRequest {
+        details: JobRunnerDetails,
+        request: JobRunnerRequest,
+    },
     LogInfo {
         sender: String,
         message: String,
@@ -35,41 +70,7 @@ pub enum NotifyJobManager {
         sender: String,
         message: String,
     },
-    TaskStarted {
-        sender: String,
-    },
-    TaskFinished {
-        sender: String,
-    },
-    JobStarted {
-        sender_name: String,
-        reply_rx: oneshot::Sender<JobManagerRx>,
-    },
-    JobFinished {
-        sender: SenderDetails,
-    },
     ShutdownJobManager,
-}
-
-#[derive(Debug)]
-pub enum ToStateManager {
-    FromJobRunner {
-        sender: SenderDetails,
-        operation: ManageState,
-    },
-}
-
-#[derive(Debug)]
-pub enum ManageState {
-    ReadJson {
-        job: JobDetails,
-        reply_tx: oneshot::Sender<Result<Bytes, DataStoreError>>,
-    },
-    WriteJson {
-        job: JobDetails,
-        payload: Bytes,
-        reply_tx: oneshot::Sender<Result<(), DataStoreError>>,
-    },
 }
 
 #[derive(Debug, Clone)]
@@ -78,39 +79,12 @@ pub struct JobDetails {
     pub name: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct SenderDetails {
-    pub id: String,
-    pub name: String,
-}
-
-#[derive(Debug, Clone)]
-pub enum NotifyJob {
-    Scale {
-        started: usize,
-        finished: usize,
-        running: usize,
-    },
-}
-
-#[derive(Debug, Clone)]
-pub enum NotifyDataSource {
-    TooManyErrors,
-}
-
 #[derive(Debug)]
 pub enum Message {
     ToJobManager(NotifyJobManager),
-    /// read/write state using SimpleStore + QueryStore
-    ToStateManager(ManageState),
     ToJobRunner(NotifyJobRunner),
-    ToDataSource(NotifyDataSource),
-    ToJob(NotifyJob),
 }
 
-// Users the re-exported crate from etl-core
-//#[derive(Serialize, Deserialize, Debug, Clone)]
-//#[serde(crate = "serde")]
 pub struct JobManagerConfig {
     /// When max_errors is reached, a shutdown message is sent, which stops all
     /// of the jobs currently running. There is no guarantee that this message will arrive at a
@@ -170,7 +144,11 @@ impl JobManagerHandle {
         self.job_manager_tx.clone()
     }
 
-    pub async fn connect<N: Into<String>>(&self, name: N) -> anyhow::Result<JobManagerChannel> {
+    pub async fn connect<A, B>(&self, id: A, name: B) -> anyhow::Result<JobManagerChannel>
+    where
+        A: ToString,
+        B: ToString,
+    {
         // this will recieve the reciever from the JobManager so the JobRunner can send
         // messages
         let (oneshot_tx, oneshot_rx): (
@@ -178,7 +156,7 @@ impl JobManagerHandle {
             oneshot::Receiver<JobManagerRx>,
         ) = oneshot::channel();
         self.job_manager_tx
-            .send(Message::broadcast_job_start(name, oneshot_tx))
+            .send(Message::broadcast_job_start(id, name, oneshot_tx))
             .await?;
         let job_manager_rx = oneshot_rx.await?;
         Ok(JobManagerChannel {
@@ -230,6 +208,78 @@ impl JobManager {
         })
     }
 
+    fn notify_job_manager_job_operation(
+        to_job_runner_tx: &mut HashMap<String, Sender<Message>>,
+        num_jobs_running: &mut usize,
+        num_tasks_started: &mut usize,
+        num_tasks_finished: &mut usize,
+        details: JobRunnerDetails,
+        operation: JobRunnerOperation,
+    ) -> Result<(), DataStoreError> {
+        let JobRunnerDetails { id, name } = details;
+        let sender_name = format!("{}-{}", &name, &id);
+        /*
+        log_info(
+            &self.logger_tx,
+            format!("JobManager: starting {}-{}", &name, &id),
+        );
+        */
+        use JobRunnerOperation::*;
+        match operation {
+            JobStart { reply_rx } => {
+                let (tx, rx): (JobManagerTx, JobManagerRx) = mpsc::channel(1);
+                reply_rx.send(rx).expect(
+                    "Fatal error replying with a JobManagerRx to a job, this should never happen",
+                );
+                to_job_runner_tx.insert(sender_name, tx);
+                *num_jobs_running += 1;
+            }
+            JobFinish => {
+                *num_jobs_running -= 1;
+                let _ = to_job_runner_tx.remove(&sender_name);
+            }
+            TaskStart => {
+                *num_tasks_started += 1;
+            }
+            TaskFinish => {
+                *num_tasks_finished += 1;
+            }
+        }
+        Ok(())
+    }
+
+    async fn notify_job_manager_job_request(
+        state_ds: &Box<dyn QueryableStore<Bytes>>,
+        details: JobRunnerDetails,
+        request: JobRunnerRequest,
+    ) -> Result<(), DataStoreError> {
+        let JobRunnerDetails { id, name } = details;
+        let sep = state_ds.path_sep();
+        let job_path = format!("{}{}{}{}.state", sep, &name, sep, &id);
+        /*
+        log_info(
+            &self.logger_tx,
+            format!("JobManager: starting {}-{}", &name, &id),
+        );
+        */
+        use JobRunnerRequest::*;
+        match request {
+            LoadState { reply_tx } => {
+                let b = state_ds.load(&job_path).await;
+                reply_tx
+                    .send(b)
+                    .map_err(|_e| DataStoreError::FatalIO("Failed to load state".into()))?;
+            }
+            SaveState { payload, reply_tx } => {
+                let w = state_ds.write(&job_path, payload).await;
+                reply_tx
+                    .send(w)
+                    .map_err(|_e| DataStoreError::FatalIO("Failed to save state".into()))?;
+            }
+        }
+        Ok(())
+    }
+
     //pub fn start(mut self) -> JoinHandle<()> {
     pub fn start(mut self) -> JobManagerHandle {
         let (job_manager_tx, job_manager_rx) = mpsc::channel(16);
@@ -239,9 +289,6 @@ impl JobManager {
             loop {
                 if let Some(from_jobs_rx) = &mut self.from_job_runner_channel {
                     match from_jobs_rx.recv().await {
-                        Some(Message::ToStateManager(m)) => {
-                            process_state_manager(&state_datastore, m).await?;
-                        }
                         Some(Message::ToJobManager(m)) => {
                             use NotifyJobManager::*;
                             match m {
@@ -266,69 +313,19 @@ impl JobManager {
                                         }
                                     }
                                 }
-                                TaskStarted { sender } => {
-                                    self.num_tasks_started += 1;
-                                    let s = format!(
-                                        "Started {} tasks: {}/{}",
-                                        sender, self.num_tasks_finished, self.num_tasks_started
-                                    );
-
-                                    /*
-                                    self.tx
-                                        .send(Message::ToJob(NotifyJob::Scale {
-                                            started: self.num_tasks_started,
-                                            finished: self.num_tasks_finished,
-                                            running: self.num_tasks_started
-                                                - self.num_tasks_finished,
-                                        }))
-                                        .expect("Fatal");
-                                    */
-                                    log_info(&self.logger_tx, s);
-                                }
-                                TaskFinished { sender } => {
-                                    self.num_tasks_finished += 1;
-                                    /*
-                                    self.tx
-                                        .send(Message::ToJob(NotifyJob::Scale {
-                                            started: self.num_tasks_started,
-                                            finished: self.num_tasks_finished,
-                                            running: self.num_tasks_started
-                                                - self.num_tasks_finished,
-                                        }))
-                                        .expect("Fatal");
-                                    */
-                                    let s = format!(
-                                        "Finished {} tasks: {}/{}",
-                                        sender, self.num_tasks_finished, self.num_tasks_started
-                                    );
-                                    log_info(&self.logger_tx, s);
-                                }
                                 // needed so the job manager can finish writing the log
                                 ShutdownJobManager => {
                                     break;
                                 }
-                                JobStarted {
-                                    sender_name,
-                                    reply_rx,
-                                } => {
-                                    log_info(
-                                        &self.logger_tx,
-                                        format!("JobManager: starting {}", &sender_name),
-                                    );
-                                    let (tx, rx): (JobManagerTx, JobManagerRx) = mpsc::channel(1);
-                                    reply_rx
-                                        .send(rx)
-                                        .expect("Fatal error replying with a JobManagerRx to a job, this should never happen");
-                                    self.to_job_runner_tx.insert(sender_name, tx);
-                                    self.num_jobs_running += 1;
-                                }
-                                JobFinished { sender } => {
-                                    self.num_jobs_running -= 1;
-                                    log_info(
-                                        &self.logger_tx,
-                                        format!("JobManager: finished {}", &sender.name),
-                                    );
-                                    let _ = self.to_job_runner_tx.remove(&sender.name);
+                                JobOperation { details, operation } => {
+                                    Self::notify_job_manager_job_operation(
+                                        &mut self.to_job_runner_tx,
+                                        &mut self.num_jobs_running,
+                                        &mut self.num_tasks_started,
+                                        &mut self.num_tasks_finished,
+                                        details,
+                                        operation,
+                                    )?;
                                     if self.num_jobs_running == 0 {
                                         log_info(
                                             &self.logger_tx,
@@ -339,21 +336,22 @@ impl JobManager {
                                         break;
                                     }
                                 }
+                                JobRequest { details, request } => {
+                                    Self::notify_job_manager_job_request(
+                                        &state_datastore,
+                                        details,
+                                        request,
+                                    )
+                                    .await?;
+                                }
                             }
                         }
                         None => {
                             println!("JobManager exiting got a none");
                             break;
                         }
-                        // ignore these here, as they are meant for Jobs, just log them
-                        Some(Message::ToJob(m)) => {
-                            log_info(&self.logger_tx, format!("ToJob: {:?}", &m));
-                        }
                         Some(Message::ToJobRunner(m)) => {
                             log_info(&self.logger_tx, &format!("ToJobRunner: {:?}", m));
-                        }
-                        Some(Message::ToDataSource(m)) => {
-                            log_info(&self.logger_tx, &format!("ToDataSource: {:?}", m));
                         }
                     }
                 } else {
@@ -377,36 +375,33 @@ impl JobManager {
 
 impl Message {
     pub fn load_job_state(
-        id: &str,
-        name: &str,
+        job: &JobRunner,
     ) -> (Self, oneshot::Receiver<Result<Bytes, DataStoreError>>) {
         let (reply_tx, reply_rx) = oneshot::channel();
         (
-            Message::ToStateManager(ManageState::ReadJson {
-                job: JobDetails {
-                    id: id.into(),
-                    name: name.into(),
+            Message::ToJobManager(NotifyJobManager::JobRequest {
+                request: JobRunnerRequest::LoadState { reply_tx },
+                details: JobRunnerDetails {
+                    id: job.id().into(),
+                    name: job.name().into(),
                 },
-                reply_tx,
             }),
             reply_rx,
         )
     }
 
     pub fn save_job_state(
-        id: &str,
-        name: &str,
+        job: &JobRunner,
         payload: Bytes,
     ) -> (Self, oneshot::Receiver<Result<(), DataStoreError>>) {
         let (reply_tx, reply_rx) = oneshot::channel();
         (
-            Message::ToStateManager(ManageState::WriteJson {
-                payload,
-                job: JobDetails {
-                    id: id.into(),
-                    name: name.into(),
+            Message::ToJobManager(NotifyJobManager::JobRequest {
+                request: JobRunnerRequest::SaveState { payload, reply_tx },
+                details: JobRunnerDetails {
+                    id: job.id().into(),
+                    name: job.name().into(),
                 },
-                reply_tx,
             }),
             reply_rx,
         )
@@ -434,69 +429,51 @@ impl Message {
         })
     }
 
-    pub fn broadcast_task_start<A>(sender: A) -> Self
-    where
-        A: Into<String>,
-    {
-        Message::ToJobManager(NotifyJobManager::TaskStarted {
-            sender: sender.into(),
+    pub fn broadcast_task_start(job: &JobRunner) -> Self {
+        Message::ToJobManager(NotifyJobManager::JobOperation {
+            details: JobRunnerDetails {
+                id: job.id().to_string(),
+                name: job.name().to_string(),
+            },
+            operation: JobRunnerOperation::TaskStart,
         })
     }
 
-    pub fn broadcast_task_end<A>(sender: A) -> Self
-    where
-        A: Into<String>,
-    {
-        Message::ToJobManager(NotifyJobManager::TaskFinished {
-            sender: sender.into(),
+    pub fn broadcast_task_end(job: &JobRunner) -> Self {
+        Message::ToJobManager(NotifyJobManager::JobOperation {
+            details: JobRunnerDetails {
+                id: job.id().to_string(),
+                name: job.name().to_string(),
+            },
+            operation: JobRunnerOperation::TaskFinish,
         })
     }
 
-    pub fn broadcast_job_start<A>(sender: A, reply_rx: oneshot::Sender<JobManagerRx>) -> Self
+    pub fn broadcast_job_start<A, B>(
+        id: A,
+        name: B,
+        reply_rx: oneshot::Sender<JobManagerRx>,
+    ) -> Self
     where
-        A: Into<String>,
+        A: ToString,
+        B: ToString,
     {
-        Message::ToJobManager(NotifyJobManager::JobStarted {
-            sender_name: sender.into(),
-            reply_rx,
+        Message::ToJobManager(NotifyJobManager::JobOperation {
+            details: JobRunnerDetails {
+                id: id.to_string(),
+                name: name.to_string(),
+            },
+            operation: JobRunnerOperation::JobStart { reply_rx },
         })
     }
 
     pub fn broadcast_job_end(job: &JobRunner) -> Self {
-        Message::ToJobManager(NotifyJobManager::JobFinished {
-            sender: SenderDetails {
-                id: String::from(job.id()),
-                name: String::from(job.name()),
+        Message::ToJobManager(NotifyJobManager::JobOperation {
+            details: JobRunnerDetails {
+                id: job.id().to_string(),
+                name: job.name().to_string(),
             },
+            operation: JobRunnerOperation::JobFinish,
         })
     }
-}
-
-async fn process_state_manager(
-    state_ds: &Box<dyn QueryableStore<Bytes>>,
-    message: ManageState,
-) -> Result<(), DataStoreError> {
-    let sep = state_ds.path_sep();
-    println!("process_state_manager");
-    match message {
-        ManageState::ReadJson { job, reply_tx } => {
-            let job_path = format!("{}{}{}{}", sep, &job.name, sep, &job.id);
-            let b = state_ds.load(&job_path).await;
-            reply_tx
-                .send(b)
-                .map_err(|_e| DataStoreError::FatalIO("Failed to load state".into()))?;
-        }
-        ManageState::WriteJson {
-            job,
-            payload,
-            reply_tx,
-        } => {
-            let job_path = format!("{}{}{}{}", sep, &job.name, sep, &job.id);
-            let w = state_ds.write(&job_path, payload).await;
-            reply_tx
-                .send(w)
-                .map_err(|_e| DataStoreError::FatalIO("Failed to save state".into()))?;
-        }
-    }
-    Ok(())
 }

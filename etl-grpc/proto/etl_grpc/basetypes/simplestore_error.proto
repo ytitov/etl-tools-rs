@@ -1,0 +1,14 @@
+syntax = "proto3";
+package etl_grpc.basetypes.simplestore_error;
+
+message NotExistError {
+    string key = 1;
+}
+
+message IOError {}
+
+message GrpcSimpleStoreError {
+  string error = 1;
+  optional IOError fatal_io = 2;
+  optional NotExistError not_exist = 4;
+}

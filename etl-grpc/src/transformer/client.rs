@@ -83,6 +83,10 @@ fn create_stream(
                             .expect("couldn't send");
                     }
                     Some(Err(er)) => {
+                        /*
+                        match er {
+                        };
+                        */
                         panic!("Got a bad status: {}", er);
                     }
                 }
@@ -102,8 +106,7 @@ fn create_stream(
     )
 }
 
-impl DataOutput<String> for GrpcTransformerClient<String>
-{
+impl DataOutput<String> for GrpcTransformerClient<String> {
     fn start_stream(self: Box<Self>) -> Result<DataOutputTask<String>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         let source_name = String::from("GrpcTransformDataSource");
@@ -119,6 +122,7 @@ impl DataOutput<String> for GrpcTransformerClient<String>
                 match rx.recv().await {
                     Some(DataOutputMessage::Data(item)) => {
                         let item: String = item;
+                        //println!("--> GrpcTransformerClient got {}", &item);
                         client_tx
                             .send(TransformPayload {
                                 string_content: Some(item),
@@ -128,7 +132,7 @@ impl DataOutput<String> for GrpcTransformerClient<String>
                             .unwrap();
                         // to preserve order, need to wait for result before sending more
                         while let Some(res) = transformed_rx.recv().await {
-                            println!("Transform Result: {:?}", &res);
+                            //println!(" <- GrpcTransformerClient Got Result: {:?}", &res);
                             match res {
                                 Ok(TransformPayload {
                                     string_content: Some(content),

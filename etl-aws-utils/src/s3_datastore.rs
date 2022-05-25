@@ -1,15 +1,15 @@
 use etl_core::datastore::error::*;
-use etl_core::datastore::{*, simple::SimpleStore};
+use etl_core::datastore::{simple::SimpleStore, *};
 use etl_core::deps::{
     anyhow, async_trait,
     bytes::Bytes,
+    log,
     serde::de::DeserializeOwned,
     serde::Serialize,
     tokio,
     tokio::io::{AsyncBufReadExt, BufReader},
     tokio::sync::mpsc::{channel, Receiver},
     tokio::task::JoinHandle,
-    log,
 };
 use rusoto_core::HttpClient;
 pub use rusoto_core::Region;
@@ -73,11 +73,8 @@ impl S3Storage {
     }
 }
 
-#[async_trait]
 impl DataOutput<Bytes> for S3Storage {
-    async fn start_stream(
-        self: Box<Self>,
-    ) -> anyhow::Result<DataOutputTask<Bytes>> {
+    fn start_stream(self: Box<Self>) -> Result<DataOutputTask<Bytes>, DataStoreError> {
         let (tx, mut rx): (DataOutputTx<Bytes>, _) = channel(1);
         let name = self.name();
         let p = match &self.credentials_path {
@@ -90,13 +87,13 @@ impl DataOutput<Bytes> for S3Storage {
                 "s3_output_key is required when using as a DataOutput".to_string(),
             )
         })?;
-        let s3_jh =
-            s3_write_bytes_multipart(p, &self.s3_bucket, &s3_output_key, s3_rx, self.region)
-                .await
-                .map_err(|e| {
-                    DataStoreError::FatalIO(format!("S3Storage Error: {}", e.to_string()))
-                })?;
         let jh: JoinHandle<anyhow::Result<DataOutputStats>> = tokio::spawn(async move {
+            let s3_jh =
+                s3_write_bytes_multipart(p, &self.s3_bucket, &s3_output_key, s3_rx, self.region)
+                    .await
+                    .map_err(|e| {
+                        DataStoreError::FatalIO(format!("S3Storage Error: {}", e.to_string()))
+                    })?;
             let mut num_lines = 0_usize;
             loop {
                 match rx.recv().await {

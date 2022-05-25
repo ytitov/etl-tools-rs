@@ -7,6 +7,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::fmt::Debug;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::oneshot::{Receiver as OneShotRx, Sender as OneShotTx};
 use tokio::task::JoinHandle;
 
 //pub mod bytes_source;
@@ -20,6 +21,10 @@ pub mod mock;
 /// Traits that define non-streaming loading and saving of data
 pub mod simple;
 pub mod sources;
+
+pub type CallbackRx<T> = OneShotRx<Result<T, DataStoreError>>;
+pub type CallbackTx<T> = OneShotTx<Result<T, DataStoreError>>;
+pub type CallbackChannel<T> = (CallbackTx<T>, CallbackRx<T>);
 
 //pub type DataOutputItemResult = Result<String, Box<dyn std::error::Error + Send>>;
 
@@ -106,6 +111,7 @@ pub trait DataSource<T: Debug + 'static + Send>: Sync + Send {
     {
         Box::new(*self)
     }
+
 }
 
 impl<T: 'static + Debug + Send> DataSource<T> for DataSourceTask<T> {

@@ -1,3 +1,5 @@
+/// implements the grpc client which talks to a grpc server which implements the
+/// Transformer service proto rpc
 pub mod client;
 //use crate::proto::etl_grpc::basetypes::ds_error::GrpcDataStoreError;
 use crate::proto::etl_grpc::transformers::transform::{
@@ -6,20 +8,93 @@ use crate::proto::etl_grpc::transformers::transform::{
 use etl_core::datastore::error::DataStoreError;
 //use etl_core::datastore::BoxedDataSource;
 //use etl_core::datastore::DataOutputStats;
-use etl_core::datastore::DataSource;
-use etl_core::datastore::DataSourceTask;
-use etl_core::datastore::{DataSourceMessage, DataSourceStats};
+use etl_core::datastore::*;
 use etl_core::deps::serde::{Deserialize, Serialize};
 use etl_core::deps::serde_json;
-use etl_core::transformer::*;
 use std::fmt::Debug;
 use tonic::transport::Channel;
 
 //use tokio::sync::oneshot::{Receiver as OneShotRx, Sender as OneShotTx};
 
+use etl_core::transformer::Transformer;
+pub struct GrpcStringTransform {
+    pub grpc_client: TransformerClient<Channel>,
+}
+
+use std::future::Future;
+impl<'a> GrpcStringTransform {
+    pub fn new_transformer(
+        url: &str,
+    ) -> impl Future<Output = Result<Box<dyn Transformer<'a, String, String>>, DataStoreError>> + 'a
+    {
+        let url = url.to_string();
+        async move {
+            Ok(Box::new(GrpcStringTransform {
+                grpc_client: TransformerClient::connect(url.clone()).await.map_err(|e| {
+                    DataStoreError::transport(
+                        format!("Could not connect to GrpcServer at {}", url),
+                        e,
+                    )
+                })?,
+            }) as Box<dyn Transformer<'a, String, String>>)
+        }
+    }
+}
+
+use etl_core::deps::async_trait;
+#[async_trait]
+impl<'a> Transformer<'a, String, String> for GrpcStringTransform {
+    async fn transform(&mut self, s: String) -> Result<String, DataStoreError> {
+        let request = tonic::Request::new(TransformPayload {
+            string_content: Some(s),
+            ..Default::default()
+        });
+        match self.grpc_client.transform(request).await {
+            Ok(res) => match res.into_inner() {
+                TransformResponse {
+                    result:
+                        Some(TransformPayload {
+                            string_content: str_cont,
+                            bytes_content: b_cont,
+                            json_string_content: json_cont,
+                        }),
+                    ..
+                } => match (str_cont, b_cont, json_cont) {
+                    (Some(str_cont), None, None) => Ok(str_cont),
+                    (None, Some(b_cont), None) => Ok(String::from_utf8_lossy(&b_cont).to_string()),
+                    (None, None, Some(json_cont)) => Err(DataStoreError::FatalIO(format!(
+                        "Expected a normal string but got back Json String: {}",
+                        json_cont
+                    ))),
+                    _ => panic!("Got a completely empty from server"),
+                },
+                TransformResponse {
+                    result: None,
+                    error: Some(grpc_ds_err),
+                } => Err(DataStoreError::FatalIO(
+                    "Could not reply to datasource".into(),
+                )),
+                _other => Err(DataStoreError::FatalIO(
+                    "Could not reply to datasource".into(),
+                )),
+            },
+            Err(status) => {
+                panic!("error status is not handled")
+            }
+        }
+    }
+}
+
+/// Creates a grpc client which maps input DataSource<(I, CallbackTx<O>)>
+/// and acts like a DataSource<O>.  Internally
+/// it is calling an external grpc server which does the mapping.  The stream maintains ordering,
+/// therefor adds some small amount of network latency in the process.
+/// The issue is, this doesn't follow the usual pattern, so TODO: is
+/// create a transformer which accepts a DataSource<I> and creates a DataSource<O>.  Finally create
+/// a Transformer<I,O> trait similar to how SimpleStore functions
 pub struct GrpcTransformerClient<I, O> {
     pub grpc_client: TransformerClient<Channel>,
-    pub source: Box<dyn DataSource<(I, TransformerResultTx<O>)>>,
+    pub source: Box<dyn DataSource<(I, CallbackTx<O>)>>,
 }
 
 // should add serde traits to this

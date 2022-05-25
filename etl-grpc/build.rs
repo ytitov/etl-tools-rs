@@ -13,7 +13,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .compile(
             &[
                 "proto/etl_grpc/basetypes/ds_error.proto",
+                "proto/etl_grpc/basetypes/simplestore_error.proto",
                 "proto/etl_grpc/transformers/transform.proto",
+                "proto/etl_grpc/simplestore/bytes_store.proto",
+                "proto/etl_grpc/simplestore/observable_bytes_store.proto",
             ],
             &["proto/"],
         )

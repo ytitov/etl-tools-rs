@@ -1,4 +1,5 @@
 use etl_core::datastore::*;
+use etl_core::datastore::error::DataStoreError;
 use etl_core::deps::anyhow;
 use etl_core::deps::async_trait;
 use etl_core::deps::futures_core::future::BoxFuture;
@@ -64,9 +65,8 @@ impl Default for MySqlDataOutputPool {
     }
 }
 
-#[async_trait]
 impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for MySqlDataOutput {
-    async fn start_stream(self: Box<Self>) -> anyhow::Result<DataOutputTask<T>> {
+    fn start_stream(self: Box<Self>) -> Result<DataOutputTask<T>, DataStoreError> {
         let (tx, mut rx): (DataOutputTx<T>, _) = channel(self.on_put_num_rows * 2);
         let table_name = self.table_name.clone();
         let on_put_num_rows_orig = *&self.on_put_num_rows;

@@ -4,17 +4,19 @@ use etl_grpc::transformer::client::*;
 use etl_job::job::JobRunner;
 use etl_job::job::JobRunnerConfig;
 use etl_job::job_manager::*;
+use etl_grpc::transformer::GrpcStringTransform;
 //use etl_core::transformer::Transformer;
 
-static MSG: &str = r#"hello
-my
-name
-is
-mr bananas
-1
-2
-3
-rocks
+static MSG: &str = r#"
+grpc hello
+grpc my
+grpc name
+grpc is
+grpc mr bananas
+grpc 1
+grpc 2
+grpc 3
+grpc rocks
 
 previous string is empty"#;
 #[tokio::main]
@@ -31,9 +33,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init()
         .unwrap();
 
-    let output = GrpcTransformerClient::<String> {
-        result_output: Box::new(MockDataOutput::default()),
-    };
     let job_manager = JobManager::new(JobManagerConfig {
         max_errors: 100,
         ..Default::default()
@@ -41,8 +40,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .expect("Could not initialize job_manager");
     let jm_handle = job_manager.start();
     let jr = JobRunner::create(
-        "test_simple_pipeline_id",
-        "test_simple_pipeline",
+        "id",
+        "test_grpc_transformer",
         &jm_handle,
         JobRunnerConfig {
             ..Default::default()
@@ -52,33 +51,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .expect("Error creating JobRunner");
 
     let jr = jr
-        .run_stream::<String>(
-            "transformed-ds-1",
+        .run_transform_stream::<String, String>(
+            "transformed-ds-1".into(),
+            GrpcStringTransform::new_transformer("http://[::1]:50051").await?,
             Box::new(String::from(MSG)),
-            //Box::new(output),
-            output.boxed(),
+            Box::new(MockDataOutput::default()),
         )
         .await
         .expect("Error running run_data_output");
 
     jr.complete().await?;
-    /*
-    let request = tonic::Request::new(TransformPayload {
-        string_content: Some("Tonic".into()),
-        ..Default::default()
-    });
-    */
-
-    //let g = GrpcTransformerClient { grpc_client: client };
-
-    //let t_ds = Box<dyn DataSource<(I, TransformerResultTx<O>)>>::from_datasource(Box::new(String::from("lots a lines") as Box<dyn DataSource<String>>));
-    //Box::new(g).create();
-
-    /*
-    let response = client.transform(request).await?;
-
-    println!("RESPONSE={:?}", response);
-    */
 
     Ok(())
 }
