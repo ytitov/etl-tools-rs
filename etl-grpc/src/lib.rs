@@ -1,6 +1,8 @@
 pub mod proto {
-    pub(crate) const FILE_DESCRIPTOR_SET: &[u8] =
-        tonic::include_file_descriptor_set!("dataoutput_descriptor");
+    pub(crate) const TRANSFORM_REFLECTION_DESCR: &[u8] =
+        tonic::include_file_descriptor_set!("transform-reflection");
+    pub(crate) const SIMPLESTORE_REFLECTION_DESCR: &[u8] =
+        tonic::include_file_descriptor_set!("simplestore-reflection");
     pub mod etl_grpc {
         pub mod basetypes {
             pub mod ds_error {

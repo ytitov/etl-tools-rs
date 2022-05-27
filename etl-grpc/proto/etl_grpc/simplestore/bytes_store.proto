@@ -2,11 +2,11 @@ syntax = "proto3";
 package etl_grpc.simplestore.bytes_store;
 import "etl_grpc/basetypes/simplestore_error.proto";
 
-message ReadRequest {
+message LoadRequest {
   string key = 1;
 }
 
-message ReadResponse {
+message LoadResponse {
   string key = 1;
   bytes bytes_content = 2;
   optional basetypes.simplestore_error.GrpcSimpleStoreError error = 3;
@@ -24,5 +24,5 @@ message WriteResponse {
 
 service BytesSimpleStore {
   rpc Write(WriteRequest) returns (WriteResponse) {}
-  rpc Read(ReadRequest) returns (ReadResponse) {}
+  rpc Load(LoadRequest) returns (LoadResponse) {}
 }

@@ -14,12 +14,13 @@ pub enum DataStoreError {
     FatalUtf8(#[from] std::str::Utf8Error),
     #[error("Connection/Transport problem due to: `{0}`")]
     FatalIO(String),
-    #[error("Transport failed due to `{message}` caused by: `{caused_by:?}`")]
+    #[error("Transport failed due to `{message}` caused by: `{caused_by:?}` source: {error_source}")]
     Transport {
         message: String,
         //can't use this because of clone
         //caused_by: Box<dyn std::error::Error + Send + Sync + 'static>,
         caused_by: String,
+        error_source: String, //from the trait
     },
     #[error("SendError from `{from:?}` to `{to:?}` reason: `{reason:?}`")]
     SendError {
@@ -62,7 +63,11 @@ impl DataStoreError {
             M: ToString,
             E: std::error::Error
     {
-        DataStoreError::Transport { message: m.to_string(), caused_by: e.to_string() }
+        let error_source = match e.source() {
+            Some(e) => e.to_string(),
+            None => String::from("No source"),
+        };
+        DataStoreError::Transport { message: m.to_string(), error_source, caused_by: e.to_string() }
     }
 }
 

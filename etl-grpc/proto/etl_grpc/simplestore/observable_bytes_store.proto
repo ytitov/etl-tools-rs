@@ -6,9 +6,13 @@ import "etl_grpc/simplestore/bytes_store.proto";
 message ObserveAllRequest {
 }
 
+message ObserveKeyRequest {
+  string key = 1;
+}
+
 service ObservableBytesStore {
-  //rpc Write(WriteRequest) returns (WriteResponse) {}
-  //rpc Read(ReadRequest) returns (ReadResponse) {}
-  rpc ObserveKey(ReadRequest) returns (stream ReadResponse) {}
-  rpc ObserveAll(ObserveAllRequest) returns (stream ReadResponse) {}
+  rpc Load(LoadRequest) returns (LoadResponse) {}
+  rpc Write(WriteRequest) returns (WriteResponse) {}
+  rpc ObserveKey(ObserveKeyRequest) returns (stream LoadResponse) {}
+  rpc ObserveAll(ObserveAllRequest) returns (stream LoadResponse) {}
 }

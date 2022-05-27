@@ -255,13 +255,7 @@ impl JobManager {
     ) -> Result<(), DataStoreError> {
         let JobRunnerDetails { id, name } = details;
         let sep = state_ds.path_sep();
-        let job_path = format!("{}{}{}{}.state", sep, &name, sep, &id);
-        /*
-        log_info(
-            &self.logger_tx,
-            format!("JobManager: starting {}-{}", &name, &id),
-        );
-        */
+        let job_path = format!("{sep}jobs{sep}{name}{sep}{id}.state", sep=sep, name=&name, id=&id);
         use JobRunnerRequest::*;
         match request {
             LoadState { reply_tx } => {
