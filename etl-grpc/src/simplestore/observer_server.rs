@@ -18,14 +18,6 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::transport::Server;
 use tonic::{Code, Request, Response, Status};
 
-pub type StoreWriteResultRx = oneshot::Receiver<Result<(), DataStoreError>>;
-pub type StoreWriteResultTx = oneshot::Sender<Result<(), DataStoreError>>;
-pub type StoreLoadResultRx = oneshot::Receiver<Result<Bytes, DataStoreError>>;
-pub type StoreLoadResultTx = oneshot::Sender<Result<Bytes, DataStoreError>>;
-
-pub type MpscTx<T> = mpsc::Sender<Result<T, DataStoreError>>;
-pub type MpscRx<T> = mpsc::Receiver<Result<T, DataStoreError>>;
-
 /// forwards messages to connected clients as streams
 pub struct ObservableStoreServer {
     /// forward notifications to clients

@@ -73,7 +73,7 @@ impl SimpleStore<Bytes> for GrpcSimpleStoreClient {
                 drop(client_lock);
                 match r.into_inner() {
                     LoadResponse {
-                        key,
+                        key: _,
                         bytes_content,
                         error: None,
                     } => Ok(Bytes::from(bytes_content)),

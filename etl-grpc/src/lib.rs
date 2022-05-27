@@ -1,6 +1,7 @@
 pub mod proto {
-    pub(crate) const TRANSFORM_REFLECTION_DESCR: &[u8] =
-        tonic::include_file_descriptor_set!("transform-reflection");
+    //currently server only implemented in python
+    //pub(crate) const TRANSFORM_REFLECTION_DESCR: &[u8] =
+    //    tonic::include_file_descriptor_set!("transform-reflection");
     pub(crate) const SIMPLESTORE_REFLECTION_DESCR: &[u8] =
         tonic::include_file_descriptor_set!("simplestore-reflection");
     pub mod etl_grpc {

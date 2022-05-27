@@ -1,10 +1,7 @@
 use etl_core::datastore::mock::MockDataOutput;
-use etl_core::datastore::DataSource;
-use etl_grpc::transformer::client::*;
 use etl_job::job::JobRunner;
 use etl_job::job::JobRunnerConfig;
 use etl_job::job_manager::*;
-use etl_grpc::transformer::GrpcStringTransform;
 use etl_grpc::simplestore::client::GrpcSimpleStoreClient;
 //use etl_core::transformer::Transformer;
 

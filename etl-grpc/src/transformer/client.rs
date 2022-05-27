@@ -112,12 +112,10 @@ impl DataOutput<String> for GrpcTransformerClient<String> {
         let source_name = String::from("GrpcTransformDataSource");
         let (tx, mut rx) = channel(1);
         let jh = tokio::spawn(async move {
-            let mut resp_stream: Option<Streaming<TransformResponse>> = None;
             let mut lines_written = 0_usize;
             let (client_tx, client_rx): (Sender<TransformPayload>, _) = channel(1);
             let (transform_jh, mut transformed_rx) = create_stream(client_rx);
             let (result_output_tx, result_output_jh) = self.result_output.start_stream()?;
-            //let mut resp_stream = None;
             loop {
                 match rx.recv().await {
                     Some(DataOutputMessage::Data(item)) => {
@@ -155,7 +153,8 @@ impl DataOutput<String> for GrpcTransformerClient<String> {
                     }
                 }
             }
-            transform_jh.await;
+            transform_jh.await?;
+            result_output_jh.await??;
             Ok(DataOutputStats {
                 name: source_name,
                 lines_written,
