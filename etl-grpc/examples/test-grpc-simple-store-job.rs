@@ -52,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let jr = jr
         .run_stream::<String>(
-            "transformed-ds-1".into(),
+            "some-test-strings".into(),
             Box::new(String::from(MSG)),
             Box::new(MockDataOutput::default()),
         )
