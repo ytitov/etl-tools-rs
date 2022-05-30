@@ -23,6 +23,11 @@ pub mod state;
 type JsonValue = serde_json::Value;
 use self::error::*;
 
+enum OutputJoinHandle {
+    Task(DataOutputJoinHandle),
+    DataOutput(DataOutputJoinHandle),
+}
+
 /// JobRunner is used to declare pipelines which are designed to run step-by-step.  To execute
 /// multiple pipelines in parallel, use separate JobRunner for each pipeline.
 pub struct JobRunner {
@@ -31,7 +36,7 @@ pub struct JobRunner {
     num_process_item_errors: usize,
     num_processed_items: usize,
     /// helps to await on DataOutput instances to complete writing
-    data_output_handles: Vec<DataOutputJoinHandle>,
+    data_output_handles: Vec<(String, OutputJoinHandle)>,
     job_state: JobState,
     /// has the job started yet
     is_running: bool,
@@ -586,8 +591,9 @@ impl JobRunner {
         }
     }
 
-    /// runs an output in parallel
-    pub fn run_output_task<N: ToString>(
+    /// Execute an OutputTask in parallel.  Adds the JoinHandle to a list to ensure that the
+    /// execution is completed.
+    pub fn run_task<N: ToString>(
         mut self,
         name: N,
         t: Box<dyn OutputTask>,

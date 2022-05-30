@@ -48,7 +48,7 @@ impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockDataOut
         let (tx, mut rx): (DataOutputTx<T>, _) = channel(1);
         let sleep_duration = self.sleep_duration;
         let name = self.name.clone();
-        let jh: JoinHandle<Result<DataOutputStats, DataStoreError>> = tokio::spawn(async move {
+        let jh: DataOutputJoinHandle = tokio::spawn(async move {
             let name = name;
             let mut lines_written = 0;
             loop {
@@ -78,8 +78,7 @@ impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockDataOut
                     None => break,
                 };
             }
-            Ok(DataOutputStats {
-                name,
+            Ok(DataOutputDetails::Basic {
                 lines_written,
             })
         });
@@ -89,12 +88,11 @@ impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockDataOut
 
 impl DataOutput<Bytes> for MockJsonDataOutput {
     fn start_stream(self: Box<Self>) -> Result<DataOutputTask<Bytes>, DataStoreError> {
-        use serde_json::Value as JsonValue;
         use tokio::sync::mpsc::channel;
         let (tx, mut rx): (DataOutputTx<Bytes>, _) = channel(1);
         let sleep_duration = self.sleep_duration;
         let name = self.name.clone();
-        let jh: JoinHandle<Result<DataOutputStats, DataStoreError>> = tokio::spawn(async move {
+        let jh: DataOutputJoinHandle = tokio::spawn(async move {
             let name = name;
             let mut lines_written = 0;
             loop {
@@ -127,8 +125,7 @@ impl DataOutput<Bytes> for MockJsonDataOutput {
                     None => break,
                 };
             }
-            Ok(DataOutputStats {
-                name,
+            Ok(DataOutputDetails::Basic {
                 lines_written,
             })
         });
@@ -163,12 +160,10 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource
 
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         use tokio::sync::mpsc::channel;
-        use tokio::task::JoinHandle;
-        // could make this configurable
         let (tx, rx) = channel(1);
         let name = String::from("MockJsonDataSource");
         let lines = self.lines.clone();
-        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
+        let jh: DataSourceJoinHandle = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             for line in lines {
                 match serde_json::from_str::<T>(&line) {
@@ -196,7 +191,7 @@ impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource
                     }
                 };
             }
-            Ok(DataSourceStats { lines_scanned })
+            Ok(DataSourceDetails::Basic { lines_scanned })
         });
         Ok((rx, jh))
     }

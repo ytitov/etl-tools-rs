@@ -3,7 +3,6 @@ use crate::datastore::*;
 use async_trait::async_trait;
 use std::fmt::Debug;
 use tokio::sync::mpsc::Receiver;
-use tokio::task::JoinHandle;
 
 /// For use cases when you want to group stream elements in some form of custom fashion where a
 /// decoder can't handle.
@@ -29,7 +28,7 @@ impl<I: Debug + Send + Sync + 'static> DataSource<Vec<I>> for Batcher<I> {
         ) = channel(1);
         let (mut input_rx, _) = self.input.start_stream()?;
         let new_batch_func = self.new_batch;
-        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
+        let jh: DataSourceJoinHandle = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             let mut batch_vec: Vec<I> = Vec::new();
             let source: String = name.clone();
@@ -63,7 +62,7 @@ impl<I: Debug + Send + Sync + 'static> DataSource<Vec<I>> for Batcher<I> {
                     .await
                     .map_err(|e| DataStoreError::send_error(&name, &source, e))?;
             }
-            Ok(DataSourceStats { lines_scanned })
+            Ok(DataSourceDetails::Basic { lines_scanned })
         });
         Ok((rx, jh))
     }

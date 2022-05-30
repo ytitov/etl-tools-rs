@@ -1,10 +1,10 @@
 //use async_trait::async_trait;
 use crate::datastore::error::*;
 use crate::datastore::*;
-use std::fmt::Debug;
-use tokio::sync::oneshot;
 use crate::deps::*;
 use anyhow::Result;
+use std::fmt::Debug;
+use tokio::sync::oneshot;
 
 #[async_trait]
 pub trait QueueClientBuilder<T: Debug + 'static + Send>: Sync + Send {
@@ -35,11 +35,10 @@ pub trait QueueClient<T: Debug + 'static + Send>: Sync + Send {
 impl<T: Debug + Send + 'static> QueueClient<T> for DynDataSource<T> {
     async fn start_incoming(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         use tokio::sync::mpsc::channel;
-        use tokio::task::JoinHandle;
         let ds_name: String = self.ds.name();
         let (mut source_rx, source_stream_jh) = self.ds.start_stream()?;
         let (tx, rx) = channel(1);
-        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
+        let jh: DataSourceJoinHandle = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             loop {
                 match source_rx.recv().await {
@@ -64,7 +63,7 @@ impl<T: Debug + Send + 'static> QueueClient<T> for DynDataSource<T> {
                 }
             }
             source_stream_jh.await??;
-            Ok(DataSourceStats { lines_scanned })
+            Ok(DataSourceDetails::Basic { lines_scanned })
         });
         Ok((rx, jh))
     }

@@ -1,4 +1,4 @@
-use etl_grpc::simplestore::observer_server::ObservableStoreServerBuilder;
+use etl_grpc::simplestore::observer::server::ObservableStoreServerBuilder;
 use etl_core::datastore::mock::MockJsonDataSource;
 
 #[tokio::main]

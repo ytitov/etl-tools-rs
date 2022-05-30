@@ -153,14 +153,13 @@ where
         self: Box<Self>,
     ) -> Result<DataSourceTask<(L, Option<R>)>, DataStoreError> {
         use tokio::sync::mpsc::channel;
-        use tokio::task::JoinHandle;
         let (tx, rx) = channel(1);
         let (mut left_rx, _) = self.left_ds.start_stream()?;
 
         let max_left_len = self.left_buf_len;
         let matching_func = self.is_match;
         let create_right_ds = self.create_right_ds;
-        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> =
+        let jh: DataSourceJoinHandle =
             tokio::spawn(async move {
                 let mut lines_scanned = 0;
                 let mut left_stack: Vec<L> = Vec::with_capacity(max_left_len);
@@ -182,7 +181,7 @@ where
                         }
                     }
                 }
-                Ok(DataSourceStats { lines_scanned })
+                Ok(DataSourceDetails::Basic { lines_scanned })
             });
         Ok((rx, jh))
     }

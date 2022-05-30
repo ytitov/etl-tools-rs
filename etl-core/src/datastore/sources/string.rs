@@ -10,7 +10,7 @@ impl DataSource<Bytes> for String {
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<Bytes>, DataStoreError> {
         let (tx, rx) = channel(1);
         let name: String = DataSource::<Bytes>::name(&*self);
-        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
+        let jh: DataSourceJoinHandle = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             for line in self.lines() {
                 lines_scanned += 1;
@@ -21,7 +21,7 @@ impl DataSource<Bytes> for String {
                 .await
                 .map_err(|er| DataStoreError::send_error(&name, "", er))?;
             }
-            Ok(DataSourceStats { lines_scanned })
+            Ok(DataSourceDetails::Basic { lines_scanned })
         });
         Ok((rx, jh))
     }
@@ -35,7 +35,7 @@ impl DataSource<String> for String {
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<String>, DataStoreError> {
         let (tx, rx) = channel(1);
         let name: String = DataSource::<String>::name(&*self);
-        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
+        let jh: DataSourceJoinHandle = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             for line in self.lines() {
                 lines_scanned += 1;
@@ -46,7 +46,7 @@ impl DataSource<String> for String {
                 .await
                 .map_err(|er| DataStoreError::send_error(&name, "", er))?;
             }
-            Ok(DataSourceStats { lines_scanned })
+            Ok(DataSourceDetails::Basic { lines_scanned })
         });
         Ok((rx, jh))
     }

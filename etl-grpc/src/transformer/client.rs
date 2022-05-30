@@ -144,7 +144,6 @@ impl DataOutput<String> for GrpcTransformerClient<String> {
                         lines_written += 1;
                     }
                     Some(DataOutputMessage::NoMoreData) => {
-                        println!("---nomoredata");
                         break;
                     }
                     None => {

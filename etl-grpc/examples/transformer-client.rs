@@ -55,8 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .run_stream::<String>(
             "transformed-ds-1",
             Box::new(String::from(MSG)),
-            //Box::new(output),
-            output.boxed(),
+            Box::new(output),
         )
         .await
         .expect("Error running run_data_output");

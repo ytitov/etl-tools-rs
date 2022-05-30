@@ -1,8 +1,10 @@
 use super::error::*;
 use crate::datastore::simple::SimpleStore;
 use crate::datastore::{
-    DataOutput, DataOutputMessage, DataOutputStats, DataOutputTask, DataOutputTx, DataSource,
-    DataSourceMessage, DataSourceStats, DataSourceTask,
+    DataOutput, DataOutputMessage, DataOutputDetails, DataOutputTask, DataOutputTx, DataSource,
+    DataSourceMessage, DataSourceDetails, DataSourceTask,
+    DataSourceJoinHandle,
+    DataOutputJoinHandle,
 };
 use crate::queue::QueueClient;
 use async_trait::async_trait;
@@ -12,7 +14,6 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::hash::Hash;
 use std::path::Path;
-use tokio::task::JoinHandle;
 
 pub struct LocalFs {
     pub files: Vec<String>,
@@ -43,7 +44,7 @@ impl DataSource<Bytes> for LocalFs {
         let files = self.files.clone();
         let home = self.home.clone();
         let name = self.name();
-        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
+        let jh: DataSourceJoinHandle = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             for fname in files {
                 //TODO: would prefer this to fail higher, but the test is not handled properly
@@ -64,7 +65,7 @@ impl DataSource<Bytes> for LocalFs {
                     }
                 }
             }
-            Ok(DataSourceStats { lines_scanned })
+            Ok(DataSourceDetails::Basic { lines_scanned })
         });
         Ok((rx, jh))
     }
@@ -181,7 +182,7 @@ impl DataOutput<Bytes> for LocalFs {
         log::info!("Writing to file {:?}", &full_path);
         let (tx, mut rx): (DataOutputTx<Bytes>, _) = channel(1);
         let self_home = self.home;
-        let jh: JoinHandle<Result<DataOutputStats, DataStoreError>> = tokio::spawn(async move {
+        let jh: DataOutputJoinHandle = tokio::spawn(async move {
             if let Some(parent_folder) = full_path.parent() {
                 tokio::fs::create_dir_all(parent_folder).await?;
                 log::info!("Writing to folder {:?}", &parent_folder);
@@ -216,8 +217,7 @@ impl DataOutput<Bytes> for LocalFs {
                     }
                 }
             }
-            Ok(DataOutputStats {
-                name: filename,
+            Ok(DataOutputDetails::Basic {
                 lines_written: num_lines_sent,
             })
         });

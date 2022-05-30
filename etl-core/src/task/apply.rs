@@ -12,7 +12,7 @@ pub struct Apply<S, I> {
 }
 
 impl<S: 'static + Send + Sync, I: 'static + Debug + Send> Apply<S, I> {
-    pub async fn run(self) -> anyhow::Result<DataOutputStats> {
+    pub async fn run(self) -> Result<TaskOutputDetails, DataStoreError> {
         let source_name = format!("Apply-{}", self.input.name());
         let (mut rx, jh) = self.input.start_stream()?;
         let apply_fn = self.apply_fn;
@@ -28,7 +28,7 @@ impl<S: 'static + Send + Sync, I: 'static + Debug + Send> Apply<S, I> {
                         }
                         Err(e) => {
                             log::error!("Apply: {}", &e);
-                            return Err(e);
+                            return Err(e.into());
                         }
                     }
                 }
@@ -38,11 +38,11 @@ impl<S: 'static + Send + Sync, I: 'static + Debug + Send> Apply<S, I> {
             };
         }
         jh.await??;
-        Ok(DataOutputStats {name: source_name, lines_written})
+        Ok(().into())
     }
 }
 impl<S: 'static + Send + Sync, I: 'static + Debug + Send> OutputTask for Apply<S, I> {
-    fn create(self: Box<Self>) -> Result<DataOutputJoinHandle, DataStoreError> 
+    fn create(self: Box<Self>) -> Result<TaskJoinHandle, DataStoreError> 
     {
         Ok(tokio::spawn(async move {
             Ok(self.run().await?)

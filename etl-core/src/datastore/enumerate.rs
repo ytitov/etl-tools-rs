@@ -27,7 +27,7 @@ impl<S: Send + Sync + 'static, O: DeserializeOwned + Debug + Send + Sync + 'stat
         let maybe_pause = self.pause;
         let maybe_max = self.max;
         let state = self.state;
-        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
+        let jh: DataSourceJoinHandle = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             loop {
                 if let Some(max) = &maybe_max {
@@ -52,7 +52,7 @@ impl<S: Send + Sync + 'static, O: DeserializeOwned + Debug + Send + Sync + 'stat
                 }
                 lines_scanned += 1;
             }
-            Ok(DataSourceStats { lines_scanned })
+            Ok(DataSourceDetails::Basic { lines_scanned })
         });
         Ok((rx, jh))
     }
@@ -103,7 +103,7 @@ impl<S: Send + Sync + 'static, O: DeserializeOwned + Debug + Send + Sync + 'stat
         let maybe_pause = self.pause;
         let maybe_max = self.max;
         let state = self.state;
-        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
+        let jh: DataSourceJoinHandle = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             loop {
                 if let Some(max) = &maybe_max {
@@ -128,7 +128,7 @@ impl<S: Send + Sync + 'static, O: DeserializeOwned + Debug + Send + Sync + 'stat
                 }
                 lines_scanned += 1;
             }
-            Ok(DataSourceStats { lines_scanned })
+            Ok(DataSourceDetails::Basic { lines_scanned })
         });
         Ok((rx, jh))
     }

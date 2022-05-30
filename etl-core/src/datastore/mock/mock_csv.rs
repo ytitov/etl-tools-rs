@@ -41,7 +41,7 @@ impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static>
         // could make this configurable
         let (tx, rx) = channel(1);
         let name = String::from("MockJsonDataSource");
-        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> =
+        let jh: DataSourceJoinHandle =
             tokio::spawn(async move {
                 let mut count = 0;
                 let lines = self.lines;
@@ -91,7 +91,7 @@ impl<T: Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync + 'static>
                         }
                     }
                 }
-                Ok(DataSourceStats { lines_scanned })
+                Ok(DataSourceDetails::Basic { lines_scanned })
             });
         Ok((rx, jh))
     }

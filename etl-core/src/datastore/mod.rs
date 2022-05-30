@@ -1,4 +1,5 @@
 use self::error::*;
+use serde_json::Value as JsonValue;
 //use crate::job_manager::JobManagerTx;
 //use crate::preamble::*;
 use async_trait::async_trait;
@@ -34,27 +35,71 @@ pub type DataSourceRx<T> = Receiver<Result<DataSourceMessage<T>, DataStoreError>
 pub type DataSourceTx<T> = Sender<DataSourceMessage<T>>;
 pub type DataSourceTask<T> = (
     DataSourceRx<T>,
-    JoinHandle<Result<DataSourceStats, DataStoreError>>,
+    DataSourceJoinHandle,
 );
 pub type DataOutputTx<T> = Sender<DataOutputMessage<T>>;
 pub type DataOutputRx<T> = Receiver<DataOutputMessage<T>>;
-pub type DataOutputTask<T> = (
-    DataOutputTx<T>,
-    JoinHandle<Result<DataOutputStats, DataStoreError>>,
-);
+pub type DataOutputTask<T> = (DataOutputTx<T>, DataOutputJoinHandle);
 
-pub type DataOutputJoinHandle = JoinHandle<anyhow::Result<DataOutputStats>>;
-pub type DataSourceJoinHandle = JoinHandle<Result<DataSourceStats, DataStoreError>>;
+pub type DataOutputJoinHandle = JoinHandle<Result<DataOutputDetails, DataStoreError>>;
+pub type DataSourceJoinHandle = JoinHandle<Result<DataSourceDetails, DataStoreError>>;
+pub type TaskJoinHandle = JoinHandle<Result<TaskOutputDetails, DataStoreError>>;
 pub type BoxedDataSource<T> = Box<dyn DataSource<T>>;
 
-pub struct DataSourceStats {
-    pub lines_scanned: usize,
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum DataSourceDetails {
+    Empty,
+    Basic {
+        lines_scanned: usize,
+    },
+    WithJson {
+        lines_scanned: usize,
+        data: JsonValue,
+    },
+}
+
+impl From<()> for DataSourceDetails {
+    fn from(_: ()) -> Self {
+        DataSourceDetails::Empty
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct DataOutputStats {
-    pub name: String,
-    pub lines_written: usize,
+pub enum DataOutputDetails {
+    Empty,
+    Basic {
+        lines_written: usize,
+    },
+    WithJson {
+        lines_written: usize,
+        data: JsonValue,
+    },
+}
+
+impl From<()> for DataOutputDetails {
+    fn from(_: ()) -> Self {
+        DataOutputDetails::Empty
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum TaskOutputDetails {
+    Empty,
+    WithJson {
+        data: JsonValue,
+    },
+}
+
+impl From<()> for TaskOutputDetails {
+    fn from(_: ()) -> Self {
+        TaskOutputDetails::Empty
+    }
+}
+
+impl From<JsonValue> for TaskOutputDetails {
+    fn from(data: JsonValue) -> Self {
+        TaskOutputDetails::WithJson { data }
+    }
 }
 
 #[derive(Debug)]
@@ -87,7 +132,7 @@ impl<T: Debug + Send + Sync> DataOutputMessage<T> {
 }
 
 pub trait OutputTask: Sync + Send {
-    fn create(self: Box<Self>) -> Result<DataOutputJoinHandle, DataStoreError>;
+    fn create(self: Box<Self>) -> Result<TaskJoinHandle, DataStoreError>;
 }
 
 //use crate::job_manager::JobManagerRx;
@@ -105,13 +150,6 @@ pub trait DataSource<T: Debug + 'static + Send>: Sync + Send {
     fn name(&self) -> String;
 
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError>;
-
-    fn boxed(self: Box<Self>) -> Box<dyn DataSource<T> + Send + Sync> 
-        where Self: 'static + Sized
-    {
-        Box::new(*self)
-    }
-
 }
 
 impl<T: 'static + Debug + Send> DataSource<T> for DataSourceTask<T> {
@@ -179,10 +217,9 @@ impl<T: Debug + 'static + Sync + Send> DataSource<T> for DataSourceRx<T> {
 
     fn start_stream(mut self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         use tokio::sync::mpsc::channel;
-        use tokio::task::JoinHandle;
         let (tx, rx) = channel(1);
         let name = self.name();
-        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
+        let jh: DataSourceJoinHandle = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             loop {
                 match self.recv().await {
@@ -198,7 +235,7 @@ impl<T: Debug + 'static + Sync + Send> DataSource<T> for DataSourceRx<T> {
                     None => break,
                 }
             }
-            Ok(DataSourceStats { lines_scanned })
+            Ok(DataSourceDetails::Basic { lines_scanned })
         });
         Ok((rx, jh))
     }
@@ -212,10 +249,9 @@ impl<T: Debug + 'static + Sync + Send> DataSource<T> for Receiver<DataSourceMess
 
     fn start_stream(mut self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         use tokio::sync::mpsc::channel;
-        use tokio::task::JoinHandle;
         let (tx, rx) = channel(1);
         let name = self.name();
-        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
+        let jh: DataSourceJoinHandle = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             loop {
                 match self.recv().await {
@@ -228,7 +264,7 @@ impl<T: Debug + 'static + Sync + Send> DataSource<T> for Receiver<DataSourceMess
                     None => break,
                 }
             }
-            Ok(DataSourceStats { lines_scanned })
+            Ok(DataSourceDetails::Basic { lines_scanned })
         });
         Ok((rx, jh))
     }

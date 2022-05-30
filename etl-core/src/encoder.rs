@@ -5,7 +5,6 @@ use bytes::Bytes;
 use serde::Serialize;
 use std::fmt::Debug;
 use tokio::sync::mpsc::channel;
-use tokio::task::JoinHandle;
 
 #[async_trait]
 pub trait EncodeStream<I: Debug + 'static + Send, O: Debug + 'static + Send>: Sync + Send {
@@ -45,47 +44,42 @@ impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutp
         // data sent to the data output will be forwarded here
         let (data_source_tx, data_source_rx): (_, DataSourceRx<T>) = channel(1);
 
-        let given_output_jh: JoinHandle<Result<DataOutputStats, DataStoreError>> =
-            tokio::spawn(async move {
-                let encoded_datasource = self
-                    .encoder
-                    .encode_source(Box::new(data_source_rx) as Box<dyn DataSource<T>>)
-                    .await;
+        let given_output_jh: DataOutputJoinHandle = tokio::spawn(async move {
+            let encoded_datasource = self
+                .encoder
+                .encode_source(Box::new(data_source_rx) as Box<dyn DataSource<T>>)
+                .await;
 
-                // forward encoded elements to the output dataoutput
-                let (mut encoded_datasource_rx, encoded_datasource_jh) =
-                    encoded_datasource.start_stream()?;
-                let (final_data_output_tx, final_data_output_jh) =
-                    self.output.start_stream()?;
-                loop {
-                    match encoded_datasource_rx.recv().await {
-                        Some(Ok(DataSourceMessage::Data { source, content })) => {
-                            final_data_output_tx
-                                .send(DataOutputMessage::Data(content))
-                                .await
-                                .map_err(|e| {
-                                    DataStoreError::send_error(
-                                        &source,
-                                        "EncodedOutput:FinalizedOutput",
-                                        e,
-                                    )
-                                })?;
-                        }
-                        Some(Err(er)) => return Err(er),
-                        None => {
-                            break;
-                        }
+            // forward encoded elements to the output dataoutput
+            let (mut encoded_datasource_rx, encoded_datasource_jh) =
+                encoded_datasource.start_stream()?;
+            let (final_data_output_tx, final_data_output_jh) = self.output.start_stream()?;
+            loop {
+                match encoded_datasource_rx.recv().await {
+                    Some(Ok(DataSourceMessage::Data { source, content })) => {
+                        final_data_output_tx
+                            .send(DataOutputMessage::Data(content))
+                            .await
+                            .map_err(|e| {
+                                DataStoreError::send_error(
+                                    &source,
+                                    "EncodedOutput:FinalizedOutput",
+                                    e,
+                                )
+                            })?;
+                    }
+                    Some(Err(er)) => return Err(er),
+                    None => {
+                        break;
                     }
                 }
-                drop(final_data_output_tx);
-                encoded_datasource_jh.await??;
-                Ok(final_data_output_jh.await?.map_err(|er| {
-                    DataStoreError::FatalIO(format!(
-                        "Error inside the DataOutput: {}",
-                        er.to_string()
-                    ))
-                })?)
-            });
+            }
+            drop(final_data_output_tx);
+            encoded_datasource_jh.await??;
+            Ok(final_data_output_jh.await?.map_err(|er| {
+                DataStoreError::FatalIO(format!("Error inside the DataOutput: {}", er.to_string()))
+            })?)
+        });
 
         // this part receives the dataoutput messages and forwards them to the datasource
         // which can be given to the encoder, but running into problem due to encode_source method
@@ -93,7 +87,7 @@ impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutp
         // pass the input_rx stream into the encoder
         let (input_tx, mut input_rx) = channel(1);
         let output_name = String::from("EncodedOutput");
-        let jh: JoinHandle<Result<DataOutputStats, DataStoreError>> = tokio::spawn(async move {
+        let jh: DataOutputJoinHandle = tokio::spawn(async move {
             loop {
                 match input_rx.recv().await {
                     Some(DataOutputMessage::Data(data)) => {
@@ -153,53 +147,51 @@ pub mod csv_encoder {
                         escape,
                         double_quote,
                     } = self.csv_write_options;
-                    let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> =
-                        tokio::spawn(async move {
-                            let mut lines_scanned = 0_usize;
-                            loop {
-                                match source_rx.recv().await {
-                                    Some(Ok(DataSourceMessage::Data { source, content })) => {
-                                        let send_header = match lines_scanned {
-                                            0 => has_headers,
-                                            _ => false,
-                                        };
-                                        let mut wrt = WriterBuilder::new()
-                                            .has_headers(send_header)
-                                            .delimiter(delimiter)
-                                            .terminator(terminator)
-                                            .quote_style(quote_style)
-                                            .quote(quote)
-                                            .escape(escape)
-                                            .double_quote(double_quote)
-                                            .from_writer(vec![]);
-                                        wrt.serialize(content).map_err(|er| {
+                    let jh: DataSourceJoinHandle = tokio::spawn(async move {
+                        let mut lines_scanned = 0_usize;
+                        loop {
+                            match source_rx.recv().await {
+                                Some(Ok(DataSourceMessage::Data { source, content })) => {
+                                    let send_header = match lines_scanned {
+                                        0 => has_headers,
+                                        _ => false,
+                                    };
+                                    let mut wrt = WriterBuilder::new()
+                                        .has_headers(send_header)
+                                        .delimiter(delimiter)
+                                        .terminator(terminator)
+                                        .quote_style(quote_style)
+                                        .quote(quote)
+                                        .escape(escape)
+                                        .double_quote(double_quote)
+                                        .from_writer(vec![]);
+                                    wrt.serialize(content)
+                                        .map_err(|er| DataStoreError::FatalIO(er.to_string()))?;
+                                    let b = Bytes::from(
+                                        String::from_utf8(wrt.into_inner().map_err(|er| {
                                             DataStoreError::FatalIO(er.to_string())
+                                        })?)
+                                        .map_err(|e| DataStoreError::FatalIO(e.to_string()))?,
+                                    );
+                                    tx.send(Ok(DataSourceMessage::new(&source, b)))
+                                        .await
+                                        .map_err(|e| {
+                                            DataStoreError::send_error(&source, "CsvDecoder", e)
                                         })?;
-                                        let b = Bytes::from(
-                                            String::from_utf8(wrt.into_inner().map_err(|er| {
-                                                DataStoreError::FatalIO(er.to_string())
-                                            })?)
-                                            .map_err(|e| DataStoreError::FatalIO(e.to_string()))?,
-                                        );
-                                        tx.send(Ok(DataSourceMessage::new(&source, b)))
-                                            .await
-                                            .map_err(|e| {
-                                                DataStoreError::send_error(&source, "CsvDecoder", e)
-                                            })?;
-                                        lines_scanned += 1;
-                                    }
-                                    Some(Err(e)) => {
-                                        return Err(e);
-                                    }
-                                    None => {
-                                        break;
-                                    }
+                                    lines_scanned += 1;
+                                }
+                                Some(Err(e)) => {
+                                    return Err(e);
+                                }
+                                None => {
+                                    break;
                                 }
                             }
+                        }
 
-                            source_stream_jh.await??;
-                            Ok(DataSourceStats { lines_scanned })
-                        });
+                        source_stream_jh.await??;
+                        Ok(DataSourceDetails::Basic { lines_scanned })
+                    });
                     return Box::new(EncodedSource {
                         source_name: source_name.clone(),
                         ds_task_result: Ok((rx, jh)),

@@ -5,7 +5,6 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::fmt::Debug;
 use tokio::sync::mpsc::Receiver;
-use tokio::task::JoinHandle;
 
 pub struct DuplicateDataSource<I: Serialize + DeserializeOwned + Debug + Send + Sync> {
     pub rx: DataSourceRx<I>,
@@ -26,7 +25,7 @@ impl<I: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource
             channel(1);
         let mut input_rx = self.rx;
         let name = self.name;
-        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
+        let jh: DataSourceJoinHandle = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             loop {
                 match input_rx.recv().await {
@@ -62,7 +61,7 @@ impl<I: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource
                 };
                 lines_scanned += 1;
             }
-            Ok(DataSourceStats { lines_scanned })
+            Ok(DataSourceDetails::Basic { lines_scanned })
         });
         Ok((fw_rx, jh))
     }
@@ -71,10 +70,7 @@ impl<I: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource
 pub async fn split_datasources<I>(
     data_source: Box<dyn DataSource<I>>,
     n: u16,
-) -> (
-    JoinHandle<Result<DataSourceStats, DataStoreError>>,
-    Vec<Box<DuplicateDataSource<I>>>,
-)
+) -> (DataSourceJoinHandle, Vec<Box<DuplicateDataSource<I>>>)
 where
     I: Serialize + DeserializeOwned + Debug + Clone + Send + Sync + 'static,
 {
@@ -98,7 +94,7 @@ where
             rx,
         }));
     }
-    let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
+    let jh: DataSourceJoinHandle = tokio::spawn(async move {
         let (mut input_rx, input_jh) = data_source.start_stream()?;
         let mut lines_scanned = 0_usize;
         loop {
@@ -133,7 +129,7 @@ where
             };
         }
         input_jh.await??;
-        Ok(DataSourceStats { lines_scanned })
+        Ok(DataSourceDetails::Basic { lines_scanned })
     });
     (jh, dup_data_sources)
 }
