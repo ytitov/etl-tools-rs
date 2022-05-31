@@ -14,7 +14,7 @@ pub enum StepStreamStatus {
         num_errors: usize,
         inputs: HashMap<String, FileStatus>,
         #[serde(default)]
-        outputs: Vec<DataOutputStats>,
+        outputs: Vec<DataOutputDetails>,
     },
     InProgress {
         started: DateTime<Utc>,
@@ -54,7 +54,7 @@ impl StepStreamStatus {
         *self = StepStreamStatus::new_in_progress();
     }
 
-    pub fn complete(&mut self, stats: Vec<DataOutputStats>) {
+    pub fn complete(&mut self, stats: Vec<DataOutputDetails>) {
         match self {
             StepStreamStatus::InProgress {
                 ref started,

@@ -2,7 +2,6 @@ use super::*;
 use crate::job::*;
 use etl_core::datastore::*;
 use etl_core::datastore::error::*;
-use etl_core::deps::tokio::task::JoinHandle;
 use etl_core::deps::serde::{Serialize, de::DeserializeOwned};
 use crate::transform_store::handler::TransformHandler;
 
@@ -49,7 +48,7 @@ impl<
         let (tx, rx) = channel(1);
         let transformer = self.transformer;
         let job_name = self.job_name;
-        let jh: JoinHandle<Result<DataSourceStats, DataStoreError>> = tokio::spawn(async move {
+        let jh: DataSourceJoinHandle = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
             loop {
                 use crate::job::handler::TransformOutput::*;
@@ -95,7 +94,7 @@ impl<
 
             source_stream_jh.await??;
 
-            Ok(DataSourceStats { lines_scanned })
+            Ok(DataSourceDetails::Basic { lines_scanned })
         });
         Ok((rx, jh))
     }

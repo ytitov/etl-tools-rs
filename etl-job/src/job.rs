@@ -24,8 +24,13 @@ type JsonValue = serde_json::Value;
 use self::error::*;
 
 enum OutputJoinHandle {
-    Task(DataOutputJoinHandle),
+    Task(TaskJoinHandle),
     DataOutput(DataOutputJoinHandle),
+}
+
+enum OutputDetails {
+    Task(TaskOutputDetails),
+    DataOutput(DataOutputDetails),
 }
 
 /// JobRunner is used to declare pipelines which are designed to run step-by-step.  To execute
@@ -36,7 +41,7 @@ pub struct JobRunner {
     num_process_item_errors: usize,
     num_processed_items: usize,
     /// helps to await on DataOutput instances to complete writing
-    data_output_handles: Vec<(String, OutputJoinHandle)>,
+    data_output_handles: Vec<OutputJoinHandle>,
     job_state: JobState,
     /// has the job started yet
     is_running: bool,
@@ -118,8 +123,7 @@ impl JobRunner {
     }
 
     async fn load_js_new(&mut self) -> Result<Bytes, DataStoreError> {
-        let (message, result_rx) =
-            Message::load_job_state(self);
+        let (message, result_rx) = Message::load_job_state(self);
         self.job_manager_channel
             .tx
             .send(message)
@@ -210,7 +214,12 @@ impl JobRunner {
 
     /// convenience method to await on any handles useful inside the StreamHandler
     pub fn await_data_output(&mut self, d: DataOutputJoinHandle) {
-        self.data_output_handles.push(d);
+        self.data_output_handles
+            .push(OutputJoinHandle::DataOutput(d));
+    }
+
+    pub fn await_task(&mut self, d: TaskJoinHandle) {
+        self.data_output_handles.push(OutputJoinHandle::Task(d));
     }
 
     pub async fn log_info<A, B>(&self, name: A, msg: B)
@@ -337,16 +346,30 @@ impl JobRunner {
         self.data_output_handles = Vec::new();
         let mut output_stats = Vec::new();
         for join_handle in outputhandles {
-            match join_handle.await {
-                Err(join_handle_err) => {
-                    self.job_state.caught_errors.push(join_handle_err.into());
-                }
-                Ok(Err(task_err)) => {
-                    self.job_state.caught_errors.push(task_err.into());
-                }
-                Ok(Ok(data_output_stats)) => {
-                    output_stats.push(data_output_stats);
-                }
+            use OutputJoinHandle::*;
+            match join_handle {
+                Task(t_jh) => match t_jh.await {
+                    Err(join_handle_err) => {
+                        self.job_state.caught_errors.push(join_handle_err.into());
+                    }
+                    Ok(Err(task_err)) => {
+                        self.job_state.caught_errors.push(task_err.into());
+                    }
+                    Ok(Ok(_data_output_stats)) => {
+                        //output_stats.push(data_output_stats);
+                    }
+                },
+                DataOutput(do_jh) => match do_jh.await {
+                    Err(join_handle_err) => {
+                        self.job_state.caught_errors.push(join_handle_err.into());
+                    }
+                    Ok(Err(task_err)) => {
+                        self.job_state.caught_errors.push(task_err.into());
+                    }
+                    Ok(Ok(data_output_stats)) => {
+                        output_stats.push(data_output_stats);
+                    }
+                },
             }
         }
         //println!("OUTPUT STATS: {:#?}", output_stats);
@@ -363,6 +386,43 @@ impl JobRunner {
             Ok(_) => Ok(self.job_state),
             Err(er) => Err(JobRunnerError::CompleteError(er.to_string())),
         }
+    }
+
+    async fn wait_for_join_handles(&mut self) -> Result<Vec<OutputDetails>, JobRunnerError> {
+        //let outputhandles = self.data_output_handles;
+        //self.data_output_handles = Vec::new();
+        let mut output_stats = Vec::new();
+        let data_output_handles = std::mem::take(&mut self.data_output_handles);
+        for join_handle in data_output_handles {
+            use OutputJoinHandle::*;
+            match join_handle {
+                Task(t_jh) => match t_jh.await {
+                    Err(join_handle_err) => {
+                        self.job_state.caught_errors.push(join_handle_err.into());
+                    }
+                    Ok(Err(task_err)) => {
+                        self.job_state.caught_errors.push(task_err.into());
+                    }
+                    Ok(Ok(task_details)) => {
+                        //output_stats.push(data_output_stats);
+                        output_stats.push(OutputDetails::Task(task_details));
+                    }
+                },
+                DataOutput(do_jh) => match do_jh.await {
+                    Err(join_handle_err) => {
+                        self.job_state.caught_errors.push(join_handle_err.into());
+                    }
+                    Ok(Err(task_err)) => {
+                        self.job_state.caught_errors.push(task_err.into());
+                    }
+                    Ok(Ok(data_output_stats)) => {
+                        output_stats.push(OutputDetails::DataOutput(data_output_stats));
+                    }
+                },
+            }
+        }
+        self.data_output_handles = Vec::new();
+        Ok(output_stats)
     }
 
     /// Same as run except this takes a DataSource and a DataOutput and
@@ -463,7 +523,7 @@ impl JobRunner {
         Ok(self)
     }
 
-    // using impl Future because the compiler could not infer that the lifetime must be 
+    // using impl Future because the compiler could not infer that the lifetime must be
     // attached to the future
     pub fn run_transform_stream<'a, I, O>(
         mut self,
@@ -602,7 +662,7 @@ impl JobRunner {
             Ok(jh) => {
                 // ensure that the job continues but in the end this task finishes
                 self.cur_step_index += 1;
-                self.await_data_output(jh);
+                self.await_task(jh);
                 Ok(self)
             }
             Err(e) => Err(JobRunnerError::GenericError {
@@ -748,13 +808,24 @@ impl JobRunner {
 
                 // only wait if everything is okay
                 source_stream_jh.await??;
-                let mut output_stats = Vec::new();
-                for join_handle in self.data_output_handles {
-                    let s = join_handle.await??;
-                    output_stats.push(s);
+                // TODO: this might need to be deprecated in favor of something different because
+                // the StreamHandler is allowed to create many streams, but here we are
+                // asking the job manager to wait for all of the handles.  This is because
+                // the stream handler use-cases so far have been where multiple streams
+                // are written to.  Leaving as is for compatibility for now.
+                let output_stats = self.wait_for_join_handles().await?;
+                let mut do_details = Vec::new();
+                for item in output_stats {
+                    match item {
+                        // TODO: record this in state
+                        OutputDetails::Task(t) => {}
+                        OutputDetails::DataOutput(t) => {
+                            do_details.push(t);
+                        }
+                    }
                 }
                 self.job_state
-                    .stream_ok(stream_name, &self.config, output_stats)?;
+                    .stream_ok(stream_name, &self.config, do_details)?;
                 self.data_output_handles = Vec::new();
                 self.save_job_state().await?;
             }

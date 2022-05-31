@@ -82,12 +82,12 @@ impl DataOutput<Bytes> for S3Storage {
             None => ProfileProvider::new().map_err(|e| DataStoreError::FatalIO(e.to_string()))?,
         };
         let (s3_tx, s3_rx) = channel(1);
-        let s3_output_key = self.s3_output_key.ok_or_else(|| {
+        let s3_output_key = self.s3_output_key.clone().ok_or_else(|| {
             DataStoreError::FatalIO(
                 "s3_output_key is required when using as a DataOutput".to_string(),
             )
         })?;
-        let jh: JoinHandle<anyhow::Result<DataOutputStats>> = tokio::spawn(async move {
+        let jh: DataOutputJoinHandle = tokio::spawn(async move {
             let s3_jh =
                 s3_write_bytes_multipart(p, &self.s3_bucket, &s3_output_key, s3_rx, self.region)
                     .await
@@ -98,7 +98,10 @@ impl DataOutput<Bytes> for S3Storage {
             loop {
                 match rx.recv().await {
                     Some(DataOutputMessage::Data(data)) => {
-                        s3_tx.send(data).await?;
+                        s3_tx
+                            .send(data)
+                            .await
+                            .map_err(|e| DataStoreError::send_error(&name, "S3", e.to_string()))?;
                         num_lines += 1;
                     }
                     Some(DataOutputMessage::NoMoreData) => break,
@@ -107,8 +110,7 @@ impl DataOutput<Bytes> for S3Storage {
             }
             drop(s3_tx);
             s3_jh.await??;
-            Ok(DataOutputStats {
-                name,
+            Ok(DataOutputDetails::Basic {
                 lines_written: num_lines,
             })
         });
@@ -176,7 +178,7 @@ impl DataSource<Bytes> for S3Storage {
                     }
                 }
             }
-            Ok(DataSourceStats { lines_scanned })
+            Ok(DataSourceDetails::Basic { lines_scanned })
         });
         Ok((rx, jh))
     }

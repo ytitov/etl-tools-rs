@@ -1,12 +1,11 @@
-use etl_core::datastore::*;
 use etl_core::datastore::error::DataStoreError;
+use etl_core::datastore::*;
 use etl_core::deps::anyhow;
 use etl_core::deps::async_trait;
 use etl_core::deps::futures_core::future::BoxFuture;
 use etl_core::deps::log;
 use etl_core::deps::tokio;
 use etl_core::deps::tokio::sync::mpsc::channel;
-use etl_core::deps::tokio::task::JoinHandle;
 use etl_core::utils;
 use etl_core::utils::key_values;
 use serde::de;
@@ -75,7 +74,7 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
         let pool_config = self.pool.clone();
         let map_query_func = self.map_query;
         let failed_query_tx = self.failed_query_tx;
-        let join_handle: JoinHandle<anyhow::Result<DataOutputStats>> = tokio::spawn(async move {
+        let join_handle: DataOutputJoinHandle = tokio::spawn(async move {
             let mut time_started = std::time::Instant::now();
             let mut value_rows: Vec<String> = Vec::with_capacity(on_put_num_rows_max);
             let pool = match pool_config {
@@ -112,7 +111,8 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
                             "mysql://{}:{}@{}:{}/{}",
                             user, pw, host, port, &db_name
                         ))
-                        .await?
+                        .await
+                        .map_err(|e| DataStoreError::FatalIO(e.to_string()))?
                 }
             };
             let mut columns: Vec<String> = vec![];
@@ -233,8 +233,11 @@ impl<T: Serialize + std::fmt::Debug + Send + Sync + 'static> DataOutput<T> for M
             drop(pool);
             //let m = format!("{} inserted {} entries", table_name, total_inserted);
             //jm_tx.send(Message::log_info("mysql-datastore", m)).await?;
-            Ok(DataOutputStats {
-                name: format!("{}.{}", db_name, table_name),
+            use etl_core::deps::serde_json::json;
+            Ok(DataOutputDetails::WithJson {
+                data: json!({
+                    "db_name": db_name, "table_name": table_name
+                }),
                 lines_written: total_inserted,
             })
         });

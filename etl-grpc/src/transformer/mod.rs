@@ -211,7 +211,7 @@ where
                 }
             }
             source_jh.await??;
-            Ok::<_, DataStoreError>(DataSourceStats { lines_scanned })
+            Ok::<_, DataStoreError>(DataSourceDetails::Basic { lines_scanned })
         });
         Ok((output_rx, task_jh))
     }

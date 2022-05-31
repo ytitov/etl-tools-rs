@@ -154,8 +154,7 @@ impl DataOutput<String> for GrpcTransformerClient<String> {
             }
             transform_jh.await?;
             result_output_jh.await??;
-            Ok(DataOutputStats {
-                name: source_name,
+            Ok(DataOutputDetails::Basic {
                 lines_written,
             })
         });

@@ -278,7 +278,7 @@ impl JobState {
         &mut self,
         name: N,
         _: &JobRunnerConfig,
-        stats: Vec<DataOutputStats>,
+        stats: Vec<DataOutputDetails>,
     ) -> anyhow::Result<()> {
         let n = name.into();
         match self.step_history.get_mut(&n) {

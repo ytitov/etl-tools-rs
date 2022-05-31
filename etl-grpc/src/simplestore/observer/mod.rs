@@ -1,4 +1,3 @@
-use etl_core::datastore::error::DataStoreError;
 use etl_core::deps::bytes::Bytes;
 use etl_core::datastore::simple::SimpleStore;
 use etl_core::deps::async_trait;

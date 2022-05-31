@@ -1,4 +1,4 @@
-use actix_web::{get, web, web::Data, App, HttpServer, Responder};
+use actix_web::{get, web, /*web::Data,*/ App, HttpServer, Responder};
 use etl_core::datastore::fs::LocalFs;
 use etl_core::datastore::simple::*;
 use std::sync::Arc;
@@ -16,7 +16,7 @@ async fn greet(
     }
     */
     match loader.load(&name).await {
-        Ok(r) => {
+        Ok(_r) => {
             format!("Found! {name}!")
         }
         Err(e) => {

@@ -6,7 +6,7 @@ pub mod job_manager;
 pub mod transform_store;
 
 use crate::job::JobRunner;
-use etl_core::datastore::{DataOutputStats, DataOutputTask};
+use etl_core::datastore::{DataOutputDetails, DataOutputTask};
 use etl_core::deps::*;
 use std::fmt::Debug;
 
@@ -21,7 +21,7 @@ use std::fmt::Debug;
 pub async fn data_output_shutdown<T>(
     jr: &JobRunner,
     (c, jh): DataOutputTask<T>,
-) -> anyhow::Result<DataOutputStats>
+) -> anyhow::Result<DataOutputDetails>
 where
     T: Debug + Send + Sync,
 {
