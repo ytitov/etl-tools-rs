@@ -1,11 +1,12 @@
-use crate::job_manager::*;
+use crate::job_manager::{message::Message, JobManagerChannel, JobManagerHandle, JobManagerTx};
 use etl_core::datastore::error::*;
 use etl_core::datastore::*;
 use etl_core::deps::bytes::Bytes;
 use etl_core::deps::{
-    anyhow, async_trait, serde, serde::de::DeserializeOwned, serde::Serialize, tokio,
+    anyhow, async_trait, log, serde, serde::de::DeserializeOwned, serde::Serialize, tokio,
 };
 use etl_core::transformer::Transformer;
+use etl_core::transformer::TransformerFut;
 use state::*;
 use std::fmt;
 use std::fmt::Debug;
@@ -13,12 +14,12 @@ use std::future::Future;
 
 pub mod command;
 pub mod handler;
+pub mod state;
 pub mod stream;
 pub mod stream_handler_builder;
+
 use command::*;
 use handler::*;
-//use stream::*;
-pub mod state;
 
 type JsonValue = serde_json::Value;
 use self::error::*;
@@ -80,8 +81,8 @@ impl JobRunner {
     /// `id` is an enumerated name like an extract id
     /// `name` is the name of the actual job, like 'extract-patient-data'
     pub async fn create<A, B>(
-        id: A,   // what the job is always called
-        name: B, // instance id of the job
+        name: A,        // what the job is always called
+        instance_id: B, // instance id of the job
         job_manager_handle: &JobManagerHandle,
         config: JobRunnerConfig,
     ) -> anyhow::Result<Self>
@@ -90,9 +91,38 @@ impl JobRunner {
         B: Into<String>,
     {
         let name = name.into();
-        let id = id.into();
+        let instance_id = instance_id.into();
         let mut jr = JobRunner {
-            job_manager_channel: job_manager_handle.connect(id.clone(), name.clone()).await?,
+            job_manager_channel: job_manager_handle
+                .connect(name.clone(), instance_id.clone())
+                .await?,
+            num_process_item_errors: 0,
+            num_processed_items: 0,
+            config,
+            data_output_handles: Vec::new(),
+            job_state: JobState::new(name, instance_id),
+            job_state_updated: false,
+            is_running: false,
+            cur_step_index: 0,
+        };
+        jr.job_state = jr.load_job_state().await?;
+        Ok(jr)
+    }
+
+    pub fn create_with_channel<A, B>(
+        name: B, // instance id of the job
+        instance_id: A,   // what the job is always called
+        job_manager_channel: JobManagerChannel,
+        config: JobRunnerConfig,
+    ) -> anyhow::Result<Self>
+    where
+        A: Into<String>,
+        B: Into<String>,
+    {
+        let name = name.into();
+        let id = instance_id.into();
+        let jr = JobRunner {
+            job_manager_channel,
             num_process_item_errors: 0,
             num_processed_items: 0,
             config,
@@ -102,11 +132,6 @@ impl JobRunner {
             is_running: false,
             cur_step_index: 0,
         };
-        jr.job_state = jr.load_job_state().await?;
-        /*
-        jr.register().await
-            .expect("There was an error registering the job");
-        */
         Ok(jr)
     }
 
@@ -299,7 +324,8 @@ impl JobRunner {
         loop {
             match self.job_manager_channel.rx.try_recv() {
                 Ok(message) => {
-                    use crate::job_manager::Message::*;
+                    use crate::job_manager::message::NotifyJobRunner;
+                    use Message::*;
                     match message {
                         // message broadcasted from JobManager when there are too many errors and its
                         // better to stop the job completely.  max errors are defined in the
@@ -521,6 +547,120 @@ impl JobRunner {
             }
         }
         Ok(self)
+    }
+
+    // experimenting with a different structure
+    pub fn run_transform_stream_2<'a, I, O>(
+        mut self,
+        stream_name: String,
+        mut transformer: Box<dyn TransformerFut<'a, I, O>>,
+        input: Box<dyn DataSource<I>>,
+        output: Box<dyn DataOutput<O>>,
+        //) -> Result<Self, JobRunnerError>
+    ) -> impl Future<Output = Result<Self, JobRunnerError>> + 'a
+    where
+        I: Debug + Send + Sync + 'static,
+        O: Debug + Send + Sync + 'static,
+    {
+        async move {
+            self.job_state = self.load_job_state().await?;
+            let name = stream_name.to_string();
+            use stream::StepStreamStatus;
+
+            match self.job_state.start_new_stream(&name, &self.config) {
+                Ok((_, StepStreamStatus::Complete { .. })) => {
+                    self.log_info(
+                        self.job_state.name(),
+                        format!("{} stream previously ran, skipping", &name),
+                    )
+                    .await;
+                }
+                Err(e) => {
+                    log::error!("Problem starting stream: {}", e);
+                    self.complete().await?;
+                    return Err(e);
+                }
+                Ok(_) => {
+                    let input_name = input.name().to_string();
+                    let (mut input_rx, input_jh) = input.start_stream()?;
+                    let (output_tx, output_jh) = output.start_stream()?;
+                    self.save_job_state().await?;
+                    let mut lines_scanned = 0_usize;
+                    loop {
+                        let info = JobItemInfo::new((lines_scanned, self.job_state.name()));
+                        match input_rx.recv().await {
+                            Some(Ok(DataSourceMessage::Data {
+                                source,
+                                content: input_item,
+                            })) => {
+                                lines_scanned += 1;
+                                self.job_state
+                                    .stream_incr_count_ok(stream_name.clone(), &source)?;
+                                let transformed_item = transformer.transform(input_item).await?;
+                                output_tx
+                                    .send(DataOutputMessage::new(transformed_item))
+                                    .await?;
+                            }
+                            Some(Err(val)) => {
+                                lines_scanned += 1;
+                                self.job_state.stream_incr_count_err(stream_name.clone())?;
+                                self.log_err(&input_name, Some(&info), val.to_string())
+                                    .await;
+                                self.num_process_item_errors += 1;
+                            }
+                            None => break,
+                        };
+                        match self.process_job_manager_rx().await {
+                            Err(JobRunnerError::TooManyErrors) => {
+                                self.job_state.stream_not_ok(
+                                    name,
+                                    String::from("Reached too many errors"),
+                                    lines_scanned,
+                                )?;
+                                self.save_job_state().await?;
+                                drop(input_rx);
+                                drop(output_tx);
+                                // not using the number in error yet..
+                                let _ = input_jh.await??;
+                                let _ = output_jh.await??;
+                                return Err(JobRunnerError::TooManyErrors);
+                            }
+                            Err(e) => {
+                                //panic!("Received an unforseen error {}", e);
+                                self.job_state.stream_not_ok(
+                                    name,
+                                    format!(
+                                        "While processing job manager messages ran into {}",
+                                        &e
+                                    ),
+                                    lines_scanned,
+                                )?;
+                                self.save_job_state().await?;
+                                drop(input_rx);
+                                drop(output_tx);
+                                input_jh.await??;
+                                output_jh.await??;
+                                return Err(JobRunnerError::GenericError {
+                                    message: e.to_string(),
+                                });
+                            }
+                            Ok(()) => {}
+                        };
+                    }
+                    self.cur_step_index += 1;
+                    drop(input_rx);
+                    drop(output_tx);
+                    // TODO: these input join handles cancel the whole job if there is an error and
+                    // the job state does not reflect that
+                    input_jh.await??;
+                    let output_stats = output_jh.await??;
+                    self.job_state
+                        .stream_ok(name, &self.config, vec![output_stats])?;
+                    self.save_job_state().await?;
+                }
+            }
+            Ok(self)
+        }
     }
 
     // using impl Future because the compiler could not infer that the lifetime must be

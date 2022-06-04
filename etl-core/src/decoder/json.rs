@@ -30,6 +30,7 @@ impl<T: DeserializeOwned + Debug + 'static + Send + Sync> DecodeStream<T> for Js
                                 lines_scanned += 1;
                                 match serde_json::from_slice::<T>(&content) {
                                     Ok(r) => {
+                                        log::info!("{:?}", &r);
                                         tx.send(Ok(DataSourceMessage::new(
                                             "MockJsonDataSource",
                                             r,
@@ -41,6 +42,7 @@ impl<T: DeserializeOwned + Debug + 'static + Send + Sync> DecodeStream<T> for Js
                                         lines_scanned += 1;
                                     }
                                     Err(val) => {
+                                        log::error!("{}", &val);
                                         match tx
                                             .send(Err(DataStoreError::Deserialize {
                                                 message: val.to_string(),

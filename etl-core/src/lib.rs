@@ -42,3 +42,5 @@ pub mod splitter;
 pub mod transformer;
 /// take in a stream and output same items but as batches
 pub mod batch;
+/// key-value type storage.  Provides a simple interface over any storage using strings as keys
+pub mod keystore;

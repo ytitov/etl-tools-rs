@@ -1,10 +1,9 @@
 use super::error::*;
-use crate::datastore::simple::SimpleStore;
+use crate::keystore::simple::SimpleStore;
 use crate::datastore::{
-    DataOutput, DataOutputMessage, DataOutputDetails, DataOutputTask, DataOutputTx, DataSource,
-    DataSourceMessage, DataSourceDetails, DataSourceTask,
-    DataSourceJoinHandle,
-    DataOutputJoinHandle,
+    DataOutput, DataOutputDetails, DataOutputJoinHandle, DataOutputMessage, DataOutputTask,
+    DataOutputTx, DataSource, DataSourceDetails, DataSourceJoinHandle, DataSourceMessage,
+    DataSourceTask,
 };
 use crate::queue::QueueClient;
 use async_trait::async_trait;
@@ -51,12 +50,13 @@ impl DataSource<Bytes> for LocalFs {
                 //higher up.  must create a test then rectify this
                 let file = File::open(Path::new(&home).join(&fname))
                     .await
-                    .expect("File not found");
+                    .map_err(|e| DataStoreError::FatalIO(format!("Could not open file: {}", e)))?;
                 // 68 mb in size
                 let mut lines = BufReader::with_capacity(1 << 26, file).lines();
                 loop {
                     if let Some(line) = lines.next_line().await? {
                         lines_scanned += 1;
+                        log::debug!("{}", &line);
                         tx.send(Ok(DataSourceMessage::new(&fname, Bytes::from(line))))
                             .await
                             .map_err(|er| DataStoreError::send_error(&name, &fname, er))?;

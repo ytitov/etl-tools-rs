@@ -1,7 +1,5 @@
 use self::error::*;
 use serde_json::Value as JsonValue;
-//use crate::job_manager::JobManagerTx;
-//use crate::preamble::*;
 use async_trait::async_trait;
 use serde::de::Deserializer;
 use serde::Deserialize;
@@ -19,8 +17,6 @@ pub mod error;
 pub mod fs;
 /// various data stores used for testing
 pub mod mock;
-/// Traits that define non-streaming loading and saving of data
-pub mod simple;
 pub mod sources;
 
 pub type CallbackRx<T> = OneShotRx<Result<T, DataStoreError>>;
@@ -117,7 +113,7 @@ impl<T: Send> DataSourceMessage<T> {
 }
 
 #[derive(Debug)]
-pub enum DataOutputMessage<T: Debug + Send + Sync> {
+pub enum DataOutputMessage<T: Send> {
     Data(T),
     NoMoreData,
 }
@@ -146,7 +142,7 @@ impl<T: Debug + Send + 'static> DynDataSource<T> {
     }
 }
 
-pub trait DataSource<T: Debug + 'static + Send>: Sync + Send {
+pub trait DataSource<T: Send>: Sync + Send {
     fn name(&self) -> String;
 
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError>;
@@ -181,7 +177,7 @@ where
     async fn create_data_source(_: C) -> anyhow::Result<Box<dyn DataSource<T>>>;
 }
 
-pub trait DataOutput<T: Debug + 'static + Sync + Send>: Sync + Send {
+pub trait DataOutput<T: Send>: Sync + Send {
     fn start_stream(self: Box<Self>) -> Result<DataOutputTask<T>, DataStoreError>;
 
     /*

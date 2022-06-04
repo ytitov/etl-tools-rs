@@ -10,14 +10,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         //.with_level(LevelFilter::Info)
         // specific logging only for etl_core to be info
         .with_module_level("grpc_simple_store_server", LevelFilter::Info)
-        .with_module_level("etl_grpc::simplestore::observer_server", LevelFilter::Info)
+        .with_module_level("etl_grpc::simplestore::observer::server", LevelFilter::Info)
         .env()
         .init()
         .unwrap();
 
     let simplestore = Box::new(MockJsonDataSource::default());
     
-    let ip_addr = "[::]:50051".to_string();
+    //let ip_addr = "[::]:50051".to_string();
+    let ip_addr = "0.0.0.0:9000".to_string();
 
     log::info!("starting {}", &ip_addr);
 

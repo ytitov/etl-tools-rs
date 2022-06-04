@@ -8,5 +8,6 @@ members = [
     "etl-job",
     "etl-grpc",
     "etl-dev-client-viewer",
+    "etl-web",
 		#"etl-examples",
 ]

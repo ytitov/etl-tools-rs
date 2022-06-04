@@ -1,11 +1,17 @@
-use super::*;
+use async_trait::async_trait;
+use std::fmt::Debug;
+use crate::datastore::error::*;
+
+/// wraps any SimpleStore and uses tokio channels to route all operations to it thus allowing to
+/// be clonable.  This approach avoids mutex locking since there is a single Rx channel which
+/// receives all of the data and actually applies the reads and writes
+pub mod mpsc;
 
 #[async_trait]
 /// This is a simple store that acts like a key-val storage.  It is not streamted
 /// so is not meant for big files.  Primarily created for the JobRunner to
 /// store the state of the running job somewhere
 pub trait SimpleStore<T: 'static + Send>: Sync + Send {
-
     fn path_sep(&self) -> &'static str {
         "/"
     }
@@ -35,7 +41,7 @@ pub trait SimpleStore<T: 'static + Send>: Sync + Send {
 }
 
 #[async_trait]
-pub trait QueryableStore<T>: SimpleStore<T> + Sync + Send 
+pub trait QueryableStore<T>: SimpleStore<T> + Sync + Send
 where
     T: 'static + Send,
 {
@@ -98,3 +104,4 @@ impl<L: 'static + Send + Debug, R: 'static + Send + Debug> SimpleStore<DataPair<
         Ok(())
     }
 }
+

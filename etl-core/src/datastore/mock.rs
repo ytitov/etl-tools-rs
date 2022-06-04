@@ -2,7 +2,7 @@ use super::*;
 use ::log;
 use bytes::Bytes;
 use serde::{de::DeserializeOwned, Serialize};
-use simple::{QueryableStore, SimpleStore};
+use crate::keystore::simple::{QueryableStore, SimpleStore};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Debug;

@@ -9,7 +9,7 @@ message LoadRequest {
 message LoadResponse {
   string key = 1;
   bytes bytes_content = 2;
-  optional basetypes.simplestore_error.GrpcSimpleStoreError error = 3;
+  basetypes.simplestore_error.GrpcSimpleStoreError error = 3;
 }
 
 message WriteRequest {
@@ -19,7 +19,7 @@ message WriteRequest {
 
 message WriteResponse {
   string key = 1;
-  optional basetypes.simplestore_error.GrpcSimpleStoreError error = 2;
+  basetypes.simplestore_error.GrpcSimpleStoreError error = 2;
 }
 
 service BytesSimpleStore {
