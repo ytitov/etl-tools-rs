@@ -1,9 +1,9 @@
 use self::error::*;
-use serde_json::Value as JsonValue;
 use async_trait::async_trait;
 use serde::de::Deserializer;
 use serde::Deserialize;
 use serde::Serialize;
+use serde_json::Value as JsonValue;
 use std::fmt::Debug;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::{Receiver as OneShotRx, Sender as OneShotTx};
@@ -29,10 +29,7 @@ pub type DataOutputItemResult<T> = Result<T, DataStoreError>;
 
 pub type DataSourceRx<T> = Receiver<Result<DataSourceMessage<T>, DataStoreError>>;
 pub type DataSourceTx<T> = Sender<DataSourceMessage<T>>;
-pub type DataSourceTask<T> = (
-    DataSourceRx<T>,
-    DataSourceJoinHandle,
-);
+pub type DataSourceTask<T> = (DataSourceRx<T>, DataSourceJoinHandle);
 pub type DataOutputTx<T> = Sender<DataOutputMessage<T>>;
 pub type DataOutputRx<T> = Receiver<DataOutputMessage<T>>;
 pub type DataOutputTask<T> = (DataOutputTx<T>, DataOutputJoinHandle);
@@ -40,7 +37,7 @@ pub type DataOutputTask<T> = (DataOutputTx<T>, DataOutputJoinHandle);
 pub type DataOutputJoinHandle = JoinHandle<Result<DataOutputDetails, DataStoreError>>;
 pub type DataSourceJoinHandle = JoinHandle<Result<DataSourceDetails, DataStoreError>>;
 pub type TaskJoinHandle = JoinHandle<Result<TaskOutputDetails, DataStoreError>>;
-pub type BoxedDataSource<T> = Box<dyn DataSource<T>>;
+pub type BoxedDataSource<'a, T> = Box<dyn DataSource<'a, T>>;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum DataSourceDetails {
@@ -81,9 +78,7 @@ impl From<()> for DataOutputDetails {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum TaskOutputDetails {
     Empty,
-    WithJson {
-        data: JsonValue,
-    },
+    WithJson { data: JsonValue },
 }
 
 impl From<()> for TaskOutputDetails {
@@ -131,24 +126,13 @@ pub trait OutputTask: Sync + Send {
     fn create(self: Box<Self>) -> Result<TaskJoinHandle, DataStoreError>;
 }
 
-//use crate::job_manager::JobManagerRx;
-pub struct DynDataSource<T> {
-    pub ds: Box<dyn DataSource<T>>,
-}
-
-impl<T: Debug + Send + 'static> DynDataSource<T> {
-    pub fn new<C: DataSource<T> + 'static>(t: C) -> Self {
-        DynDataSource { ds: Box::new(t) }
-    }
-}
-
-pub trait DataSource<T: Send>: Sync + Send {
+pub trait DataSource<'a, T: Send>: 'a + Sync + Send {
     fn name(&self) -> String;
 
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError>;
 }
 
-impl<T: 'static + Debug + Send> DataSource<T> for DataSourceTask<T> {
+impl<'a, T: Send> DataSource<'a, T> for DataSourceTask<T> {
     fn name(&self) -> String {
         String::from("DataSourceTask")
     }
@@ -172,9 +156,9 @@ where
 pub trait CreateDataSource<'de, C, T>: Sync + Send
 where
     C: Deserializer<'de>,
-    T: Debug + 'static + Send,
+    T: Send,
 {
-    async fn create_data_source(_: C) -> anyhow::Result<Box<dyn DataSource<T>>>;
+    async fn create_data_source<'a>(_: C) -> anyhow::Result<Box<dyn DataSource<'a, T>>>;
 }
 
 pub trait DataOutput<T: Send>: Sync + Send {
@@ -206,7 +190,7 @@ pub trait DataOutput<T: Send>: Sync + Send {
 }
 
 #[async_trait]
-impl<T: Debug + 'static + Sync + Send> DataSource<T> for DataSourceRx<T> {
+impl<T: Debug + 'static + Sync + Send> DataSource<'_, T> for DataSourceRx<T> {
     fn name(&self) -> String {
         String::from("DataSourceRx")
     }
@@ -238,7 +222,10 @@ impl<T: Debug + 'static + Sync + Send> DataSource<T> for DataSourceRx<T> {
 }
 
 #[async_trait]
-impl<T: Debug + 'static + Sync + Send> DataSource<T> for Receiver<DataSourceMessage<T>> {
+impl<T> DataSource<'_, T> for Receiver<DataSourceMessage<T>>
+where
+    T: Send + Sync + Debug + 'static,
+{
     fn name(&self) -> String {
         String::from("DataSourceRx")
     }
