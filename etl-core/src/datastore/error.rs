@@ -107,13 +107,13 @@ impl From<serde_json::Error> for DataStoreError {
 
 type DataOutputMessageSendError<T> = tokio::sync::mpsc::error::SendError<DataOutputMessage<T>>;
 impl<T> From<DataOutputMessageSendError<T>> for DataStoreError 
-where T: Debug + Sync + Send
+where T: Sync + Send
 {
     fn from(er: DataOutputMessageSendError<T>) -> Self {
         DataStoreError::SendError {
             from: "Unknown".into(),
             to: "mpsc::Sender".into(),
-            reason: format!("SendError.  Content: {:?}", er.0)
+            reason: format!("SendError.  Content: {:?}", er.to_string())
         }
     }
 }

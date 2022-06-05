@@ -34,7 +34,7 @@ pub trait Task<'a>: Sync + Send {
 impl<I, O> OutputTask for TransformStream<'static, I, O> 
 where
     I: Send + Sync + 'static,
-    O: Debug + Send + Sync + 'static,
+    O: Send + Sync + 'static,
 {
     fn create(self: Box<Self>) -> Result<TaskJoinHandle, DataStoreError> {
         let input = self.input;

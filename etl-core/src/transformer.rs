@@ -1,9 +1,10 @@
 use crate::datastore::{
-    error::DataStoreError,
-    DataSource, DataSourceDetails, DataSourceJoinHandle, DataSourceMessage, DataSourceTask,
+    error::DataStoreError, DataSource, DataSourceDetails, DataSourceJoinHandle, DataSourceMessage,
+    DataSourceTask,
 };
 use async_trait::async_trait;
 use std::future::Future;
+use std::iter::Iterator;
 use std::marker::PhantomData;
 use std::pin::Pin;
 
@@ -153,7 +154,11 @@ where
     F: Fn(usize, I) -> Result<O, DataStoreError>,
 {
     pub fn new(f: F) -> Self {
-        Self { idx: 0, p: PhantomData, f }
+        Self {
+            idx: 0,
+            p: PhantomData,
+            f,
+        }
     }
 }
 
@@ -173,7 +178,7 @@ where
     }
 }
 
-impl<'a, F, I, O> TransformerFut<'a, I, O> for F 
+impl<'a, F, I, O> TransformerFut<'a, I, O> for F
 where
     F: Fn(I) -> Result<O, DataStoreError> + 'a + Send + Sync,
     I: 'a + Send + Sync,

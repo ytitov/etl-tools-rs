@@ -19,6 +19,8 @@ pub mod fs;
 pub mod mock;
 pub mod sources;
 pub mod outputs;
+/// wrapper for values for cases when multiple values are returned
+pub mod wrapper;
 
 pub type CallbackRx<T> = OneShotRx<Result<T, DataStoreError>>;
 pub type CallbackTx<T> = OneShotTx<Result<T, DataStoreError>>;
