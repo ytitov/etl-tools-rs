@@ -5,6 +5,69 @@ use bytes::Bytes;
 use serde::Serialize;
 use tokio::sync::mpsc::channel;
 
+pub mod json {
+    use super::*;
+    pub struct JsonEncoder<'a, I> {
+        m: std::marker::PhantomData<I>,
+        bytes_output: Box<dyn DataOutput<'a, Bytes>>,
+    }
+
+    impl<'a, I> JsonEncoder<'a, I>
+    where
+        I: Serialize + Send + Sync,
+    {
+        pub fn into_bytes_output<DO>(out: DO) -> Self
+        where
+            DO: DataOutput<'a, Bytes>,
+        {
+            Self {
+                m: std::marker::PhantomData,
+                bytes_output: Box::new(out),
+            }
+        }
+    }
+
+    //impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<'_, T> for MockDataOutput {
+    impl<'a, I> DataOutput<'a, I> for JsonEncoder<'a, I>
+    where
+        I: Serialize + Send + Sync + 'static,
+    {
+        fn start_stream(self: Box<Self>) -> Result<DataOutputTask<I>, DataStoreError> {
+            let (bytes_out_tx, bytes_out_jh) = self.bytes_output.start_stream()?;
+            let (tx, mut rx): (DataOutputTx<I>, _) = channel(1);
+            let jh: DataOutputJoinHandle = tokio::spawn(async move {
+                let mut lines_written = 0_usize;
+                loop {
+                    match rx.recv().await {
+                        Some(DataOutputMessage::Data(data)) => {
+                            match serde_json::to_string(&data) {
+                                Ok(data_str) => {
+                                    bytes_out_tx
+                                        .send(DataOutputMessage::new(Bytes::from(data_str)))
+                                        .await?;
+                                    lines_written += 1;
+                                }
+                                Err(er) => {
+                                    return Err(DataStoreError::FatalIO(format!(
+                                        "Could not serialize this item: {}",
+                                        er
+                                    )));
+                                }
+                            };
+                        }
+                        None => break,
+                        _ => break,
+                    };
+                }
+                drop(bytes_out_tx);
+                bytes_out_jh.await??;
+                Ok(DataOutputDetails::Basic { lines_written })
+            });
+            Ok((tx, jh))
+        }
+    }
+}
+
 //TODO: this can be removed
 pub trait EncodeStream<'a, I, O>: Sync + Send
 where

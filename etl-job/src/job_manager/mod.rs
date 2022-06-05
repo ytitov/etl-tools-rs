@@ -189,7 +189,8 @@ impl JobManager {
             jh.await??;
         }
         for jh in self.task_join_handles {
-            jh.await??;
+            let r = jh.await??;
+            log::info!("task join handle: {:?}", r);
         }
         self.job_manager_handle.shutdown().await?;
         Ok(())

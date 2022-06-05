@@ -65,7 +65,7 @@ donald duck,"234324""#
     use etl_core::decoder::csv::CsvDecoder;
     use etl_core::datastore::CsvReadOptions;
     let t1 = TransformStream::new(
-        CsvDecoder::from_bytes_source(CsvReadOptions::default(), csv_sample),
+        CsvDecoder::decode_bytes_source(CsvReadOptions::default(), csv_sample),
         Vec::new(),
         |s: CsvRow| {
             log::info!("got s {:?}", &s);

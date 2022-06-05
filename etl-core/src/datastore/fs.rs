@@ -1,10 +1,10 @@
 use super::error::*;
-use crate::keystore::simple::SimpleStore;
 use crate::datastore::{
     DataOutput, DataOutputDetails, DataOutputJoinHandle, DataOutputMessage, DataOutputTask,
     DataOutputTx, DataSource, DataSourceDetails, DataSourceJoinHandle, DataSourceMessage,
     DataSourceTask,
 };
+use crate::keystore::simple::SimpleStore;
 use crate::queue::QueueClient;
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -18,6 +18,39 @@ pub struct LocalFs {
     pub files: Vec<String>,
     pub home: String,
     pub output_name: Option<String>,
+}
+
+impl LocalFs {
+    // Pretty yucky quick hack
+    fn walk_dir_sync(s: String) -> anyhow::Result<Vec<String>> {
+        use std::fs::read_dir;
+        use std::fs::ReadDir;
+        let mut v = Vec::new();
+        for e in read_dir(s) {
+            let r: ReadDir = e;
+            for f in r {
+                if let Ok(f) = f {
+                    let ft = f.file_type()?;
+
+                    if ft.is_dir() {
+                        let sub_v = LocalFs::walk_dir_sync(String::from(
+                            f.path().into_os_string().to_string_lossy(),
+                        ))?;
+                        for e in sub_v {
+                            v.push(e);
+                        }
+                    } else if ft.is_file() {
+                        let s = String::from(f.path().into_os_string().to_string_lossy());
+                        if s.ends_with("json") {
+                            v.push(s);
+                        }
+                    } else {
+                    }
+                }
+            }
+        }
+        Ok(v)
+    }
 }
 
 impl Default for LocalFs {
@@ -37,11 +70,20 @@ impl DataSource<'_, Bytes> for LocalFs {
 
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<Bytes>, DataStoreError> {
         use tokio::fs::File;
+        use tokio::fs::{read_dir, ReadDir};
         use tokio::io::{AsyncBufReadExt, BufReader};
         use tokio::sync::mpsc::channel;
         let (tx, rx) = channel(1);
-        let files = self.files.clone();
+        //let files = self.files.clone();
         let home = self.home.clone();
+
+        let files = if self.files.len() > 0 {
+            self.files.clone()
+        } else {
+            LocalFs::walk_dir_sync(home.clone())?
+        };
+
+        //println!("FILES: {:?}", &files);
         let name = self.name();
         let jh: DataSourceJoinHandle = tokio::spawn(async move {
             let mut lines_scanned = 0_usize;
@@ -207,6 +249,7 @@ impl DataOutput<'_, Bytes> for LocalFs {
                 match rx.recv().await {
                     Some(DataOutputMessage::Data(item)) => {
                         file.write_all(&item).await?;
+                        file.write_all("\n".as_bytes()).await?;
                         num_lines_sent += 1;
                     }
                     Some(DataOutputMessage::NoMoreData) => {

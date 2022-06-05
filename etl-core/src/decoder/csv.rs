@@ -20,7 +20,7 @@ impl CsvDecoder {
     }
 
     // this is most deffinitely awkward...
-    pub fn from_bytes_source<'a, DS, O>(
+    pub fn decode_bytes_source<'a, DS, O>(
         opts: CsvReadOptions,
         source: DS,
     ) -> TransformSource<'a, Bytes, O>

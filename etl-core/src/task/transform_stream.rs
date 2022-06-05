@@ -61,9 +61,13 @@ where
                 };
             }
             drop(out_tx); // graceful close
-            in_jh.await??;
-            out_jh.await??;
-            Ok(TaskOutputDetails::Empty)
+            let input_result = in_jh.await??;
+            let output_result = out_jh.await??;
+            use serde_json::json;
+            Ok(TaskOutputDetails::WithJson { data: json!({
+                "input": input_result,
+                "output": output_result,
+            })})
         }))
     }
 }
