@@ -12,29 +12,33 @@ impl Default for StringDecoder {
 }
 
 impl StringDecoder {
-    pub fn with_datasource_dyn(
+    pub fn with_datasource_dyn<'a>(
         self,
-        source: Box<dyn DataSource<Bytes>>,
-    ) -> Box<dyn DataSource<String>>
+        source: Box<dyn DataSource<'a, Bytes>>,
+    ) -> Box<dyn DataSource<'a, String>>
     where
-        String: Debug + Send + Sync + 'static,
+        String: Send + Sync + 'static,
     {
         DecodeStream::decode_source(self, source)
     }
-    pub fn with_datasource<T>(self, source: T) -> Box<dyn DataSource<String>>
+    /*
+    pub fn with_datasource<'a, T>(self, source: T) -> Box<dyn DataSource<'a, String>>
     where
-        String: Debug + Send + Sync + 'static,
-        T: DataSource<Bytes> + 'static,
+        String: Send + Sync + 'a,
+        T: 'a + DataSource<'a, Bytes>,
     {
-        DecodeStream::decode_source(self, Box::new(source) as Box<dyn DataSource<Bytes>>)
+        DecodeStream::decode_source(self, Box::new(source) as Box<dyn DataSource<'a, Bytes>>)
+
     }
+    */
 }
 
-impl<T: Debug + 'static + Send + Sync> DecodeStream<T> for StringDecoder
+impl<T> DecodeStream<T> for StringDecoder
 where
-    DecodedSource<String>: DataSource<T>,
+    T: 'static + Send + Sync,
+    for<'a> DecodedSource<String>: DataSource<'a, T>,
 {
-    fn decode_source(self, source: Box<dyn DataSource<Bytes>>) -> Box<dyn DataSource<T>> {
+    fn decode_source(self, source: Box<dyn DataSource<Bytes>>) -> Box<dyn DataSource<'_, T>> {
         use tokio::sync::mpsc::channel;
         let (tx, rx) = channel(1);
 

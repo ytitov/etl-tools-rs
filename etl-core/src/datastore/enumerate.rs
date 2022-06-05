@@ -12,8 +12,10 @@ pub struct EnumerateStream<S, O> {
     pub create: fn(&'_ S, usize) -> DataOutputItemResult<O>,
 }
 
-impl<S: Send + Sync + 'static, O: DeserializeOwned + Debug + Send + Sync + 'static> DataSource<O>
-    for EnumerateStream<S, O>
+impl<S, O> DataSource<'_, O> for EnumerateStream<S, O>
+where
+    S: Send + Sync + 'static,
+    O: DeserializeOwned + Send + Sync + 'static,
 {
     fn name(&self) -> String {
         format!("{}", &self.name)
@@ -88,8 +90,10 @@ impl<S, O> EnumerateStreamAsync<S, O> {
     }
 }
 
-impl<S: Send + Sync + 'static, O: DeserializeOwned + Debug + Send + Sync + 'static> DataSource<O>
-    for EnumerateStreamAsync<S, O>
+impl<S, O> DataSource<'_, O> for EnumerateStreamAsync<S, O>
+where
+    S: Send + Sync + 'static,
+    O: DeserializeOwned + Debug + Send + Sync + 'static,
 {
     fn name(&self) -> String {
         format!("{}", &self.name)
@@ -133,4 +137,3 @@ impl<S: Send + Sync + 'static, O: DeserializeOwned + Debug + Send + Sync + 'stat
         Ok((rx, jh))
     }
 }
-

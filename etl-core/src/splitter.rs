@@ -3,17 +3,17 @@ use crate::datastore::*;
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::fmt::Debug;
 use tokio::sync::mpsc::Receiver;
 
-pub struct DuplicateDataSource<I: Serialize + DeserializeOwned + Debug + Send + Sync> {
+pub struct DuplicateDataSource<I: Serialize + DeserializeOwned + Send + Sync> {
     pub rx: DataSourceRx<I>,
     pub name: String,
 }
 
 #[async_trait]
-impl<I: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource<I>
-    for DuplicateDataSource<I>
+impl<I> DataSource<'_, I> for DuplicateDataSource<I>
+where
+    I: Serialize + DeserializeOwned + Send + Sync + 'static,
 {
     fn name(&self) -> String {
         format!("{}-DuplicatedDataSource", &self.name)
@@ -68,11 +68,11 @@ impl<I: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource
 }
 
 pub async fn split_datasources<I>(
-    data_source: Box<dyn DataSource<I>>,
+    data_source: Box<dyn DataSource<'static, I>>,
     n: u16,
 ) -> (DataSourceJoinHandle, Vec<Box<DuplicateDataSource<I>>>)
 where
-    I: Serialize + DeserializeOwned + Debug + Clone + Send + Sync + 'static,
+    I: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
 {
     if n == 0 {
         panic!("Can't split into zero streams");

@@ -3,22 +3,21 @@ use crate::datastore::*;
 use futures_core::future::BoxFuture;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
-use std::fmt::Debug;
 use tokio::sync::mpsc::Sender;
 
 // move these into datastore module
-pub type BoxedDataSourceResult<T> = anyhow::Result<Box<dyn DataSource<T>>>;
+pub type BoxedDataSourceResult<'a, T> = anyhow::Result<Box<dyn DataSource<'a, T>>>;
 pub type CreateDataSourceFn<'a, R> =
-    Box<dyn Fn() -> BoxFuture<'a, BoxedDataSourceResult<R>> + 'static + Send + Sync>;
-pub type BoxedDataOutputResult<T> = anyhow::Result<Box<dyn DataOutput<T>>>;
+    Box<dyn Fn() -> BoxFuture<'a, BoxedDataSourceResult<'a, R>> + 'static + Send + Sync>;
+pub type BoxedDataOutputResult<'a, T> = anyhow::Result<Box<dyn DataOutput<'a, T>>>;
 pub type CreateDataOutputFn<'a, R> =
-    Box<dyn Fn() -> BoxFuture<'a, BoxedDataOutputResult<R>> + 'static + Send + Sync>;
+    Box<dyn Fn() -> BoxFuture<'a, BoxedDataOutputResult<'a, R>> + 'static + Send + Sync>;
 
 //NOTE: caching could be added here, though wrapping this with a DataOutput inside
 //JobRunner would accomplish this.
 pub struct LeftJoin<'a, L, R> {
     pub create_right_ds: CreateDataSourceFn<'a, R>,
-    pub left_ds: Box<dyn DataSource<L>>,
+    pub left_ds: Box<dyn DataSource<'a, L>>,
     /// Number of rows from the left dataset to hold in memory.  Higher number means less scans
     /// on the right table
     pub left_buf_len: usize,
@@ -33,8 +32,8 @@ async fn fill_left_stack<L, R>(
     fw_tx: &Sender<Result<DataSourceMessage<(L, Option<R>)>, DataStoreError>>,
 ) -> Result<usize, DataStoreError>
 where
-    L: DeserializeOwned + Send + Debug,
-    R: DeserializeOwned + Send + Debug,
+    L: DeserializeOwned + Send,
+    R: DeserializeOwned + Send,
 {
     let mut num_read = 0;
     while v.capacity() > v.len() {
@@ -66,8 +65,8 @@ async fn forward_matches<L, R>(
     is_match: &Box<dyn Fn(&L, &R) -> bool + Send + Sync>,
 ) -> Result<usize, DataStoreError>
 where
-    L: DeserializeOwned + Send + Debug + Clone,
-    R: DeserializeOwned + Send + Debug + Clone + 'static,
+    L: DeserializeOwned + Send + Clone,
+    R: DeserializeOwned + Send + Clone + 'static,
 {
     let mut num_read = 0;
     let mut left_match_counts: HashMap<usize, usize> = HashMap::with_capacity(v.len());
@@ -140,10 +139,10 @@ where
     Ok(num_read)
 }
 
-impl<L, R> DataSource<(L, Option<R>)> for LeftJoin<'static, L, R>
+impl<L, R> DataSource<'_, (L, Option<R>)> for LeftJoin<'static, L, R>
 where
-    R: DeserializeOwned + Debug + Clone + 'static + Send + Sync,
-    L: DeserializeOwned + Debug + Clone + 'static + Send + Sync,
+    R: DeserializeOwned + Clone + 'static + Send + Sync,
+    L: DeserializeOwned + Clone + 'static + Send + Sync,
 {
     fn name(&self) -> String {
         format!("LeftJoin-{}", self.left_ds.name())

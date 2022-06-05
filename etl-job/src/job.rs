@@ -110,8 +110,8 @@ impl JobRunner {
     }
 
     pub fn create_with_channel<A, B>(
-        name: B, // instance id of the job
-        instance_id: A,   // what the job is always called
+        name: B,        // instance id of the job
+        instance_id: A, // what the job is always called
         job_manager_channel: JobManagerChannel,
         config: JobRunnerConfig,
     ) -> anyhow::Result<Self>
@@ -453,100 +453,106 @@ impl JobRunner {
 
     /// Same as run except this takes a DataSource and a DataOutput and
     /// moves the data from one to the other.
-    pub async fn run_stream<T>(
+    pub fn run_stream<'a, T>(
         mut self,
-        stream_name: &str,
-        input: Box<dyn DataSource<T>>,
-        output: Box<dyn DataOutput<T>>,
-    ) -> Result<Self, JobRunnerError>
+        stream_name: &'a str,
+        input: Box<dyn DataSource<'a, T>>,
+        output: Box<dyn DataOutput<'a, T>>,
+        //) -> Result<Self, JobRunnerError>
+    ) -> impl Future<Output = Result<Self, JobRunnerError>> + 'a
     where
         T: Debug + Send + Sync + 'static,
     {
-        self.job_state = self.load_job_state().await?;
         let name = stream_name.to_string();
-        use stream::StepStreamStatus;
+        async move {
+            self.job_state = self.load_job_state().await?;
+            use stream::StepStreamStatus;
 
-        match self.job_state.start_new_stream(&name, &self.config) {
-            Ok((_, StepStreamStatus::Complete { .. })) => {
-                self.log_info(
-                    self.job_state.name(),
-                    format!("{} stream previously ran, skipping", &name),
-                )
-                .await;
-            }
-            Err(e) => {
-                self.complete().await?;
-                return Err(e);
-            }
-            Ok(_) => {
-                let input_name = input.name().to_string();
-                // no need to wait on input JoinHandle
-                let (mut input_rx, _) = input.start_stream()?;
-                let (output_tx, output_jh) = output.start_stream()?;
-                self.save_job_state().await?;
-                let mut lines_scanned = 0_usize;
-                loop {
-                    let info = JobItemInfo::new((lines_scanned, self.job_state.name()));
-                    match input_rx.recv().await {
-                        Some(Ok(DataSourceMessage::Data {
-                            source,
-                            content: input_item,
-                        })) => {
-                            lines_scanned += 1;
-                            self.job_state.stream_incr_count_ok(stream_name, &source)?;
-                            output_tx.send(DataOutputMessage::new(input_item)).await?;
-                        }
-                        Some(Err(val)) => {
-                            lines_scanned += 1;
-                            self.job_state.stream_incr_count_err(stream_name)?;
-                            self.log_err(&input_name, Some(&info), val.to_string())
-                                .await;
-                            self.num_process_item_errors += 1;
-                        }
-                        None => break,
-                    };
-                    match self.process_job_manager_rx().await {
-                        Err(JobRunnerError::TooManyErrors) => {
-                            self.job_state.stream_not_ok(
-                                name,
-                                String::from("Reached too many errors"),
-                                lines_scanned,
-                            )?;
-                            self.save_job_state().await?;
-                            drop(input_rx);
-                            drop(output_tx);
-                            // not using the number in error yet..
-                            let _ = output_jh.await??;
-                            return Err(JobRunnerError::TooManyErrors);
-                        }
-                        Err(e) => {
-                            //panic!("Received an unforseen error {}", e);
-                            self.job_state.stream_not_ok(
-                                name,
-                                format!("While processing job manager messages ran into {}", &e),
-                                lines_scanned,
-                            )?;
-                            self.save_job_state().await?;
-                            drop(input_rx);
-                            drop(output_tx);
-                            output_jh.await??;
-                            return Err(JobRunnerError::GenericError {
-                                message: e.to_string(),
-                            });
-                        }
-                        Ok(()) => {}
-                    };
+            match self.job_state.start_new_stream(&name, &self.config) {
+                Ok((_, StepStreamStatus::Complete { .. })) => {
+                    self.log_info(
+                        self.job_state.name(),
+                        format!("{} stream previously ran, skipping", &name),
+                    )
+                    .await;
                 }
-                self.cur_step_index += 1;
-                drop(input_rx);
-                drop(output_tx);
-                let output_stats = output_jh.await??;
-                self.job_state
-                    .stream_ok(name, &self.config, vec![output_stats])?;
-                self.save_job_state().await?;
+                Err(e) => {
+                    self.complete().await?;
+                    return Err(e);
+                }
+                Ok(_) => {
+                    let input_name = input.name().to_string();
+                    // no need to wait on input JoinHandle
+                    let (mut input_rx, _) = input.start_stream()?;
+                    let (output_tx, output_jh) = output.start_stream()?;
+                    self.save_job_state().await?;
+                    let mut lines_scanned = 0_usize;
+                    loop {
+                        let info = JobItemInfo::new((lines_scanned, self.job_state.name()));
+                        match input_rx.recv().await {
+                            Some(Ok(DataSourceMessage::Data {
+                                source,
+                                content: input_item,
+                            })) => {
+                                lines_scanned += 1;
+                                self.job_state.stream_incr_count_ok(stream_name, &source)?;
+                                output_tx.send(DataOutputMessage::new(input_item)).await?;
+                            }
+                            Some(Err(val)) => {
+                                lines_scanned += 1;
+                                self.job_state.stream_incr_count_err(stream_name)?;
+                                self.log_err(&input_name, Some(&info), val.to_string())
+                                    .await;
+                                self.num_process_item_errors += 1;
+                            }
+                            None => break,
+                        };
+                        match self.process_job_manager_rx().await {
+                            Err(JobRunnerError::TooManyErrors) => {
+                                self.job_state.stream_not_ok(
+                                    name,
+                                    String::from("Reached too many errors"),
+                                    lines_scanned,
+                                )?;
+                                self.save_job_state().await?;
+                                drop(input_rx);
+                                drop(output_tx);
+                                // not using the number in error yet..
+                                let _ = output_jh.await??;
+                                return Err(JobRunnerError::TooManyErrors);
+                            }
+                            Err(e) => {
+                                //panic!("Received an unforseen error {}", e);
+                                self.job_state.stream_not_ok(
+                                    name,
+                                    format!(
+                                        "While processing job manager messages ran into {}",
+                                        &e
+                                    ),
+                                    lines_scanned,
+                                )?;
+                                self.save_job_state().await?;
+                                drop(input_rx);
+                                drop(output_tx);
+                                output_jh.await??;
+                                return Err(JobRunnerError::GenericError {
+                                    message: e.to_string(),
+                                });
+                            }
+                            Ok(()) => {}
+                        };
+                    }
+                    self.cur_step_index += 1;
+                    drop(input_rx);
+                    drop(output_tx);
+                    let output_stats = output_jh.await??;
+                    self.job_state
+                        .stream_ok(name, &self.config, vec![output_stats])?;
+                    self.save_job_state().await?;
+                }
             }
+            Ok(self)
         }
-        Ok(self)
     }
 
     // experimenting with a different structure
@@ -554,8 +560,8 @@ impl JobRunner {
         mut self,
         stream_name: String,
         mut transformer: Box<dyn TransformerFut<'a, I, O>>,
-        input: Box<dyn DataSource<I>>,
-        output: Box<dyn DataOutput<O>>,
+        input: Box<dyn DataSource<'a, I>>,
+        output: Box<dyn DataOutput<'a, O>>,
         //) -> Result<Self, JobRunnerError>
     ) -> impl Future<Output = Result<Self, JobRunnerError>> + 'a
     where
@@ -669,8 +675,8 @@ impl JobRunner {
         mut self,
         stream_name: String,
         mut transformer: Box<dyn Transformer<'a, I, O>>,
-        input: Box<dyn DataSource<I>>,
-        output: Box<dyn DataOutput<O>>,
+        input: Box<dyn DataSource<'a, I>>,
+        output: Box<dyn DataOutput<'a, O>>,
         //) -> Result<Self, JobRunnerError>
     ) -> impl Future<Output = Result<Self, JobRunnerError>> + 'a
     where
@@ -773,21 +779,26 @@ impl JobRunner {
         }
     }
 
-    pub async fn run_stream_handler_fn<I>(
+    pub fn run_stream_handler_fn<'a, I>(
         mut self,
         name: &str,
-        ds: Box<dyn DataSource<I>>,
+        ds: Box<dyn DataSource<'a, I>>,
         create_sh: CreateStreamHandlerFn<'static, I>,
-    ) -> Result<Self, JobRunnerError>
+        //) -> Result<Self, JobRunnerError>
+    ) -> impl Future<Output = Result<Self, JobRunnerError>> + 'a
     where
         I: DeserializeOwned + Serialize + Debug + Send + Sync + 'static,
     {
-        use stream::StepStreamStatus;
-        if let Some((_i, StepStreamStatus::Complete { .. })) = self.job_state.get_stream(name) {
-            Ok(self)
-        } else {
-            let sh = create_sh(&mut self).await?;
-            Ok(self.run_stream_handler::<I, &str>(name, ds, sh).await?)
+        let name = name.to_string();
+        async move {
+            use stream::StepStreamStatus;
+            if let Some((_i, StepStreamStatus::Complete { .. })) = self.job_state.get_stream(&name)
+            {
+                Ok(self)
+            } else {
+                let sh = create_sh(&mut self).await?;
+                Ok(self.run_stream_handler::<I, &str>(&name, ds, sh).await?)
+            }
         }
     }
 
@@ -815,10 +826,10 @@ impl JobRunner {
     /// This method gives a lot of flexibility in what you can execute
     /// during the execute (like external apis).  During the init, and
     /// shutdown step give extra options.  See the relevant docs on that
-    pub async fn run_stream_handler<I, S: Into<String>>(
+    pub async fn run_stream_handler<'a, I, S: Into<String>>(
         mut self,
         name: S,
-        ds: Box<dyn DataSource<I>>,
+        ds: Box<dyn DataSource<'a, I>>,
         mut job_handler: Box<dyn StreamHandler<I>>,
     ) -> Result<Self, JobRunnerError>
     where

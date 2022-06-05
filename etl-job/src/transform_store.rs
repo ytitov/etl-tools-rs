@@ -9,23 +9,23 @@ use crate::transform_store::handler::TransformHandler;
 /// filter a stream, and output that as a new DataSource which can
 /// then be forwarded to a DataOutput, or continue as input for
 /// more transformations
-pub struct TransformDataSource<I, O: Serialize + Debug + Send + Sync + 'static> {
-    pub input_ds: Box<dyn DataSource<I>>, // recv message
+pub struct TransformDataSource<'a, I, O: Serialize + Debug + Send + Sync + 'static> {
+    pub input_ds: Box<dyn DataSource<'a, I>>, // recv message
     pub transformer: Box<dyn TransformHandler<I, O>>,
     pub job_name: String,
 }
 
-impl<I, O> TransformDataSource<I, O>
+impl<'a, I, O> TransformDataSource<'a, I, O>
 where
     I: Debug + Send + Sync,
     O: Serialize + Debug + Send + Sync,
 {
     pub fn new(
         name: &str,
-        ds: Box<dyn DataSource<I>>,
+        ds: Box<dyn DataSource<'a, I>>,
         transformer: Box<dyn TransformHandler<I, O>>,
     ) -> Self {
-        TransformDataSource {
+        TransformDataSource::<'a, I, O> {
             job_name: name.to_string(),
             transformer,
             input_ds: ds,
@@ -36,7 +36,7 @@ where
 impl<
         I: Serialize + DeserializeOwned + Debug + Send + Sync + 'static,
         O: Serialize + DeserializeOwned + Debug + Send + Sync + 'static,
-    > DataSource<O> for TransformDataSource<I, O>
+    > DataSource<'_, O> for TransformDataSource<'static, I, O>
 {
     fn name(&self) -> String {
         format!("TransformDataSource-{}", &self.job_name)

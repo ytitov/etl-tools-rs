@@ -18,6 +18,7 @@ pub mod fs;
 /// various data stores used for testing
 pub mod mock;
 pub mod sources;
+pub mod outputs;
 
 pub type CallbackRx<T> = OneShotRx<Result<T, DataStoreError>>;
 pub type CallbackTx<T> = OneShotTx<Result<T, DataStoreError>>;
@@ -113,7 +114,7 @@ pub enum DataOutputMessage<T: Send> {
     NoMoreData,
 }
 
-impl<T: Debug + Send + Sync> DataOutputMessage<T> {
+impl<T: Send + Sync> DataOutputMessage<T> {
     pub fn new(data: T) -> Self {
         DataOutputMessage::Data(data)
     }
@@ -132,7 +133,7 @@ pub trait DataSource<'a, T: Send>: 'a + Sync + Send {
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError>;
 }
 
-impl<'a, T: Send> DataSource<'a, T> for DataSourceTask<T> {
+impl<'a, T: 'a + Send> DataSource<'a, T> for DataSourceTask<T> {
     fn name(&self) -> String {
         String::from("DataSourceTask")
     }
@@ -143,12 +144,12 @@ impl<'a, T: Send> DataSource<'a, T> for DataSourceTask<T> {
 
 /// Helps with creating DataOutput's during run-time.
 #[async_trait]
-pub trait CreateDataOutput<'de, C, T>: Sync + Send
+pub trait CreateDataOutput<'de, 'a, C, T>: Sync + Send
 where
     C: Deserializer<'de>,
-    T: Debug + 'static + Send,
+    T: 'static + Send,
 {
-    async fn create_data_output(_: C) -> anyhow::Result<Box<dyn DataOutput<T>>>;
+    async fn create_data_output(_: C) -> anyhow::Result<Box<dyn DataOutput<'a, T>>>;
 }
 
 /// Helps with creating DataSource's during run-time.
@@ -161,7 +162,7 @@ where
     async fn create_data_source<'a>(_: C) -> anyhow::Result<Box<dyn DataSource<'a, T>>>;
 }
 
-pub trait DataOutput<T: Send>: Sync + Send {
+pub trait DataOutput<'a, T: Send>: 'a + Sync + Send {
     fn start_stream(self: Box<Self>) -> Result<DataOutputTask<T>, DataStoreError>;
 
     /*
@@ -250,6 +251,16 @@ where
             Ok(DataSourceDetails::Basic { lines_scanned })
         });
         Ok((rx, jh))
+    }
+}
+
+pub struct DynDataSource<'a, T> {
+    pub ds: Box<dyn DataSource<'a, T>>,
+}
+
+impl<'a, T: Debug + Send + 'static> DynDataSource<'a, T> {
+    pub fn new<C: DataSource<'a, T> + 'static>(t: C) -> Self {
+        DynDataSource { ds: Box::new(t) }
     }
 }
 

@@ -10,17 +10,20 @@ pub mod csv;
 pub mod json;
 pub mod string;
 
-pub trait DecodeStream<T: Debug + 'static + Send>: Sync + Send {
+pub trait DecodeStream<T: 'static + Send>: Sync + Send {
     fn decode_source(self, source: Box<dyn DataSource<Bytes>>) -> Box<dyn DataSource<T>>;
 }
 
 /// Helper wrapper for specific decoders to return so you do not have to construct them manually
-pub struct DecodedSource<T: Debug + 'static + Send + Send> {
+pub struct DecodedSource<T: 'static + Send + Send> {
     source_name: String,
     ds_task_result: Result<DataSourceTask<T>, DataStoreError>,
 }
 
-impl<T: Debug + Send + Sync + 'static> DataSource<T> for DecodedSource<T> {
+impl<T> DataSource<'_, T> for DecodedSource<T>
+where
+    T: Send + Sync + 'static,
+{
     fn name(&self) -> String {
         format!("DecodedSource-{}", &self.source_name)
     }

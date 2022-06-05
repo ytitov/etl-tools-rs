@@ -1,8 +1,8 @@
 use super::*;
+use crate::keystore::simple::{QueryableStore, SimpleStore};
 use ::log;
 use bytes::Bytes;
 use serde::{de::DeserializeOwned, Serialize};
-use crate::keystore::simple::{QueryableStore, SimpleStore};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -42,7 +42,7 @@ impl Default for MockDataOutput {
     }
 }
 
-impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockDataOutput {
+impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<'_, T> for MockDataOutput {
     fn start_stream(self: Box<Self>) -> Result<DataOutputTask<T>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         let (tx, mut rx): (DataOutputTx<T>, _) = channel(1);
@@ -78,15 +78,13 @@ impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<T> for MockDataOut
                     None => break,
                 };
             }
-            Ok(DataOutputDetails::Basic {
-                lines_written,
-            })
+            Ok(DataOutputDetails::Basic { lines_written })
         });
         Ok((tx, jh))
     }
 }
 
-impl DataOutput<Bytes> for MockJsonDataOutput {
+impl DataOutput<'_, Bytes> for MockJsonDataOutput {
     fn start_stream(self: Box<Self>) -> Result<DataOutputTask<Bytes>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         let (tx, mut rx): (DataOutputTx<Bytes>, _) = channel(1);
@@ -125,9 +123,7 @@ impl DataOutput<Bytes> for MockJsonDataOutput {
                     None => break,
                 };
             }
-            Ok(DataOutputDetails::Basic {
-                lines_written,
-            })
+            Ok(DataOutputDetails::Basic { lines_written })
         });
         Ok((tx, jh))
     }
@@ -151,8 +147,9 @@ impl Default for MockJsonDataSource {
 }
 
 #[async_trait]
-impl<T: Serialize + DeserializeOwned + Debug + Send + Sync + 'static> DataSource<T>
-    for MockJsonDataSource
+impl<T> DataSource<'_, T> for MockJsonDataSource
+where
+    T: Serialize + DeserializeOwned + Send + Sync + 'static,
 {
     fn name(&self) -> String {
         format!("MockJsonDataSource")

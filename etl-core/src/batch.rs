@@ -6,15 +6,18 @@ use tokio::sync::mpsc::Receiver;
 
 /// For use cases when you want to group stream elements in some form of custom fashion where a
 /// decoder can't handle.
-pub struct Batcher<I> {
-    pub input: Box<dyn DataSource<I>>,
+pub struct Batcher<'a, I> {
+    pub input: Box<dyn DataSource<'a, I>>,
     /// Returns if a new batch should be started.  The element sent will be the first element in a
     /// new batch
     pub new_batch: fn(&'_ I, &'_ Vec<I>) -> bool,
 }
 
 #[async_trait]
-impl<I: Debug + Send + Sync + 'static> DataSource<Vec<I>> for Batcher<I> {
+impl<'a, I> DataSource<'a, Vec<I>> for Batcher<'a, I>
+where
+    I: Debug + Send + Sync + 'static,
+{
     fn name(&self) -> String {
         format!("Batcher-{}", self.input.name())
     }

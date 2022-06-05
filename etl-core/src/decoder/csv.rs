@@ -1,5 +1,8 @@
 use super::*;
+use crate::transformer::{TransformFuncIdx, TransformSource};
 use ::csv::ReaderBuilder;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 pub struct CsvDecoder {
     pub csv_options: CsvReadOptions,
@@ -14,6 +17,89 @@ impl CsvDecoder {
         T: DeserializeOwned + Debug + Send + Sync + 'static,
     {
         DecodeStream::decode_source(CsvDecoder { csv_options }, source)
+    }
+
+    // this is most deffinitely awkward...
+    pub fn from_bytes_source<'a, DS, O>(
+        opts: CsvReadOptions,
+        source: DS,
+    ) -> TransformSource<'a, Bytes, O>
+    where
+        for<'_a> DS: DataSource<'_a, Bytes>,
+        O: Send + Sync + DeserializeOwned + 'static,
+    {
+        let o = Arc::new(opts);
+        let headers = Arc::new(Mutex::new("".to_string()));
+        TransformSource::new(
+            source,
+            TransformFuncIdx::new(move |idx, content: Bytes| {
+                let headers = &headers;
+                let opts = &o;
+                let has_headers = opts.has_headers;
+                let delimiter = opts.delimiter;
+                let flexible = opts.flexible;
+                let terminator = opts.terminator;
+                let quote = opts.quote;
+                let escape = opts.escape;
+                let double_quote = opts.double_quote;
+                let quoting = opts.quoting;
+                let comment = opts.comment;
+                let line = std::string::String::from_utf8_lossy(&*content).to_string();
+                if idx == 0 && has_headers {
+                    let headers_str = std::string::String::from_utf8_lossy(&*content).to_string();
+                    let mut h = headers
+                        .lock()
+                        .map_err(|e| DataStoreError::FatalIO(e.to_string()))?;
+                    h.clear();
+                    h.push_str(&headers_str);
+                    drop(h);
+                }
+                let data;
+                match has_headers {
+                    true => {
+                        let h = headers
+                            .lock()
+                            .map_err(|e| DataStoreError::FatalIO(e.to_string()))?;
+                        data = format!("{}\n{}", h, line);
+                        drop(h);
+                    }
+                    false => {
+                        data = line.to_string();
+                    }
+                };
+                let rdr = ReaderBuilder::new()
+                    .delimiter(delimiter)
+                    .has_headers(has_headers)
+                    .flexible(flexible)
+                    .terminator(terminator)
+                    .quote(quote)
+                    .escape(escape)
+                    .double_quote(double_quote)
+                    .quoting(quoting)
+                    .comment(comment)
+                    .from_reader(data.as_bytes());
+                let mut iter = rdr.into_deserialize::<O>();
+                match iter.next() {
+                    Some(result) => match result {
+                        Ok(item) => {
+                            return Ok(item);
+                        }
+                        Err(er) => {
+                            return Err(DataStoreError::Deserialize {
+                                message: er.to_string(),
+                                attempted_string: line.to_string(),
+                            });
+                        }
+                    },
+                    None => {
+                        return Err(DataStoreError::Deserialize {
+                            message: "Could not pull out a CSV object from the line".into(),
+                            attempted_string: "".into(),
+                        });
+                    }
+                }
+            }),
+        )
     }
 }
 

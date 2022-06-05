@@ -32,7 +32,10 @@ pub trait QueueClient<T: Debug + 'static + Send>: Sync + Send {
 
 /// provide so each DataSource could be a client
 #[async_trait]
-impl<T: Debug + Send + 'static> QueueClient<T> for DynDataSource<T> {
+impl<T> QueueClient<T> for DynDataSource<'static, T>
+where
+    T: Debug + Send + 'static,
+{
     async fn start_incoming(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         let ds_name: String = self.ds.name();

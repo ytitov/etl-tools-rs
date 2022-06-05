@@ -2,7 +2,7 @@ use crate::datastore::*;
 use bytes::Bytes;
 use tokio::sync::mpsc::channel;
 
-impl DataSource<Bytes> for String {
+impl DataSource<'_, Bytes> for String {
     fn name(&self) -> String {
         format!("BytesString")
     }
@@ -27,7 +27,7 @@ impl DataSource<Bytes> for String {
     }
 }
 
-impl DataSource<String> for String {
+impl DataSource<'_, String> for String {
     fn name(&self) -> String {
         format!("String")
     }

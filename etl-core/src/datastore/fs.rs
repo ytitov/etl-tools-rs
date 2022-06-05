@@ -30,7 +30,7 @@ impl Default for LocalFs {
     }
 }
 
-impl DataSource<Bytes> for LocalFs {
+impl DataSource<'_, Bytes> for LocalFs {
     fn name(&self) -> String {
         format!("LocalFs-{}", &self.home)
     }
@@ -168,7 +168,7 @@ impl LocalFs {
     }
 }
 
-impl DataOutput<Bytes> for LocalFs {
+impl DataOutput<'_, Bytes> for LocalFs {
     fn start_stream(self: Box<Self>) -> Result<DataOutputTask<Bytes>, DataStoreError> {
         use tokio::fs::OpenOptions;
         use tokio::io::AsyncWriteExt;

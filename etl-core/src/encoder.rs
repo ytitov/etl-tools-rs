@@ -3,24 +3,30 @@ use crate::datastore::*;
 use async_trait::async_trait;
 use bytes::Bytes;
 use serde::Serialize;
-use std::fmt::Debug;
 use tokio::sync::mpsc::channel;
 
-#[async_trait]
-pub trait EncodeStream<I: Debug + 'static + Send, O: Debug + 'static + Send>: Sync + Send {
-    async fn encode_source(
+//TODO: this can be removed
+pub trait EncodeStream<'a, I, O>: Sync + Send
+where
+    I: 'static + Send,
+    O: 'static + Send,
+{
+    fn encode_source(
         self: Box<Self>,
-        source: Box<dyn DataSource<I>>,
-    ) -> Box<dyn DataSource<O>>;
+        source: Box<dyn DataSource<'a, I>>,
+    ) -> Box<dyn DataSource<'a, O>>;
 }
 
 /// helper wrapper that specific  encoders can return for convenience
-pub struct EncodedSource<T: Debug + 'static + Send + Sync> {
+pub struct EncodedSource<T: 'static + Send + Sync> {
     source_name: String,
     ds_task_result: Result<DataSourceTask<T>, DataStoreError>,
 }
 
-impl<T: Debug + Send + Sync + 'static> DataSource<T> for EncodedSource<T> {
+impl<T> DataSource<'_, T> for EncodedSource<T>
+where
+    T: Send + Sync + 'static,
+{
     fn name(&self) -> String {
         format!("{}-EncodedSource", &self.source_name)
     }
@@ -31,25 +37,25 @@ impl<T: Debug + Send + Sync + 'static> DataSource<T> for EncodedSource<T> {
 
 /// A convenience wrapper which takes in any decoder which will decode to Bytes and accepts any
 /// DataOutput which will accepts bytes and wraps that all into a DataOutput
-pub struct EncodedOutput<I: Debug + 'static + Send + Sync> {
+pub struct EncodedOutput<'a, I: 'static + Send + Sync> {
     /// takes any I and converts to Bytes.  For example csv encoder will implement EncodeStream
-    pub encoder: Box<dyn EncodeStream<I, Bytes>>,
+    pub encoder: Box<dyn EncodeStream<'a, I, Bytes>>,
     /// handles writing the result of the encoder
-    pub output: Box<dyn DataOutput<Bytes>>,
+    pub output: Box<dyn DataOutput<'a, Bytes>>,
 }
 
-impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutput<T> {
+/*
+use std::fmt::Debug;
+impl<'a, T: Debug + Serialize + 'static + Sync + Send> DataOutput<T> for EncodedOutput<'a, T> {
     fn start_stream(self: Box<Self>) -> Result<DataOutputTask<T>, DataStoreError> {
         // create a datasource for the encoder because it is needed to create the encoder
         // data sent to the data output will be forwarded here
         let (data_source_tx, data_source_rx): (_, DataSourceRx<T>) = channel(1);
 
+        let encoder = self.encoder;
+        let encoded_datasource =
+            encoder.encode_source(Box::new(data_source_rx) as Box<dyn DataSource<'a, T>>);
         let given_output_jh: DataOutputJoinHandle = tokio::spawn(async move {
-            let encoded_datasource = self
-                .encoder
-                .encode_source(Box::new(data_source_rx) as Box<dyn DataSource<T>>)
-                .await;
-
             // forward encoded elements to the output dataoutput
             let (mut encoded_datasource_rx, encoded_datasource_jh) =
                 encoded_datasource.start_stream()?;
@@ -110,6 +116,7 @@ impl<T: Serialize + Debug + 'static + Sync + Send> DataOutput<T> for EncodedOutp
         Ok((input_tx, jh))
     }
 }
+*/
 
 pub mod csv_encoder {
     use super::*;
@@ -127,12 +134,13 @@ pub mod csv_encoder {
         }
     }
 
+    /*
     #[async_trait]
-    impl<I: Serialize + Debug + 'static + Send> EncodeStream<I, Bytes> for CsvStringEncoder {
+    impl<'a, I: 'static + Serialize + Send> EncodeStream<'a, I, Bytes> for CsvStringEncoder {
         async fn encode_source(
             self: Box<Self>,
-            source: Box<dyn DataSource<I>>,
-        ) -> Box<dyn DataSource<Bytes>> {
+            source: Box<dyn for<'i> DataSource<'i, I>>,
+        ) -> Box<dyn DataSource<'a, Bytes>> {
             use csv::WriterBuilder;
             let (tx, rx) = channel(1);
             let source_name = source.name();
@@ -206,4 +214,5 @@ pub mod csv_encoder {
             }
         }
     }
+    */
 }

@@ -1,6 +1,7 @@
 use super::*;
 
 pub struct JsonDecoder {}
+use crate::transformer::{ TransformFunc, TransformSource };
 
 impl JsonDecoder {
     pub fn new<T>(source: Box<dyn DataSource<Bytes>>) -> Box<dyn DataSource<T>>
@@ -8,6 +9,39 @@ impl JsonDecoder {
         T: DeserializeOwned + Debug + Send + Sync + 'static,
     {
         DecodeStream::decode_source(JsonDecoder {}, source)
+    }
+
+    pub fn from_bytes_source<'a, DS, O>(source: DS) -> TransformSource<'a, Bytes, O>
+    where
+        for<'_a> DS: DataSource<'_a, Bytes>,
+        O: Send + Sync + DeserializeOwned + 'static,
+    {
+        TransformSource::new(source, TransformFunc::new(|content: Bytes| {
+            let c = content.to_vec();
+            match serde_json::from_slice::<O>(&c) {
+                Ok(r) => Ok(r),
+                Err(er) => Err(DataStoreError::Deserialize {
+                    message: er.to_string(),
+                    attempted_string: "".into(),
+                }),
+            }
+        }))
+    }
+
+    pub fn from_string_source<'a, DS, O>(source: DS) -> TransformSource<'a, String, O>
+    where
+        for<'_a> DS: DataSource<'_a, String>,
+        O: Send + Sync + DeserializeOwned + 'static,
+    {
+        TransformSource::new(source, TransformFunc::new(|content: String| {
+            match serde_json::from_str::<O>(&content) {
+                Ok(r) => Ok(r),
+                Err(er) => Err(DataStoreError::Deserialize {
+                    message: er.to_string(),
+                    attempted_string: "".into(),
+                }),
+            }
+        }))
     }
 }
 
