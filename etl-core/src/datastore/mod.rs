@@ -132,7 +132,13 @@ pub trait OutputTask: Sync + Send {
 pub trait DataSource<'a, T: Send>: 'a + Sync + Send {
     fn name(&self) -> String;
 
+    // this deffinition forces user to 'static lifetimes for all implementations
+    // better option would be to allow user to select appropriate lifetimes instead
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<T>, DataStoreError>;
+
+    fn start_stream_non_spawn(self: Box<Self>) -> Result<DataSourceRx<T>, DataStoreError> {
+        panic!("non spawn start not implemented");
+    }
 }
 
 impl<'a, T: 'a + Send> DataSource<'a, T> for DataSourceTask<T> {

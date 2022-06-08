@@ -4,16 +4,16 @@ use crate::datastore::{
 };
 use async_trait::async_trait;
 use std::future::Future;
-use std::iter::Iterator;
 use std::marker::PhantomData;
 use std::pin::Pin;
 
+// the idea here is that transformer lives at least as long as the input
 pub struct TransformSource<'a, I, O> {
     input: Box<dyn DataSource<'a, I>>,
-    transformer: Box<dyn TransformerFut<'static, I, O>>,
+    transformer: Box<dyn for<'tr> TransformerFut<'tr, I, O> + 'a>,
 }
 
-impl<'a, 'b, I, O> TransformSource<'a, I, O>
+impl<'a, I, O> TransformSource<'a, I, O>
 where
     I: Send + Sync,
     O: Send + Sync,
@@ -21,7 +21,7 @@ where
     pub fn new<DS, TR>(i: DS, t: TR) -> Self
     where
         DS: DataSource<'a, I>,
-        TR: TransformerFut<'static, I, O>,
+        TR: for <'tr> TransformerFut<'tr, I, O> + 'a,
     {
         Self {
             input: Box::new(i),
@@ -30,7 +30,7 @@ where
     }
 }
 
-impl<'a, I, O> DataSource<'a, O> for TransformSource<'a, I, O>
+impl<'a, I, O> DataSource<'a, O> for TransformSource<'static, I, O>
 where
     I: Send + Sync + 'static,
     O: Send + Sync + 'static,

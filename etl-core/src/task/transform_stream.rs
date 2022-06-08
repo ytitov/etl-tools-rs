@@ -1,7 +1,6 @@
 use crate::datastore::error::*;
 use crate::datastore::*;
 use crate::transformer::*;
-use std::fmt::Debug;
 pub struct TransformStream<'a, I, O> {
     input: Box<dyn DataSource<'a, I>>,
     output: Box<dyn DataOutput<'a, O>>,
@@ -27,7 +26,7 @@ where
     }
 }
 
-pub trait Task<'a>: Sync + Send {
+pub trait Task<'a>: 'a + Sync + Send {
     fn create(self: Box<Self>) -> Result<TaskJoinHandle, DataStoreError>;
 }
 

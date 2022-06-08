@@ -13,7 +13,7 @@ impl JsonDecoder {
 
     pub fn from_bytes_source<'a, DS, O>(source: DS) -> TransformSource<'a, Bytes, O>
     where
-        for<'_a> DS: DataSource<'_a, Bytes>,
+        for<'ds> DS: DataSource<'ds, Bytes>,
         O: Send + Sync + DeserializeOwned + 'static,
     {
         TransformSource::new(source, TransformFunc::new(|content: Bytes| {
@@ -22,7 +22,7 @@ impl JsonDecoder {
                 Ok(r) => Ok(r),
                 Err(er) => Err(DataStoreError::Deserialize {
                     message: er.to_string(),
-                    attempted_string: "".into(),
+                    attempted_string: String::from_utf8_lossy(&c).into(),
                 }),
             }
         }))
@@ -30,7 +30,7 @@ impl JsonDecoder {
 
     pub fn from_string_source<'a, DS, O>(source: DS) -> TransformSource<'a, String, O>
     where
-        for<'_a> DS: DataSource<'_a, String>,
+        for<'ds> DS: DataSource<'ds, String>,
         O: Send + Sync + DeserializeOwned + 'static,
     {
         TransformSource::new(source, TransformFunc::new(|content: String| {
