@@ -22,10 +22,6 @@ pub type ProducerResultFut<'a, O> =
 pub type ConsumerResultFut<'a, O> =
     Pin<Box<dyn Future<Output = Result<O, Box<dyn Error + Send + Sync>>> + 'a + Send + Sync>>;
 
-pub struct DataProducerStream<'dp, T> {
-    stream: Pin<Box<dyn Stream<Item = T> + 'dp + Send + Sync>>,
-}
-
 pub trait DataProducer<'dp, T: Send>: 'dp {
     /// the given sender gets the items produced
     fn start_producer(self: Box<Self>, _: Sender<T>) -> ProducerResultFut<'dp, DataSourceDetails>;
@@ -79,7 +75,11 @@ fn crazy_stream<T: Clone>(max: usize, item: T) -> impl Stream<Item = T> {
     }
 }
 
-impl<'dp, T> DataProducerStream<'dp, T>
+pub struct ProducerStreamBuilder<'dp, T> {
+    stream: Pin<Box<dyn Stream<Item = T> + 'dp + Send + Sync>>,
+}
+
+impl<'dp, T> ProducerStreamBuilder<'dp, T>
 where
     T: Sync + Send,
 {
@@ -102,7 +102,7 @@ where
         }
     }
 
-    pub fn into_stream<I>(d: I) -> impl Stream<Item = T>
+    pub fn producer_to_stream<I>(d: I) -> impl Stream<Item = T>
     where
         T: 'static + Sync + Send,
         I: DataProducer<'static, T> + Sync + Send,
@@ -148,7 +148,7 @@ where
     }
 }
 
-impl<'dp, T> DataProducer<'dp, T> for DataProducerStream<'dp, T>
+impl<'dp, T> DataProducer<'dp, T> for ProducerStreamBuilder<'dp, T>
 where
     T: 'dp + Sync + Send + Debug,
 {
@@ -321,7 +321,7 @@ pub async fn demo_stream_wrapper() {
             .await
             .expect("failed");
     });
-    DataProducerStream::from_async_stream(LinesStream::new(c.lines()))
+    ProducerStreamBuilder::from_async_stream(LinesStream::new(c.lines()))
         .boxed()
         .start_producer(tx)
         .await
