@@ -896,11 +896,13 @@ name = "etl-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-stream",
  "async-trait",
  "bytes",
  "chrono",
  "csv",
  "futures-core",
+ "futures-util",
  "log",
  "serde",
  "serde_json",
