@@ -4,7 +4,8 @@ use tokio::sync::mpsc::channel;
 
 pub struct TransformProducer<'a, I, O> {
     producer: Box<dyn Producer<'a, I> + Send>,
-    transformer: Box<dyn for<'tr> TransformerFut<'tr, I, O> + 'a>,
+    //transformer: Box<dyn for<'tr> TransformerFut<'tr, I, O> + 'a>,
+    transformer: Box<dyn TransformerFut<'a, I, O>>,
 }
 
 impl<'a, I, O> TransformProducer<'a, I, O>
@@ -15,7 +16,8 @@ where
     pub fn new<P, TR>(i: P, t: TR) -> Self
     where
         P: Producer<'a, I> + Send,
-        TR: for <'tr> TransformerFut<'tr, I, O> + 'a,
+        //TR: for <'tr> TransformerFut<'tr, I, O> + 'a,
+        TR: TransformerFut<'a, I, O>,
     {
         Self {
             producer: Box::new(i),
