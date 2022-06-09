@@ -15,6 +15,7 @@ use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 
 pub mod transformer;
+pub mod split;
 
 pub type BoxDynError = Box<dyn Error + 'static + Send + Sync>;
 
@@ -35,6 +36,7 @@ pub struct ConsumerResultDetails {
     pub num_read: usize,
 }
 
+#[derive(Debug)]
 pub enum ConsumerResult<D> {
     Details(ConsumerResultDetails),
     WithData {
@@ -42,6 +44,7 @@ pub enum ConsumerResult<D> {
         details: ConsumerResultDetails,
     },
 }
+
 
 pub trait Consumer<'dp, T: Send, D>: 'dp {
     /// the given receiver sends the items to be consumed
@@ -251,7 +254,10 @@ where
     }
 }
 
-pub async fn run_data_stream<'a, T, I, O, DATA>(input: I, output: O) -> ConsumerResult<DATA>
+pub async fn run_data_stream<'a, T, I, O, DATA>(
+    input: I,
+    output: O,
+) -> JoinHandle<Result<ConsumerResult<DATA>, BoxDynError>>
 where
     T: 'static + Sync + Send + Debug,
     I: Producer<'a, T>,
@@ -269,6 +275,7 @@ where
         }
     });
     Box::new(input).start_producer(tx).await.unwrap();
+    /*
     match jh.await {
         Ok(Ok(_details)) => _details,
         Ok(Err(_other_fatal_error)) => {
@@ -278,6 +285,8 @@ where
             panic!("run_data_stream encountered a JoinError");
         }
     }
+    */
+    jh
 }
 
 pub async fn test_run_data_stream() {
