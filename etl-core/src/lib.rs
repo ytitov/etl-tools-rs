@@ -10,8 +10,8 @@
 //! located on an MySql database.
 
 pub mod datastore;
-/// same as a DataSource except this doesn't require 'static lifetimes due to not using spawn
-pub mod data_rx;
+/// Rework of the datastore module instead to focus on the async Stream
+pub mod streams;
 /// Used by the [crate::datastore::DataSource<Bytes>] to help decode various streams.  So
 /// anything that implements a BytesSource target, can select which decoder they want to use.  For
 /// example either [crate::decoder::csv::CsvDecoder] or [crate::decoder::json::JsonDecoder]

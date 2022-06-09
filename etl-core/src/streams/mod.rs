@@ -1,50 +1,77 @@
 /// ProducerResultFut and ConsumerResultFut errors are consider to be fatal, and will stop the
 /// whole process.  Any "acceptable" errors must be sent through so they can be reported and
 /// handled by the appropriate streams like an error queue.
-use crate::datastore::error::DataStoreError;
 use crate::datastore::*;
 use futures_core::stream::Stream;
 use futures_util::pin_mut;
+use log;
 use std::error::Error;
 use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::task::JoinError;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 
-pub type BoxFut<'a, O> =
-    Pin<Box<dyn Future<Output = Result<O, DataStoreError>> + 'a + Send + Sync>>;
+pub mod transformer;
+
+pub type BoxDynError = Box<dyn Error + 'static + Send + Sync>;
 
 pub type ProducerResultFut<'a, O> =
-    Pin<Box<dyn Future<Output = Result<O, Box<dyn Error + 'a>>> + 'a + Send + Sync>>;
+    Pin<Box<dyn Future<Output = Result<O, Box<dyn Error + 'a + Send + Sync>>> + 'a + Send + Sync>>;
 
 pub type ConsumerResultFut<'a, O> =
     Pin<Box<dyn Future<Output = Result<O, Box<dyn Error + Send + Sync>>> + 'a + Send + Sync>>;
 
-pub trait DataProducer<'dp, T: Send>: 'dp {
+pub trait Producer<'dp, T: Send>: 'dp {
     /// the given sender gets the items produced
     fn start_producer(self: Box<Self>, _: Sender<T>) -> ProducerResultFut<'dp, DataSourceDetails>;
 }
 
-pub trait DataConsumer<'dp, T: Send>: 'dp {
-    /// the given sender gets the items produced
-    fn start_consumer(self: Box<Self>, _: Receiver<T>)
-        -> ConsumerResultFut<'dp, DataSourceDetails>;
+#[derive(Debug)]
+pub struct ConsumerResultDetails {
+    pub num_errors: usize,
+    pub num_read: usize,
 }
 
-pub fn producer_stream<I, T>(producer: I) -> impl Stream<Item = T>
+pub enum ConsumerResult<D> {
+    Details(ConsumerResultDetails),
+    WithData {
+        data: D,
+        details: ConsumerResultDetails,
+    },
+}
+
+pub trait Consumer<'dp, T: Send, D>: 'dp {
+    /// the given receiver sends the items to be consumed
+    fn start_consumer(self: Box<Self>, _: Receiver<T>)
+        -> ConsumerResultFut<'dp, ConsumerResult<D>>;
+}
+
+pub enum StreamMessage<T> {
+    Item(T),
+    /// Stream is completed but there was an error that was a fatal error
+    CompletedError(Box<dyn Error + Sync + Send>),
+    /// When converting from a Producer there tokio::spawn is called and if there is a
+    /// JoinError which is caused by a panic, this is returned
+    JoinError {
+        error: JoinError,
+        message: String,
+    },
+}
+pub fn producer_stream<I, T>(producer: I) -> impl Stream<Item = StreamMessage<T>>
 where
     T: 'static + Sync + Send,
-    I: DataProducer<'static, T> + Sync + Send,
+    I: Producer<'static, T> + Sync + Send,
 {
     use async_stream::stream;
     use tokio::sync::mpsc::channel;
     let (tx, rx): (Sender<T>, _) = channel(1);
-    let jh: JoinHandle<()> = tokio::spawn(async move {
+    let jh: JoinHandle<Result<(), BoxDynError>> = tokio::spawn(async move {
         match Box::new(producer).start_producer(tx).await {
-            Err(_e) => (),
-            Ok(_) => (),
+            Ok(_) => Ok(()),
+            Err(other) => Err(other as Box<dyn Error + Send + Sync>),
         }
     });
     stream! {
@@ -52,11 +79,21 @@ where
         pin_mut!(jh);
         loop {
             match rx.recv().await {
-                Some(item) => yield item,
+                Some(item) => yield StreamMessage::Item(item),
                 None => break,
             }
         }
-        jh.await.unwrap();
+        match jh.await {
+            Ok(Ok(_)) => {
+                log::info!("ProducerStream finished successfully");
+            },
+            Ok(Err(s)) => yield StreamMessage::CompletedError(s),
+            Err(je) => {
+                log::error!("FAILED joining on producer: {}", &je);
+                yield StreamMessage::JoinError { error: je, message: "Failed joining on producer JoinHandle".into() };
+            }
+        };
+        drop(rx);
     }
 }
 
@@ -76,7 +113,7 @@ fn crazy_stream<T: Clone>(max: usize, item: T) -> impl Stream<Item = T> {
 }
 
 pub struct ProducerStreamBuilder<'dp, T> {
-    stream: Pin<Box<dyn Stream<Item = T> + 'dp + Send + Sync>>,
+    stream: Pin<Box<dyn Stream<Item = StreamMessage<T>> + 'dp + Send + Sync>>,
 }
 
 impl<'dp, T> ProducerStreamBuilder<'dp, T>
@@ -87,68 +124,33 @@ where
     where
         Q: 'dp + Stream<Item = T> + Unpin + Sync + Send,
     {
+        let s = stream.map(|m| StreamMessage::Item(m));
         Self {
-            stream: Box::pin(stream),
+            stream: Box::pin(s),
         }
     }
 
-    pub fn from_producer<I>(d: I) -> Self
+    pub fn producer_to_stream<I>(d: I) -> impl Stream<Item = StreamMessage<T>>
     where
         T: 'static + Sync + Send,
-        I: DataProducer<'static, T> + Sync + Send,
-    {
-        Self {
-            stream: Box::pin(producer_stream(d)),
-        }
-    }
-
-    pub fn producer_to_stream<I>(d: I) -> impl Stream<Item = T>
-    where
-        T: 'static + Sync + Send,
-        I: DataProducer<'static, T> + Sync + Send,
+        I: Producer<'static, T> + Sync + Send,
     {
         producer_stream(d)
     }
 
-    // can't get around from having to return JoinHandle
-    // not sure if I like this, it ends up requiring quite a few extra bounds to error
-    // would likely nneed to actually implement the Stream trait that would await on the join
-    // handle in the end
-    /*
-    pub fn from_data_producer<I>(
-        producer: I,
-    ) -> (
-        JoinHandle<Result<(), Box<dyn Error + Send>>>,
-        Self,
-    )
+    pub fn into_stream(self) -> impl Stream<Item = StreamMessage<T>> + 'dp
     where
-        T: 'static + Sync + Send + Debug,
-        I: DataProducer<'static, T> + Sync + Send,
+        T: 'dp,
     {
-        use tokio::sync::mpsc::channel;
-        use tokio_stream::wrappers::ReceiverStream;
-        let (tx, rx): (Sender<T>, _) = channel(1);
-        let jh = tokio::spawn(async move {
-            match Box::new(producer).start_producer(tx).await {
-                Err(e) => Err(e),
-                Ok(_) => Ok(()),
-            }
-        });
-        (
-            jh,
-            Self {
-                stream: Box::pin(ReceiverStream::new(rx)),
-            },
-        )
+        self.stream
     }
-    */
 
     pub fn boxed(self) -> Box<Self> {
         Box::new(self)
     }
 }
 
-impl<'dp, T> DataProducer<'dp, T> for ProducerStreamBuilder<'dp, T>
+impl<'dp, T> Producer<'dp, T> for ProducerStreamBuilder<'dp, T>
 where
     T: 'dp + Sync + Send + Debug,
 {
@@ -156,10 +158,20 @@ where
         let mut stream = self.stream;
         Box::pin(async move {
             while let Some(item) = StreamExt::next(&mut stream.as_mut()).await {
-                match tx.send(item).await {
-                    Ok(_) => {}
-                    Err(send_err) => {
-                        return Err(Box::new(send_err) as Box<dyn Error>);
+                match item {
+                    StreamMessage::Item(item) => match tx.send(item).await {
+                        Ok(_) => {}
+                        Err(send_err) => {
+                            return Err(Box::new(send_err) as Box<dyn Error + Send + Sync>);
+                        }
+                    },
+                    StreamMessage::CompletedError(er) => {
+                        log::error!("Stream completed with error: {}", er);
+                        return Err(er);
+                    }
+                    StreamMessage::JoinError { error: er, message } => {
+                        log::error!("Fatal JoinError: {}", &message);
+                        return Err(Box::new(er));
                     }
                 }
             }
@@ -170,7 +182,7 @@ where
 
 /*
 // can't do both, this conflicts with the Stream implementation
-impl<'dp, 'item: 'dp, T, Q> DataProducer<'dp, 'item, T> for Q
+impl<'dp, 'item: 'dp, T, Q> Producer<'dp, 'item, T> for Q
 where
     T: 'item + Sync + Send + Debug,
     Q: 'dp + std::iter::Iterator<Item = T>,
@@ -188,7 +200,7 @@ where
 }
 */
 
-impl<'dp, T, Q> DataProducer<'dp, T> for Q
+impl<'dp, T, Q> Producer<'dp, T> for Q
 where
     T: 'dp + Sync + Send + Debug,
     Q: 'dp + futures_core::stream::Stream<Item = T> + Unpin + Sync + Send,
@@ -202,7 +214,7 @@ where
                 match tx.send(item).await {
                     Ok(_) => {}
                     Err(send_err) => {
-                        return Err(Box::new(send_err) as Box<dyn Error>);
+                        return Err(Box::new(send_err) as Box<dyn Error + Send + Sync>);
                     }
                 }
             }
@@ -211,29 +223,40 @@ where
     }
 }
 
-impl<'dc, T> DataConsumer<'dc, T> for Vec<T>
+impl<'dc, T> Consumer<'dc, T, Vec<T>> for Vec<T>
 where
     T: 'dc + Sync + Send + Debug,
 {
     fn start_consumer(
         self: Box<Self>,
         mut rx: Receiver<T>,
-    ) -> ConsumerResultFut<'dc, DataSourceDetails> {
+    ) -> ConsumerResultFut<'dc, ConsumerResult<Vec<T>>> {
         Box::pin(async move {
             let mut items = Vec::new();
+            let num_errors = 0;
+            let mut num_read = 0;
             while let Some(i) = rx.recv().await {
+                log::info!("Vec<T> - {:?}", &i);
+                num_read += 1;
                 items.push(i);
             }
-            Ok(DataSourceDetails::Empty)
+            Ok(ConsumerResult::WithData {
+                data: items,
+                details: ConsumerResultDetails {
+                    num_errors,
+                    num_read,
+                },
+            })
         })
     }
 }
 
-pub async fn run_data_stream<'a, T, I, O>(input: I, output: O) -> ()
+pub async fn run_data_stream<'a, T, I, O, DATA>(input: I, output: O) -> ConsumerResult<DATA>
 where
     T: 'static + Sync + Send + Debug,
-    I: DataProducer<'a, T>,
-    O: DataConsumer<'a, T> + 'static + Send + Sync,
+    I: Producer<'a, T>,
+    DATA: 'static + Send,
+    O: Consumer<'a, T, DATA> + 'static + Send + Sync,
 {
     use tokio::sync::mpsc::channel;
     //use tokio::sync::mpsc::error::SendError;
@@ -242,15 +265,19 @@ where
     let jh = tokio::spawn(async move {
         match Box::new(output).start_consumer(rx).await {
             Err(e) => Err(e),
-            Ok(_) => Ok(()),
+            Ok(r) => Ok(r),
         }
     });
     Box::new(input).start_producer(tx).await.unwrap();
     match jh.await {
-        Ok(Ok(_details)) => {}
-        Ok(Err(_other_fatal_error)) => {}
-        Err(_join_err) => {}
-    };
+        Ok(Ok(_details)) => _details,
+        Ok(Err(_other_fatal_error)) => {
+            panic!("run_data_stream encountered an error");
+        }
+        Err(_join_err) => {
+            panic!("run_data_stream encountered a JoinError");
+        }
+    }
 }
 
 pub async fn test_run_data_stream() {

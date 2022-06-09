@@ -1,7 +1,7 @@
 use super::*;
 
 pub struct JsonDecoder {}
-use crate::transformer::{ TransformFunc, TransformSource };
+use crate::transformer::{ TransformerFut, TransformFunc, TransformSource };
 
 impl JsonDecoder {
     pub fn new<T>(source: Box<dyn DataSource<Bytes>>) -> Box<dyn DataSource<T>>
@@ -42,6 +42,37 @@ impl JsonDecoder {
                 }),
             }
         }))
+    }
+
+    pub fn from_bytes_transformer<O>() -> impl for<'tr> TransformerFut<'tr, Bytes, O>
+    where
+        O: Send + Sync + DeserializeOwned + 'static,
+    {
+        TransformFunc::new(|content: Bytes| {
+            let c = content.to_vec();
+            match serde_json::from_slice::<O>(&c) {
+                Ok(r) => Ok(r),
+                Err(er) => Err(DataStoreError::Deserialize {
+                    message: er.to_string(),
+                    attempted_string: String::from_utf8_lossy(&c).into(),
+                }),
+            }
+        })
+    }
+
+    pub fn from_string_transformer<O>() -> impl for<'tr> TransformerFut<'tr, String, O>
+    where
+        O: Send + Sync + DeserializeOwned + 'static,
+    {
+        TransformFunc::new(|content: String| {
+            match serde_json::from_str::<O>(&content) {
+                Ok(r) => Ok(r),
+                Err(er) => Err(DataStoreError::Deserialize {
+                    message: er.to_string(),
+                    attempted_string: "".into(),
+                }),
+            }
+        })
     }
 }
 

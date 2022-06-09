@@ -70,7 +70,6 @@ impl DataSource<'_, Bytes> for LocalFs {
 
     fn start_stream(self: Box<Self>) -> Result<DataSourceTask<Bytes>, DataStoreError> {
         use tokio::fs::File;
-        use tokio::fs::{read_dir, ReadDir};
         use tokio::io::{AsyncBufReadExt, BufReader};
         use tokio::sync::mpsc::channel;
         let (tx, rx) = channel(1);
@@ -265,5 +264,53 @@ impl DataOutput<'_, Bytes> for LocalFs {
             })
         });
         Ok((tx, jh))
+    }
+}
+
+use crate::streams::*;
+use tokio::sync::mpsc::Sender;
+impl<'p> Producer<'p, Bytes> for LocalFs {
+    fn start_producer(
+        self: Box<Self>,
+        tx: Sender<Bytes>,
+    ) -> ProducerResultFut<'p, DataSourceDetails> {
+        use tokio::fs::File;
+        use tokio::io::{AsyncBufReadExt, BufReader};
+        let home = self.home.clone();
+
+        let files = if self.files.len() > 0 {
+            self.files.clone()
+        } else {
+            log::warn!("Note scanning files is a blocking operation");
+            match LocalFs::walk_dir_sync(home.clone()) {
+                Ok(files) => files,
+                Err(e) => {
+                    log::error!("Encountered an error and not returning any files: {}",e);
+                    vec![]
+                }
+            }
+        };
+        Box::pin(async move {
+            let mut lines_scanned = 0_usize;
+            for fname in files {
+                //TODO: instead of failing, should forward an enum of lines possibly
+                //like Item::Ok(line), Item::ErrorOpeningFile(path)
+                let file = File::open(Path::new(&home).join(&fname))
+                    .await
+                    .map_err(|e| DataStoreError::FatalIO(format!("Could not open file: {}", e)))?;
+                // 68 mb in size
+                let mut lines = BufReader::with_capacity(1 << 26, file).lines();
+                loop {
+                    if let Some(line) = lines.next_line().await? {
+                        lines_scanned += 1;
+                        log::debug!("{}", &line);
+                        tx.send(Bytes::from(line)).await?;
+                    } else {
+                        break;
+                    }
+                }
+            }
+            Ok(DataSourceDetails::Basic { lines_scanned })
+        })
     }
 }
