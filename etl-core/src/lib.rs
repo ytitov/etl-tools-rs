@@ -36,6 +36,7 @@ pub mod deps {
     pub use bytes;
     pub use futures_core;
     pub use chrono;
+    pub use tokio_stream;
 }
 /// Perform joins between two [crate::datastore::DataSource]s
 pub mod joins;

@@ -14,10 +14,10 @@ use tokio_stream::StreamExt;
 use tonic::Streaming;
 
 /// run the data fed to this into a grpc service, and results are written to the given output
-pub struct GrpcTransformerClient<O> {
+pub struct GrpcTransformerClient<'a, O> {
     //pub input: Box<dyn DataSource<I>>,
     /// final output of the transformation goes here
-    pub result_output: Box<dyn DataOutput<O>>,
+    pub result_output: Box<dyn DataOutput<'a, O>>,
     //pub p: PhantomData<O>,
 }
 
@@ -106,7 +106,7 @@ fn create_stream(
     )
 }
 
-impl DataOutput<String> for GrpcTransformerClient<String> {
+impl<'a> DataOutput<'a, String> for GrpcTransformerClient<'a, String> {
     fn start_stream(self: Box<Self>) -> Result<DataOutputTask<String>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         let source_name = String::from("GrpcTransformDataSource");

@@ -44,7 +44,7 @@ impl JsonDecoder {
         }))
     }
 
-    pub fn from_bytes_transformer<O>() -> impl for<'tr> TransformerFut<'tr, Bytes, O>
+    pub fn from_bytes_transformer<O>() -> impl TransformerFut<Bytes, O>
     where
         O: Send + Sync + DeserializeOwned + 'static,
     {
@@ -60,7 +60,7 @@ impl JsonDecoder {
         })
     }
 
-    pub fn from_string_transformer<O>() -> impl for<'tr> TransformerFut<'tr, String, O>
+    pub fn from_string_transformer<O>() -> impl TransformerFut<String, O>
     where
         O: Send + Sync + DeserializeOwned + 'static,
     {

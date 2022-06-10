@@ -3,8 +3,8 @@ use crate::proto::etl_grpc::simplestore::bytes_store::{
     LoadRequest, LoadResponse, ObserveAllRequest, ObserveKeyRequest, WriteRequest, WriteResponse,
 };
 use etl_core::datastore::error::DataStoreError;
-use etl_core::datastore::simple::QueryableStore;
-use etl_core::datastore::simple::SimpleStore;
+use etl_core::keystore::simple::QueryableStore;
+use etl_core::keystore::simple::SimpleStore;
 use etl_core::deps::async_trait;
 use etl_core::deps::bytes::Bytes;
 use std::borrow::BorrowMut;

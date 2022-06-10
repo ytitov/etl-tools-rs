@@ -4,7 +4,7 @@ use crate::transformer::*;
 pub struct TransformStream<'a, I, O> {
     input: Box<dyn DataSource<'a, I>>,
     output: Box<dyn DataOutput<'a, O>>,
-    transformer: Box<dyn TransformerFut<'a, I, O>>,
+    transformer: Box<dyn TransformerFut<I, O>>,
 }
 
 impl<'a, I, O> TransformStream<'a, I, O>
@@ -16,7 +16,7 @@ where
     where
         DS: DataSource<'a, I>,
         DO: DataOutput<'a, O>,
-        TR: TransformerFut<'a, I, O>,
+        TR: 'static + TransformerFut<I, O>,
     {
         Self {
             input: Box::new(i),

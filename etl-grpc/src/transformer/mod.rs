@@ -1,27 +1,25 @@
 /// implements the grpc client which talks to a grpc server which implements the
 /// Transformer service proto rpc
 pub mod client;
-//use crate::proto::etl_grpc::basetypes::ds_error::GrpcDataStoreError;
 use crate::proto::etl_grpc::transformers::transform::{
     transformer_client::TransformerClient, TransformPayload, TransformResponse,
 };
 use etl_core::datastore::error::DataStoreError;
-//use etl_core::datastore::BoxedDataSource;
-//use etl_core::datastore::DataOutputStats;
 use etl_core::datastore::*;
 use etl_core::deps::serde::{Deserialize, Serialize};
-use etl_core::deps::serde_json;
-use std::fmt::Debug;
-use tonic::transport::Channel;
-
-//use tokio::sync::oneshot::{Receiver as OneShotRx, Sender as OneShotTx};
-
 use etl_core::transformer::Transformer;
+use etl_core::transformer::TransformerFut;
+use etl_core::{deps::bytes::Bytes, deps::serde_json};
+use std::fmt::Debug;
+use std::future::Future;
+use std::pin::Pin;
+use tonic::transport::Channel;
+use futures::future::BoxFuture;
+
 pub struct GrpcStringTransform {
     pub grpc_client: TransformerClient<Channel>,
 }
 
-use std::future::Future;
 impl<'a> GrpcStringTransform {
     pub fn new_transformer(
         url: &str,
@@ -38,6 +36,56 @@ impl<'a> GrpcStringTransform {
                 })?,
             }) as Box<dyn Transformer<'a, String, String>>)
         }
+    }
+}
+
+impl<'a> TransformerFut<'static, Bytes, Bytes> for GrpcStringTransform {
+    fn transform(
+        &mut self,
+        b: Bytes,
+    //) -> Pin<Box<dyn Future<Output = Result<Bytes, DataStoreError>> + 'a + Send + Sync>> {
+    ) -> BoxFuture<'a, Result<Bytes, DataStoreError>> {
+        let request = tonic::Request::new(TransformPayload {
+            bytes_content: Some(b.to_vec()),
+            ..Default::default()
+        });
+        let fut = self.grpc_client.transform(request);
+        Box::pin(async move {
+            fut.await.unwrap();
+            Ok(b)
+            /*
+            match fut.await {
+                Ok(res) => match res.into_inner() {
+                    TransformResponse {
+                        result:
+                            Some(TransformPayload {
+                                string_content: str_cont,
+                                bytes_content: b_cont,
+                                json_string_content: json_cont,
+                            }),
+                        ..
+                    } => match (str_cont, b_cont, json_cont) {
+                        (Some(str_cont), None, None) => Ok(Bytes::from(str_cont)),
+                        (None, Some(b_cont), None) => Ok(Bytes::from(b_cont)),
+                        (None, None, Some(json_cont)) => Ok(Bytes::from(json_cont)),
+                        _ => panic!("Got a completely empty from server"),
+                    },
+                    TransformResponse {
+                        result: None,
+                        error: Some(grpc_ds_err),
+                    } => Err(DataStoreError::FatalIO(
+                        "Could not reply to datasource".into(),
+                    )),
+                    _other => Err(DataStoreError::FatalIO(
+                        "Could not reply to datasource".into(),
+                    )),
+                },
+                Err(status) => {
+                    panic!("error status is not handled")
+                }
+            }
+            */
+        })
     }
 }
 
@@ -92,13 +140,13 @@ impl<'a> Transformer<'a, String, String> for GrpcStringTransform {
 /// The issue is, this doesn't follow the usual pattern, so TODO: is
 /// create a transformer which accepts a DataSource<I> and creates a DataSource<O>.  Finally create
 /// a Transformer<I,O> trait similar to how SimpleStore functions
-pub struct GrpcTransformerClient<I, O> {
+pub struct GrpcTransformerClient<'a, I, O> {
     pub grpc_client: TransformerClient<Channel>,
-    pub source: Box<dyn DataSource<(I, CallbackTx<O>)>>,
+    pub source: Box<dyn DataSource<'a, (I, CallbackTx<O>)>>,
 }
 
 // should add serde traits to this
-impl<I, O> DataSource<O> for GrpcTransformerClient<I, O>
+impl<'a, I, O> DataSource<'a, O> for GrpcTransformerClient<'a, I, O>
 where
     I: 'static + Debug + Send + Serialize,
     for<'de> O: 'static + Debug + Send + Deserialize<'de>,

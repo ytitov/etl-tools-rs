@@ -11,7 +11,7 @@ pub struct SplitStreams<'a, I, L, R, LDATA, RDATA> {
     //producer: Box<dyn Producer<'a, I> + Send>,
     consumer_left: Box<dyn Consumer<'a, L, LDATA> + Send + Sync>,
     consumer_right: Box<dyn Consumer<'a, R, RDATA> + Send + Sync>,
-    transformer: Box<dyn TransformerFut<'a, I, SelectStream<L, R>>>,
+    transformer: Box<dyn TransformerFut<I, SelectStream<L, R>>>,
 }
 
 impl<'a, I, L, R, LDATA, RDATA> SplitStreams<'a, I, L, R, LDATA, RDATA>
@@ -26,7 +26,7 @@ where
     where
         LC: Consumer<'a, L, LDATA> + Send + Sync,
         RC: Consumer<'a, R, RDATA> + Send + Sync,
-        TR: TransformerFut<'a, I, SelectStream<L,R>>,
+        TR: TransformerFut<I, SelectStream<L, R>> + 'static,
     {
         Self {
             consumer_left: Box::new(left),
@@ -48,7 +48,8 @@ where
     fn start_consumer(
         self: Box<Self>,
         mut rx: Receiver<I>,
-    ) -> ConsumerResultFut<'static, ConsumerResult<(ConsumerResult<LDATA>, ConsumerResult<RDATA>)>> {
+    ) -> ConsumerResultFut<'static, ConsumerResult<(ConsumerResult<LDATA>, ConsumerResult<RDATA>)>>
+    {
         let (left_tx, left_rx): (Sender<L>, _) = channel(1);
         let (right_tx, right_rx): (Sender<R>, _) = channel(1);
         let mut t = self.transformer;

@@ -559,7 +559,7 @@ impl JobRunner {
     pub fn run_transform_stream_2<'a, I, O>(
         mut self,
         stream_name: String,
-        mut transformer: Box<dyn TransformerFut<'a, I, O>>,
+        mut transformer: Box<dyn TransformerFut< I, O>>,
         input: Box<dyn DataSource<'a, I>>,
         output: Box<dyn DataOutput<'a, O>>,
         //) -> Result<Self, JobRunnerError>

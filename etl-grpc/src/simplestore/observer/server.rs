@@ -6,7 +6,7 @@ use crate::proto::etl_grpc::simplestore::bytes_store::{
 };
 use crate::simplestore::observer::SimpleStoreEvent;
 use etl_core::datastore::error::DataStoreError;
-use etl_core::datastore::simple::SimpleStore;
+use etl_core::keystore::simple::SimpleStore;
 use etl_core::deps::bytes::Bytes;
 use futures::Stream;
 use std::pin::Pin;

@@ -9,5 +9,8 @@ members = [
     "etl-grpc",
     "etl-dev-client-viewer",
     "etl-web",
+    "mllp",
+    "hl7-mllp-codec",
 		#"etl-examples",
 ]
+

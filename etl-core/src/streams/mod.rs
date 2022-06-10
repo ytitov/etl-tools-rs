@@ -7,23 +7,27 @@ use futures_util::pin_mut;
 use log;
 use std::error::Error;
 use std::fmt::Debug;
-use std::future::Future;
+//use std::future::Future;
 use std::pin::Pin;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinError;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
+use futures::future::BoxFuture;
 
 pub mod transformer;
 pub mod split;
 
 pub type BoxDynError = Box<dyn Error + 'static + Send + Sync>;
 
-pub type ProducerResultFut<'a, O> =
-    Pin<Box<dyn Future<Output = Result<O, Box<dyn Error + 'a + Send + Sync>>> + 'a + Send + Sync>>;
+pub type ProducerResultFut<'a, O> = BoxFuture<'a, Result<O,Box<dyn Error + 'a + Send + Sync>>>;
+    //Pin<Box<dyn Future<Output = Result<O, Box<dyn Error + 'a + Send + Sync>>> + 'a + Send + Sync>>;
 
+/*
 pub type ConsumerResultFut<'a, O> =
     Pin<Box<dyn Future<Output = Result<O, Box<dyn Error + Send + Sync>>> + 'a + Send + Sync>>;
+*/
+pub type ConsumerResultFut<'a, O> = BoxFuture<'a, Result<O,Box<dyn Error + 'a + Send + Sync>>>;
 
 pub trait Producer<'dp, T: Send>: 'dp {
     /// the given sender gets the items produced
@@ -262,7 +266,7 @@ where
     T: 'static + Sync + Send + Debug,
     I: Producer<'a, T>,
     DATA: 'static + Send,
-    O: Consumer<'a, T, DATA> + 'static + Send + Sync,
+    O: Consumer<'static, T, DATA> + Send + Sync,
 {
     use tokio::sync::mpsc::channel;
     //use tokio::sync::mpsc::error::SendError;
