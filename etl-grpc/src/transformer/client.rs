@@ -106,7 +106,7 @@ fn create_stream(
     )
 }
 
-impl<'a> DataOutput<'a, String> for GrpcTransformerClient<'a, String> {
+impl<'a> DataOutput<'a, String> for GrpcTransformerClient<'static, String> {
     fn start_stream(self: Box<Self>) -> Result<DataOutputTask<String>, DataStoreError> {
         use tokio::sync::mpsc::channel;
         let source_name = String::from("GrpcTransformDataSource");

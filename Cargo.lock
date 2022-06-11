@@ -1725,6 +1725,7 @@ name = "mllp"
 version = "0.1.0"
 dependencies = [
  "etl-core",
+ "etl-grpc",
  "futures",
  "hl7-mllp-codec",
  "simple_logger",

@@ -65,8 +65,8 @@ where
                     // _details
                     return Ok(_details);
                 }
-                Ok(Err(_other_fatal_error)) => {
-                    panic!("run_data_stream encountered an error");
+                Ok(Err(err)) => {
+                    return Err(err as BoxDynError);
                 }
                 Err(_join_err) => {
                     panic!("run_data_stream encountered a JoinError");

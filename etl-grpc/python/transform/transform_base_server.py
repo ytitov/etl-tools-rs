@@ -17,11 +17,17 @@ class StringTransform:
     async def transform(self, payload: str, ctx) -> str:
         raise NotImplementedError("Default StringHandler")
 
+class BytesTransform:
+    async def transform(self, payload: bytes, ctx) -> bytes:
+        raise NotImplementedError("Default BytesHandler")
+
 class TransformerServicer(transform_grpc.TransformerServicer):
     enable_reflection = False
 
-    def __init__(self, string_transform = StringTransform()) -> None:
+    def __init__(self, string_transform = StringTransform(), \
+            bytes_transform = BytesTransform()) -> None:
         self.string_transform = string_transform
+        self.bytes_transform = bytes_transform
 
     def set_enable_reflection(self, en: bool):
         self.enable_reflection = en
@@ -30,11 +36,20 @@ class TransformerServicer(transform_grpc.TransformerServicer):
         return await self.transform_payload(r, ctx)
 
     async def transform_payload(self, req: TransformPayload, ctx):
+        print(req)
         try:
-            if req.string_content is not None:
+            if req.string_content is not None and len(req.string_content) > 0:
                 #result_str = asyncio.run(self.string_transform.transform(r.string_content, ctx))
                 result_str = await self.string_transform.transform(req.string_content, ctx)
+                print("============== GOT STRING =================")
                 return TransformResponse(result=TransformPayload(string_content=result_str))
+            elif req.bytes_content is not None:
+                print("============== GOT BYTES =================")
+                result_bytes = await self.bytes_transform.transform(req.bytes_content, ctx)
+                return TransformResponse(result=TransformPayload(bytes_content=result_bytes))
+            else:
+                print("============== NOT HANDLED =================")
+                raise NotImplementedError
         except NotImplementedError as ni:
             logging.error("NotImplementedError")
             raise ni

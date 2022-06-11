@@ -8,16 +8,23 @@ use etl_core::datastore::error::DataStoreError;
 use etl_core::datastore::*;
 use etl_core::deps::serde::{Deserialize, Serialize};
 use etl_core::transformer::Transformer;
+use etl_core::transformer::TransformerBuilder;
 use etl_core::transformer::TransformerFut;
 use etl_core::{deps::bytes::Bytes, deps::serde_json};
+use futures::future::BoxFuture;
 use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
 use tonic::transport::Channel;
-use futures::future::BoxFuture;
 
 pub struct GrpcStringTransform {
+    pub url: String,
     pub grpc_client: TransformerClient<Channel>,
+}
+
+pub struct GrpcBytesTransform {
+    pub url: String,
+    pub grpc_client: Option<TransformerClient<Channel>>,
 }
 
 impl<'a> GrpcStringTransform {
@@ -28,6 +35,7 @@ impl<'a> GrpcStringTransform {
         let url = url.to_string();
         async move {
             Ok(Box::new(GrpcStringTransform {
+                url: url.clone(),
                 grpc_client: TransformerClient::connect(url.clone()).await.map_err(|e| {
                     DataStoreError::transport(
                         format!("Could not connect to GrpcServer at {}", url),
@@ -39,52 +47,78 @@ impl<'a> GrpcStringTransform {
     }
 }
 
-impl<'a> TransformerFut<'static, Bytes, Bytes> for GrpcStringTransform {
-    fn transform(
-        &mut self,
-        b: Bytes,
-    //) -> Pin<Box<dyn Future<Output = Result<Bytes, DataStoreError>> + 'a + Send + Sync>> {
-    ) -> BoxFuture<'a, Result<Bytes, DataStoreError>> {
+impl<'a> GrpcBytesTransform {
+    pub fn new(url: &str) -> Self {
+        let url = url.to_string();
+        Self {
+            url,
+            grpc_client: None,
+        }
+    }
+}
+impl<'a> TransformerBuilder<'a, Bytes, Bytes> for GrpcBytesTransform {
+    fn build(&self) -> Box<dyn for<'b> TransformerFut<Bytes, Bytes>> {
+        Box::new(GrpcBytesTransform {
+            url: self.url.clone(),
+            grpc_client: None,
+        }) as Box<dyn TransformerFut<Bytes, Bytes>>
+    }
+}
+
+impl<'a> TransformerFut<Bytes, Bytes> for GrpcBytesTransform {
+    fn transform(&mut self, b: Bytes) -> BoxFuture<'_, Result<Bytes, DataStoreError>> {
         let request = tonic::Request::new(TransformPayload {
             bytes_content: Some(b.to_vec()),
             ..Default::default()
         });
-        let fut = self.grpc_client.transform(request);
+        let url = self.url.clone();
+        log::info!("Sending bytes to: {}", &url);
         Box::pin(async move {
-            fut.await.unwrap();
-            Ok(b)
-            /*
-            match fut.await {
-                Ok(res) => match res.into_inner() {
-                    TransformResponse {
-                        result:
-                            Some(TransformPayload {
-                                string_content: str_cont,
-                                bytes_content: b_cont,
-                                json_string_content: json_cont,
-                            }),
-                        ..
-                    } => match (str_cont, b_cont, json_cont) {
-                        (Some(str_cont), None, None) => Ok(Bytes::from(str_cont)),
-                        (None, Some(b_cont), None) => Ok(Bytes::from(b_cont)),
-                        (None, None, Some(json_cont)) => Ok(Bytes::from(json_cont)),
-                        _ => panic!("Got a completely empty from server"),
-                    },
-                    TransformResponse {
-                        result: None,
-                        error: Some(grpc_ds_err),
-                    } => Err(DataStoreError::FatalIO(
-                        "Could not reply to datasource".into(),
-                    )),
-                    _other => Err(DataStoreError::FatalIO(
-                        "Could not reply to datasource".into(),
-                    )),
-                },
-                Err(status) => {
-                    panic!("error status is not handled")
-                }
+            if self.grpc_client.is_none() {
+                self.grpc_client =
+                    Some(TransformerClient::connect(url.clone()).await.map_err(|e| {
+                        DataStoreError::transport(
+                            format!("Could not connect to GrpcServer at {}", url),
+                            e,
+                        )
+                    })?);
             }
-            */
+            if let Some(grpc_client) = &mut self.grpc_client {
+                let fut = grpc_client.transform(request);
+                match fut.await {
+                    Ok(res) => match res.into_inner() {
+                        TransformResponse {
+                            result:
+                                Some(TransformPayload {
+                                    string_content: str_cont,
+                                    bytes_content: b_cont,
+                                    json_string_content: json_cont,
+                                }),
+                            ..
+                        } => match (str_cont, b_cont, json_cont) {
+                            (Some(str_cont), None, None) => Ok(Bytes::from(str_cont)),
+                            (None, Some(b_cont), None) => Ok(Bytes::from(b_cont)),
+                            (None, None, Some(json_cont)) => Ok(Bytes::from(json_cont)),
+                            _ => panic!("Got a completely empty from server"),
+                        },
+                        TransformResponse {
+                            result: None,
+                            error: Some(grpc_ds_err),
+                        } => Err(DataStoreError::FatalIO(
+                            "Could not reply to datasource".into(),
+                        )),
+                        _other => Err(DataStoreError::FatalIO(
+                            "Could not reply to datasource".into(),
+                        )),
+                    },
+                    Err(status) => {
+                        log::error!("GrpcClient got: {}", status);
+                        Err(DataStoreError::FatalIO(format!("Error from server: {}",status)))
+                    }
+                }
+            } else {
+                panic!("should not be none");
+            }
         })
     }
 }
