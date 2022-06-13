@@ -41,14 +41,15 @@ class TransformerServicer(transform_grpc.TransformerServicer):
             if req.string_content is not None and len(req.string_content) > 0:
                 #result_str = asyncio.run(self.string_transform.transform(r.string_content, ctx))
                 result_str = await self.string_transform.transform(req.string_content, ctx)
-                print("============== GOT STRING =================")
+                #print("============== GOT STRING =================")
                 return TransformResponse(result=TransformPayload(string_content=result_str))
-            elif req.bytes_content is not None:
-                print("============== GOT BYTES =================")
+            elif req.bytes_content is not None and len(req.bytes_content) > 0:
+                #print("============== GOT BYTES =================")
                 result_bytes = await self.bytes_transform.transform(req.bytes_content, ctx)
                 return TransformResponse(result=TransformPayload(bytes_content=result_bytes))
             else:
-                print("============== NOT HANDLED =================")
+                #print("============== NOT HANDLED =================")
+                logging.error("Got something other than string_content or bytes_content")
                 raise NotImplementedError
         except NotImplementedError as ni:
             logging.error("NotImplementedError")
