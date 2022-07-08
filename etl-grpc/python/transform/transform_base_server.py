@@ -36,7 +36,6 @@ class TransformerServicer(transform_grpc.TransformerServicer):
         return await self.transform_payload(r, ctx)
 
     async def transform_payload(self, req: TransformPayload, ctx):
-        print(req)
         try:
             if req.string_content is not None and len(req.string_content) > 0:
                 #result_str = asyncio.run(self.string_transform.transform(r.string_content, ctx))

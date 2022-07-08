@@ -53,7 +53,83 @@ where
                                 tx.send(Ok(result)).await?;
                             }
                             Err(er) => {
-                                tx.send(Err(Box::new(er) as BoxDynError)).await?;
+                                //tx.send(Err(Box::new(er) as BoxDynError)).await?;
+                                tx.send(Err(er)).await?;
+                            }
+                        };
+                    }
+                    None => break,
+                }
+            }
+            match jh.await {
+                Ok(Ok(_details)) => {
+                    // _details
+                    return Ok(_details);
+                }
+                Ok(Err(err)) => {
+                    return Err(err as BoxDynError);
+                }
+                Err(_join_err) => {
+                    panic!("run_data_stream encountered a JoinError");
+                }
+            }
+        })
+    }
+}
+
+pub struct TransformConsumer<'a, I, O, Data> {
+    consumer: Box<dyn Consumer<'a, O, Data> + Send + Sync>,
+    transformer: Box<dyn TransformerFut<I, O>>,
+}
+
+impl<'a, I, O, Data> TransformConsumer<'a, I, O, Data>
+where
+    I: Send + Sync,
+    O: Send + Sync,
+{
+    pub fn new<C, TR>(i: C, t: TR) -> Self
+    where
+        C: Consumer<'a, O, Data> + Send + Sync,
+        TR: 'static + TransformerFut<I, O>,
+    {
+        Self {
+            consumer: Box::new(i),
+            transformer: Box::new(t),
+        }
+    }
+}
+
+impl<'a, I, O, Data> Consumer<'a, I, Data> for TransformConsumer<'static, I, O, Data>
+where
+    I: Send + Sync + 'static,
+    O: Send + Sync + 'static + Debug,
+    Data: 'static + Send,
+{
+    fn start_consumer(
+        self: Box<Self>,
+        mut rx: Receiver<I>,
+    ) -> ConsumerResultFut<'a, ConsumerResult<Data>> {
+        let (consumer_tx, consumer_rx): (Sender<O>, _) = channel(1);
+        let consumer = self.consumer;
+        let mut t = self.transformer;
+        let jh: JoinHandle<Result<_, BoxDynError>> = tokio::spawn(async move {
+            match Box::new(consumer).start_consumer(consumer_rx).await {
+                Ok(d) => Ok(d),
+                Err(other) => Err(other as Box<dyn Error + Send + Sync>),
+            }
+        });
+        Box::pin(async move {
+            loop {
+                match rx.recv().await {
+                    Some(item) => {
+                        match t.transform(item).await {
+                            Ok(result) => {
+                                consumer_tx.send(result).await?;
+                            }
+                            Err(er) => {
+                                return Err(er);
+                                //tx.send(Err(Box::new(er) as BoxDynError)).await?;
+                                //tx.send(Err(er)).await?;
                             }
                         };
                     }

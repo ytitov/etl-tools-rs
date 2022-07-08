@@ -20,10 +20,10 @@ impl JsonDecoder {
             let c = content.to_vec();
             match serde_json::from_slice::<O>(&c) {
                 Ok(r) => Ok(r),
-                Err(er) => Err(DataStoreError::Deserialize {
+                Err(er) => Err(Box::new(DataStoreError::Deserialize {
                     message: er.to_string(),
                     attempted_string: String::from_utf8_lossy(&c).into(),
-                }),
+                })),
             }
         }))
     }
@@ -36,10 +36,10 @@ impl JsonDecoder {
         TransformSource::new(source, TransformFunc::new(|content: String| {
             match serde_json::from_str::<O>(&content) {
                 Ok(r) => Ok(r),
-                Err(er) => Err(DataStoreError::Deserialize {
+                Err(er) => Err(Box::new(DataStoreError::Deserialize {
                     message: er.to_string(),
                     attempted_string: "".into(),
-                }),
+                })),
             }
         }))
     }
@@ -52,10 +52,10 @@ impl JsonDecoder {
             let c = content.to_vec();
             match serde_json::from_slice::<O>(&c) {
                 Ok(r) => Ok(r),
-                Err(er) => Err(DataStoreError::Deserialize {
+                Err(er) => Err(Box::new(DataStoreError::Deserialize {
                     message: er.to_string(),
                     attempted_string: String::from_utf8_lossy(&c).into(),
-                }),
+                })),
             }
         })
     }
@@ -67,10 +67,10 @@ impl JsonDecoder {
         TransformFunc::new(|content: String| {
             match serde_json::from_str::<O>(&content) {
                 Ok(r) => Ok(r),
-                Err(er) => Err(DataStoreError::Deserialize {
+                Err(er) => Err(Box::new(DataStoreError::Deserialize {
                     message: er.to_string(),
                     attempted_string: "".into(),
-                }),
+                })),
             }
         })
     }

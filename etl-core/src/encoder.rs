@@ -27,6 +27,31 @@ pub mod json {
         }
     }
 
+    /*
+    pub struct TransformConsumer<'a, I, O, Data> {
+        consumer: Box<dyn Consumer<'a, O, Data> + Send>,
+        transformer: Box<dyn TransformerFut<I, O>>,
+    }
+        */
+    use crate::streams::transformer::TransformConsumer;
+    use crate::streams::*;
+    use crate::transformer::TransformFunc;
+
+    /// Accepts any Consumer which can receive Bytes, then uses the Serialize trait to convert the
+    /// incoming data to Bytes
+    pub fn as_json_bytes_consumer<'a, I, C, Data>(
+        bytes_consumer: C,
+    ) -> TransformConsumer<'a, I, Bytes, Data>
+    where
+        C: Consumer<'a, Bytes, Data> + Send + Sync,
+        I: 'static + Send + Sync + Serialize,
+    {
+        TransformConsumer::new(
+            bytes_consumer,
+            TransformFunc::new(|incoming: I| Ok(Bytes::from(serde_json::to_vec(&incoming)?))),
+        )
+    }
+
     //impl<T: Serialize + Debug + Send + Sync + 'static> DataOutput<'_, T> for MockDataOutput {
     impl<'a, I> DataOutput<'a, I> for JsonEncoder<'a, I>
     where

@@ -7,6 +7,7 @@ use async_trait::async_trait;
 //use std::future::Future;
 use std::marker::PhantomData;
 //use std::pin::Pin;
+use crate::streams::BoxDynError;
 
 // the idea here is that transformer lives at least as long as the input
 pub struct TransformSource<'a, I, O> {
@@ -60,7 +61,7 @@ where
                                 .map_err(|er| DataStoreError::FatalIO(er.to_string()))?;
                             }
                             Err(er) => {
-                                tx.send(Err(er))
+                                tx.send(Err(DataStoreError::FatalIO(er.to_string())))
                                     .await
                                     .map_err(|er| DataStoreError::FatalIO(er.to_string()))?;
                             }
@@ -68,7 +69,8 @@ where
                     }
                     Some(Err(er)) => {
                         log::error!("TransformSource got an error from source: {}", er);
-                        tx.send(Err(er))
+                        //tx.send(Err(Box::new(er) as Box<dyn Error>))
+                        tx.send(Err(er.into()))
                             .await
                             .map_err(|er| DataStoreError::FatalIO(er.to_string()))?;
                     }
@@ -118,12 +120,13 @@ pub trait TransformerFut<I: Send, O: Send>: Sync + Send {
     fn transform(
         &mut self,
         _: I,
-    ) -> BoxFuture<'_, Result<O, DataStoreError>>;
+    //) -> BoxFuture<'_, Result<O, DataStoreError>>;
+    ) -> BoxFuture<'_, Result<O, BoxDynError>>;
 }
 
 pub struct TransformFunc<I, O, F>
 where
-    F: Fn(I) -> Result<O, DataStoreError>,
+    F: Fn(I) -> Result<O, BoxDynError>,
 {
     f: F,
     p: PhantomData<(I, O)>,
@@ -131,7 +134,7 @@ where
 
 impl<I, O, F> Clone for TransformFunc<I, O, F>
 where
-    F: Fn(I) -> Result<O, DataStoreError> + Clone + Send + Sync,
+    F: Fn(I) -> Result<O, BoxDynError> + Clone + Send + Sync,
 {
     fn clone(&self) -> Self {
         Self { f: Clone::clone(&self.f), p: self.p.clone() }
@@ -143,7 +146,7 @@ impl<I, O, F> TransformerBuilder<'static, I, O> for TransformFunc<I, O, F>
 where
     I: Send + 'static,
     O: Send + 'static,
-    F: Fn(I) -> Result<O, DataStoreError> + 'static + Clone + Send + Sync,
+    F: Fn(I) -> Result<O, BoxDynError> + 'static + Clone + Send + Sync,
     Self: TransformerFut<I, O>,
 {
     //fn build(&self) -> Self {
@@ -170,7 +173,7 @@ where
 
 impl<I, O, F> TransformFunc<I, O, F>
 where
-    F: Fn(I) -> Result<O, DataStoreError>,
+    F: Fn(I) -> Result<O, BoxDynError>,
 {
     pub fn new(f: F) -> Self {
         Self { p: PhantomData, f }
@@ -179,7 +182,7 @@ where
 
 impl<'a, F, I, O> TransformerFut<I, O> for TransformFunc<I, O, F>
 where
-    F: Fn(I) -> Result<O, DataStoreError> + 'a + Send + Sync,
+    F: Fn(I) -> Result<O, BoxDynError> + 'a + Send + Sync,
     I: 'a + Send + Sync,
     O: 'a + Send + Sync,
 {
@@ -187,7 +190,8 @@ where
         &mut self,
         input: I,
     //) -> Pin<Box<dyn Future<Output = Result<O, DataStoreError>> + Send + Sync + 'a>> {
-    ) -> BoxFuture<'_, Result<O, DataStoreError>> {
+    //) -> BoxFuture<'_, Result<O, DataStoreError>> {
+    ) -> BoxFuture<'_, Result<O, BoxDynError>> {
         let result = (self.f)(input);
         Box::pin(async { result })
     }
@@ -195,7 +199,7 @@ where
 
 pub struct TransformFuncIdx<I, O, F>
 where
-    F: Fn(usize, I) -> Result<O, DataStoreError>,
+    F: Fn(usize, I) -> Result<O, BoxDynError>,
 {
     f: F,
     idx: usize,
@@ -204,7 +208,7 @@ where
 
 impl<I, O, F> TransformFuncIdx<I, O, F>
 where
-    F: Fn(usize, I) -> Result<O, DataStoreError>,
+    F: Fn(usize, I) -> Result<O, BoxDynError>,
 {
     pub fn new(f: F) -> Self {
         Self {
@@ -217,7 +221,7 @@ where
 
 impl<'a, F, I, O> TransformerFut<I, O> for TransformFuncIdx<I, O, F>
 where
-    F: Fn(usize, I) -> Result<O, DataStoreError> + 'a + Send + Sync,
+    F: Fn(usize, I) -> Result<O, BoxDynError> + 'a + Send + Sync,
     I: 'a + Send + Sync,
     O: 'a + Send + Sync,
 {
@@ -225,7 +229,8 @@ where
         &mut self,
         input: I,
     //) -> Pin<Box<dyn Future<Output = Result<O, DataStoreError>> + Send + Sync + 'a>> {
-    ) -> BoxFuture<'_, Result<O, DataStoreError>> {
+    //) -> BoxFuture<'_, Result<O, DataStoreError>> {
+    ) -> BoxFuture<'_, Result<O, BoxDynError>> {
         let result = (self.f)(self.idx, input);
         self.idx += 1;
         Box::pin(async { result })
@@ -234,7 +239,7 @@ where
 
 impl<'a, F, I, O> TransformerFut<I, O> for F
 where
-    F: Fn(I) -> Result<O, DataStoreError> + 'a + Send + Sync,
+    F: Fn(I) -> Result<O, BoxDynError> + 'a + Send + Sync,
     I: 'a + Send + Sync,
     O: 'static + Send + Sync,
 {
@@ -242,7 +247,7 @@ where
         &mut self,
         input: I,
     //) -> Pin<Box<dyn Future<Output = Result<O, DataStoreError>> + Send + Sync + 'a>> {
-    ) -> BoxFuture<'_, Result<O, DataStoreError>> {
+    ) -> BoxFuture<'_, Result<O, BoxDynError>> {
         let result = (self)(input);
         Box::pin(async { result })
     }

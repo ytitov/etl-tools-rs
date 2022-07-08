@@ -1067,6 +1067,7 @@ pub enum JobRunnerAction {
 pub mod error {
     use super::*;
     use etl_core::deps::thiserror::{self, Error};
+    use std::error::Error;
     /// These are all fatal errors which can stop the execution of a pipeline defined by the
     /// JobRunner
     #[derive(Serialize, Error, Clone, Debug, PartialEq)]
@@ -1094,6 +1095,14 @@ pub mod error {
         /// Errors returned from DataSource or DataOutputs
         #[error("StreamError: {message}")]
         StreamError { message: String },
+    }
+
+    impl From<Box<dyn Error + Send + Sync>> for JobRunnerError {
+        fn from(er: Box<dyn Error + Send + Sync>) -> Self {
+            JobRunnerError::GenericError {
+                message: er.to_string(),
+            }
+        }
     }
 
     impl From<anyhow::Error> for JobRunnerError {

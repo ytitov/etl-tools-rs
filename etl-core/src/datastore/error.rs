@@ -1,5 +1,9 @@
 use super::*;
 use thiserror::Error;
+use tokio::task::JoinError;
+
+type DataOutputMessageSendError<T> = tokio::sync::mpsc::error::SendError<DataOutputMessage<T>>;
+
 #[derive(Error, Debug, Clone)]
 pub enum DataStoreError {
     #[error(
@@ -71,7 +75,6 @@ impl DataStoreError {
     }
 }
 
-use tokio::task::JoinError;
 impl From<JoinError> for DataStoreError {
     fn from(er: JoinError) -> Self {
         DataStoreError::JoinError(er.to_string())
@@ -104,8 +107,13 @@ impl From<serde_json::Error> for DataStoreError {
     }
 }
 */
+use std::error::Error;
+impl From<Box<dyn Error + Sync + Send>> for DataStoreError {
+    fn from(e: Box<dyn Error + Sync + Send>) -> Self {
+        DataStoreError::FatalIO(e.to_string()) 
+    }
+}
 
-type DataOutputMessageSendError<T> = tokio::sync::mpsc::error::SendError<DataOutputMessage<T>>;
 impl<T> From<DataOutputMessageSendError<T>> for DataStoreError 
 where T: Sync + Send
 {

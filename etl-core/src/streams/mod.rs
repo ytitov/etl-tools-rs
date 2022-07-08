@@ -2,32 +2,25 @@
 /// whole process.  Any "acceptable" errors must be sent through so they can be reported and
 /// handled by the appropriate streams like an error queue.
 use crate::datastore::*;
+use futures::future::BoxFuture;
 use futures_core::stream::Stream;
 use futures_util::pin_mut;
 use log;
 use std::error::Error;
 use std::fmt::Debug;
-//use std::future::Future;
 use std::pin::Pin;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinError;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
-use futures::future::BoxFuture;
 
-pub mod transformer;
 pub mod split;
+pub mod transformer;
 
 pub type BoxDynError = Box<dyn Error + 'static + Send + Sync>;
 
-pub type ProducerResultFut<'a, O> = BoxFuture<'a, Result<O,Box<dyn Error + 'a + Send + Sync>>>;
-    //Pin<Box<dyn Future<Output = Result<O, Box<dyn Error + 'a + Send + Sync>>> + 'a + Send + Sync>>;
-
-/*
-pub type ConsumerResultFut<'a, O> =
-    Pin<Box<dyn Future<Output = Result<O, Box<dyn Error + Send + Sync>>> + 'a + Send + Sync>>;
-*/
-pub type ConsumerResultFut<'a, O> = BoxFuture<'a, Result<O,Box<dyn Error + 'a + Send + Sync>>>;
+pub type ProducerResultFut<'a, O> = BoxFuture<'a, Result<O, Box<dyn Error + 'a + Send + Sync>>>;
+pub type ConsumerResultFut<'a, O> = BoxFuture<'a, Result<O, Box<dyn Error + 'a + Send + Sync>>>;
 
 pub trait Producer<'dp, T: Send>: 'dp {
     /// the given sender gets the items produced
@@ -48,7 +41,6 @@ pub enum ConsumerResult<D> {
         details: ConsumerResultDetails,
     },
 }
-
 
 pub trait Consumer<'dp, T: Send, D>: 'dp {
     /// the given receiver sends the items to be consumed

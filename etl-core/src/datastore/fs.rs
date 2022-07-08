@@ -285,7 +285,7 @@ impl<'p> Producer<'p, Bytes> for LocalFs {
             match LocalFs::walk_dir_sync(home.clone()) {
                 Ok(files) => files,
                 Err(e) => {
-                    log::error!("Encountered an error and not returning any files: {}",e);
+                    log::error!("Encountered an error and not returning any files: {}", e);
                     vec![]
                 }
             }
@@ -311,6 +311,74 @@ impl<'p> Producer<'p, Bytes> for LocalFs {
                 }
             }
             Ok(DataSourceDetails::Basic { lines_scanned })
+        })
+    }
+}
+
+pub struct LocalFsConsumerResultDetails {
+    pub home: String,
+    pub lines_written: usize,
+}
+use tokio::sync::mpsc::Receiver;
+//use crate::streams::*;
+impl<'c> Consumer<'c, Bytes, LocalFsConsumerResultDetails> for LocalFs {
+    fn start_consumer(
+        self: Box<Self>,
+        mut rx: Receiver<Bytes>,
+    ) -> ConsumerResultFut<'c, ConsumerResult<LocalFsConsumerResultDetails>> {
+        use tokio::fs::OpenOptions;
+        use tokio::io::AsyncWriteExt;
+        let filename = match self.output_name {
+            Some(n) => n,
+            None => "output".to_string(),
+        };
+        //let filepath = format!("{}/{}", &self.home, &filename);
+        let full_path = Path::new(&self.home).join(&filename);
+        log::info!("Writing to file {:?}", &full_path);
+        let self_home = self.home;
+        Box::pin(async move {
+            if let Some(parent_folder) = full_path.parent() {
+                tokio::fs::create_dir_all(parent_folder).await?;
+                log::info!("Writing to folder {:?}", &parent_folder);
+            } else {
+                tokio::fs::create_dir_all(Path::new(&self_home)).await?;
+                log::info!("Writing to folder {}", &self_home);
+            }
+            let mut file = OpenOptions::new()
+                .write(true)
+                .truncate(true)
+                .create(true)
+                .open(&full_path)
+                .await
+                .map_err(|e| {
+                    DataStoreError::FatalIO(format!(
+                    "LocalFs ran into an error trying to open the file: {:?} caused by error: {}",
+                    &full_path, e
+                ))
+                })?;
+            let mut num_lines_sent = 0_usize;
+            loop {
+                match rx.recv().await {
+                    Some(item) => {
+                        file.write_all(&item).await?;
+                        file.write_all("\n".as_bytes()).await?;
+                        num_lines_sent += 1;
+                    }
+                    None => {
+                        break;
+                    }
+                }
+            }
+            Ok(ConsumerResult::WithData {
+                data: LocalFsConsumerResultDetails { 
+                    home: self_home,
+                    lines_written: num_lines_sent,
+                },
+                details: ConsumerResultDetails {
+                    num_errors: 0,
+                    num_read: num_lines_sent,
+                },
+            })
         })
     }
 }

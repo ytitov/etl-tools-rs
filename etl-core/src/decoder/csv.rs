@@ -47,21 +47,29 @@ impl CsvDecoder {
                 let line = std::string::String::from_utf8_lossy(&*content).to_string();
                 if idx == 0 && has_headers {
                     let headers_str = std::string::String::from_utf8_lossy(&*content).to_string();
-                    let mut h = headers
-                        .lock()
-                        .map_err(|e| DataStoreError::FatalIO(e.to_string()))?;
-                    h.clear();
-                    h.push_str(&headers_str);
-                    drop(h);
+                    match headers.lock() {
+                        Ok(mut h) => {
+                            h.clear();
+                            h.push_str(&headers_str);
+                            drop(h);
+                        }
+                        Err(er) => {
+                            return Err(Box::new(DataStoreError::FatalIO(er.to_string())));
+                        }
+                    };
                 }
                 let data;
                 match has_headers {
                     true => {
-                        let h = headers
-                            .lock()
-                            .map_err(|e| DataStoreError::FatalIO(e.to_string()))?;
-                        data = format!("{}\n{}", h, line);
-                        drop(h);
+                        match headers.lock() {
+                            Ok(h) => {
+                                data = format!("{}\n{}", h, line);
+                                drop(h);
+                            }
+                            Err(er) => {
+                                return Err(Box::new(DataStoreError::FatalIO(er.to_string())));
+                            }
+                        };
                     }
                     false => {
                         data = line.to_string();
@@ -85,17 +93,17 @@ impl CsvDecoder {
                             return Ok(item);
                         }
                         Err(er) => {
-                            return Err(DataStoreError::Deserialize {
+                            return Err(Box::new(DataStoreError::Deserialize {
                                 message: er.to_string(),
                                 attempted_string: line.to_string(),
-                            });
+                            }));
                         }
                     },
                     None => {
-                        return Err(DataStoreError::Deserialize {
+                        return Err(Box::new(DataStoreError::Deserialize {
                             message: "Could not pull out a CSV object from the line".into(),
                             attempted_string: "".into(),
-                        });
+                        }));
                     }
                 }
             }),

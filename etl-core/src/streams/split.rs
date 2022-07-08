@@ -80,8 +80,7 @@ where
                         right_tx.send(r_item).await?;
                     }
                     Err(_er) => {
-                        //tx.send(Err(Box::new(er) as BoxDynError)).await?;
-                        return Err(Box::new(_er) as BoxDynError);
+                        return Err(_er);
                     }
                 };
             }

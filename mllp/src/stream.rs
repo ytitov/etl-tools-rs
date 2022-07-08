@@ -1,7 +1,9 @@
 use etl_core::datastore::error::DataStoreError;
 use etl_core::datastore::*;
-use etl_core::deps::bytes::{Bytes, BytesMut};
+use etl_core::deps::bytes::{BufMut, Bytes, BytesMut};
 use etl_core::deps::log;
+use etl_core::deps::serde::Deserialize;
+use etl_core::deps::serde_json;
 use etl_core::deps::tokio;
 use etl_core::deps::tokio::net::{lookup_host, TcpListener, TcpStream, ToSocketAddrs};
 use etl_core::deps::tokio::sync::mpsc::Sender;
@@ -10,14 +12,46 @@ use etl_core::streams::*;
 use etl_core::transformer::TransformerBuilder;
 use etl_core::transformer::TransformerFut;
 use futures::SinkExt;
+use hl7_mllp_codec::MllpCodec;
 use std::error::Error;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
+use etl_core::deps::serde_json::Value as JsonValue;
+use std::collections::HashMap;
 
-use hl7_mllp_codec::MllpCodec;
+#[derive(Deserialize, Debug)]
+#[serde(crate = "etl_core::deps::serde", rename_all = "camelCase")]
+pub struct AckResponse {
+    pub code: String,
+    pub msg: String,
+    #[serde(flatten)]
+    //pub fields: HashMap<String, JsonValue>,
+    pub fields: JsonValue,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(crate = "etl_core::deps::serde",untagged)]
+pub enum MllpResponse {
+    WithJson {
+        ack: AckResponse,
+        json_string: String,
+    },
+    Ack(AckResponse),
+    Raw(Bytes),
+}
+
+impl MllpResponse {
+    pub fn get_ack_bytes(&self) -> Bytes {
+        match self {
+            MllpResponse::WithJson { ack, .. } => Bytes::from(ack.msg.clone()),
+            MllpResponse::Ack(ack) => Bytes::from(ack.msg.clone()),
+            MllpResponse::Raw(b) => b.clone(),
+        }
+    }
+}
 
 pub struct MllpServer {
     server_addr: SocketAddr,
@@ -46,10 +80,10 @@ impl MllpServer {
 }
 
 #[allow(unreachable_code)]
-impl<'dp> Producer<'dp, Bytes> for MllpServer {
+impl<'dp> Producer<'dp, (Bytes, MllpResponse)> for MllpServer {
     fn start_producer(
         self: Box<Self>,
-        tx: Sender<Bytes>,
+        tx: Sender<(Bytes, MllpResponse)>,
     ) -> ProducerResultFut<'dp, DataSourceDetails> {
         let transformer = self.transformer;
         let server_addr = self.server_addr;
@@ -86,7 +120,7 @@ impl<'dp> Producer<'dp, Bytes> for MllpServer {
 async fn process(
     stream: TcpStream,
     mut t: Box<dyn TransformerFut<Bytes, Bytes>>,
-    tx: Sender<Bytes>,
+    tx: Sender<(Bytes, MllpResponse)>,
 ) -> Result<(), Box<dyn Error>>
 where
         //TR: TransformerFut<'static, Bytes, Bytes>,
@@ -107,29 +141,41 @@ where
                 //let nack_msg = BytesMut::from("\x15"); //<ACK> ascii char, simple ack
 
                 let bytes_incoming = Bytes::from(_message);
-                let ack_msg = match t.transform(bytes_incoming.clone()).await {
-                    Ok(ack_msg) => {
-                        log::info!("From transform: {:?}", &ack_msg);
-                        //let ack_msg = BytesMut::from(basic_ack); //<ACK> ascii char, simple ack
-                        //let ack_msg: Bytes = ack_msg.freeze();
-                        match tx.send(ack_msg.clone()).await {
+                match t.transform(bytes_incoming.clone()).await {
+                    Ok(reply_msg) => {
+                        log::info!("From transform: {:?}", &reply_msg);
+
+                        let (ack_msg, mllp_res) =
+                            match serde_json::from_slice::<MllpResponse>(&reply_msg) {
+                                Ok(res) => {
+                                    let mut buf = BytesMut::with_capacity(reply_msg.len());
+                                    buf.put(res.get_ack_bytes());
+                                    (buf, res)
+                                }
+                                _ => {
+                                    // if we can't deserialize, assuming the whole
+                                    // thing is an ack
+                                    let mut buf = BytesMut::with_capacity(reply_msg.len());
+                                    buf.put(reply_msg.clone());
+                                    (buf, MllpResponse::Raw(reply_msg))
+                                }
+                            };
+                        // reply with ack
+                        transport.send(ack_msg).await?;
+                        // forward the actual message downstream
+                        match tx.send((bytes_incoming, mllp_res)).await {
                             Ok(_) => {}
                             Err(e) => {
                                 log::error!("FATAL, downstream consumer must be down: {}; should reply with NACK here",e);
                             }
                         };
-                        use etl_core::deps::bytes::{BufMut, BytesMut};
-                        let mut buf = BytesMut::with_capacity(ack_msg.len());
-                        buf.put(ack_msg);
-                        buf
                     }
                     Err(e) => {
                         log::error!("Got error, should be replying with NACK message: {}", e);
                         let ack_msg = BytesMut::from(basic_ack); //<ACK> ascii char, simple ack
-                        ack_msg
+                        transport.send(ack_msg).await?;
                     }
                 };
-                transport.send(ack_msg).await?;
                 //println!("sent ack");
                 //println!("  ACK sent...");
             }

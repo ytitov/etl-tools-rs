@@ -16,6 +16,7 @@ use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
 use tonic::transport::Channel;
+use etl_core::streams::BoxDynError;
 
 pub struct GrpcStringTransform {
     pub url: String,
@@ -66,7 +67,7 @@ impl<'a> TransformerBuilder<'a, Bytes, Bytes> for GrpcBytesTransform {
 }
 
 impl<'a> TransformerFut<Bytes, Bytes> for GrpcBytesTransform {
-    fn transform(&mut self, b: Bytes) -> BoxFuture<'_, Result<Bytes, DataStoreError>> {
+    fn transform(&mut self, b: Bytes) -> BoxFuture<'_, Result<Bytes, BoxDynError>> {
         let request = tonic::Request::new(TransformPayload {
             bytes_content: Some(b.to_vec()),
             ..Default::default()
@@ -77,11 +78,12 @@ impl<'a> TransformerFut<Bytes, Bytes> for GrpcBytesTransform {
             if self.grpc_client.is_none() {
                 self.grpc_client =
                     Some(TransformerClient::connect(url.clone()).await.map_err(|e| {
-                        DataStoreError::transport(
+                        Box::new(DataStoreError::transport(
                             format!("Could not connect to GrpcServer at {}", url),
                             e,
-                        )
+                        )) as BoxDynError
                     })?);
+                    //Some(TransformerClient::connect(url.clone()).await?);
             }
             if let Some(grpc_client) = &mut self.grpc_client {
                 let fut = grpc_client.transform(request);
@@ -104,16 +106,16 @@ impl<'a> TransformerFut<Bytes, Bytes> for GrpcBytesTransform {
                         TransformResponse {
                             result: None,
                             error: Some(grpc_ds_err),
-                        } => Err(DataStoreError::FatalIO(
+                        } => Err(Box::new(DataStoreError::FatalIO(
                             "Could not reply to datasource".into(),
-                        )),
-                        _other => Err(DataStoreError::FatalIO(
+                        )) as BoxDynError),
+                        _other => Err(Box::new(DataStoreError::FatalIO(
                             "Could not reply to datasource".into(),
-                        )),
+                        )) as BoxDynError),
                     },
                     Err(status) => {
                         log::error!("GrpcClient got: {}", status);
-                        Err(DataStoreError::FatalIO(format!("Error from server: {}",status)))
+                        Err(Box::new(DataStoreError::FatalIO(format!("Error from server: {}",status))) as BoxDynError )
                     }
                 }
             } else {
