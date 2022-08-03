@@ -1,9 +1,9 @@
-use futures::future::BoxFuture;
 use crate::datastore::{
     error::DataStoreError, DataSource, DataSourceDetails, DataSourceJoinHandle, DataSourceMessage,
     DataSourceTask,
 };
 use async_trait::async_trait;
+use futures::future::BoxFuture;
 //use std::future::Future;
 use std::marker::PhantomData;
 //use std::pin::Pin;
@@ -120,7 +120,7 @@ pub trait TransformerFut<I: Send, O: Send>: Sync + Send {
     fn transform(
         &mut self,
         _: I,
-    //) -> BoxFuture<'_, Result<O, DataStoreError>>;
+        //) -> BoxFuture<'_, Result<O, DataStoreError>>;
     ) -> BoxFuture<'_, Result<O, BoxDynError>>;
 }
 
@@ -137,7 +137,10 @@ where
     F: Fn(I) -> Result<O, BoxDynError> + Clone + Send + Sync,
 {
     fn clone(&self) -> Self {
-        Self { f: Clone::clone(&self.f), p: self.p.clone() }
+        Self {
+            f: Clone::clone(&self.f),
+            p: self.p.clone(),
+        }
     }
 }
 
@@ -189,8 +192,8 @@ where
     fn transform(
         &mut self,
         input: I,
-    //) -> Pin<Box<dyn Future<Output = Result<O, DataStoreError>> + Send + Sync + 'a>> {
-    //) -> BoxFuture<'_, Result<O, DataStoreError>> {
+        //) -> Pin<Box<dyn Future<Output = Result<O, DataStoreError>> + Send + Sync + 'a>> {
+        //) -> BoxFuture<'_, Result<O, DataStoreError>> {
     ) -> BoxFuture<'_, Result<O, BoxDynError>> {
         let result = (self.f)(input);
         Box::pin(async { result })
@@ -228,8 +231,8 @@ where
     fn transform(
         &mut self,
         input: I,
-    //) -> Pin<Box<dyn Future<Output = Result<O, DataStoreError>> + Send + Sync + 'a>> {
-    //) -> BoxFuture<'_, Result<O, DataStoreError>> {
+        //) -> Pin<Box<dyn Future<Output = Result<O, DataStoreError>> + Send + Sync + 'a>> {
+        //) -> BoxFuture<'_, Result<O, DataStoreError>> {
     ) -> BoxFuture<'_, Result<O, BoxDynError>> {
         let result = (self.f)(self.idx, input);
         self.idx += 1;
@@ -246,7 +249,7 @@ where
     fn transform(
         &mut self,
         input: I,
-    //) -> Pin<Box<dyn Future<Output = Result<O, DataStoreError>> + Send + Sync + 'a>> {
+        //) -> Pin<Box<dyn Future<Output = Result<O, DataStoreError>> + Send + Sync + 'a>> {
     ) -> BoxFuture<'_, Result<O, BoxDynError>> {
         let result = (self)(input);
         Box::pin(async { result })

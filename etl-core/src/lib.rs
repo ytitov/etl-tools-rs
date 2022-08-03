@@ -25,6 +25,11 @@ pub mod preamble {
     //pub use crate::datastore::transform_store::TransformDataSource;
 }
 /// deps which are re-exported (and used in the core)
+/// ```rust
+/// fn run() -> true {
+///     false
+/// }
+/// ```
 pub mod deps {
     pub use anyhow;
     pub use async_trait::async_trait;
