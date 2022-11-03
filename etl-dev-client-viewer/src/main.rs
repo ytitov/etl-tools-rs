@@ -1,6 +1,8 @@
-use actix_web::{get, web, /*web::Data,*/ App, HttpServer, Responder};
+// https://ace.c9.io/#nav=embedding for code editing
+use actix_web::{get, web, /*web::Data,*/ App, HttpServer, HttpResponse, Responder};
+use actix_files::NamedFile;
 use etl_core::datastore::fs::LocalFs;
-use etl_core::datastore::simple::*;
+use etl_core::keystore::simple::*;
 use std::sync::Arc;
 
 #[get("/file/{key}")]
@@ -8,6 +10,7 @@ async fn greet(
     loader: web::Data<Arc<PairedDataStore<String, String>>>,
     name: web::Path<String>,
 ) -> impl Responder {
+    let html_str = include_str!("../html/viewer-page-template.html");
     /*
     if let Ok(files) = loader.load(&name).await {
         format!("Found! {name}!")
@@ -15,14 +18,30 @@ async fn greet(
         format!("Not found {name}!")
     }
     */
-    match loader.load(&name).await {
-        Ok(_r) => {
-            format!("Found! {name}!")
+    HttpResponse::Ok().content_type("text/html").body(match loader.load(&name).await {
+        Ok(DataPair { left: Some(left), right: Some(right) }) => {
+            html_str.replace("{{left-source}}", &left)
+                .replace("{{right-source}}", &right)
+        }
+        _ => {
+            format!("Error! {name} not all covered")
         }
         Err(e) => {
             format!("Error! {name} {e}")
         }
-    }
+    })
+}
+
+#[get("/assets/{p:.*}")]
+async fn serve_assets(
+    loader: web::Data<Arc<PairedDataStore<String, String>>>,
+    p: web::Path<String>,
+) -> impl Responder {
+    println!("Requested {p}");
+    let p_str = p.into_inner();
+    let p = format!("./assets/{p_str}");
+    println!("Retrieving {p}");
+    NamedFile::open_async(p).await
 }
 
 #[actix_web::main]
@@ -50,10 +69,13 @@ async fn main() -> std::io::Result<()> {
     let server = HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(loader.clone()))
+            .service(serve_assets)
             .service(greet)
     })
     .bind("localhost:8111")?
     .run();
+
+    println!("navigate to localhost:8111/file/[filename]");
 
     server.await
 }

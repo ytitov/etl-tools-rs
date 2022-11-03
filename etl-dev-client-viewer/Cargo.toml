@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 actix-web = "4"
+actix-files = "0.6.2"
 etl-core = { path = "../etl-core" }
 
 log = "0.4"
